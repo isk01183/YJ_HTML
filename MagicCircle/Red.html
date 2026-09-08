@@ -357,7 +357,7 @@
              - 숫자를 키울수록(예: 3 -> 10) 중앙에 가까워질 때 회전 속도가 
                훨씬 더 강력하고 역동적으로 빨라집니다.
              ================================================================= */
-          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 1);
+          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 5);
           const angularSpeed = baseAngularSpeed * speedMultiplier;
 
           const direction = 1; 
