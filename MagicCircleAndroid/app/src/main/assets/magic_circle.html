@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>마법진 + 내부 가속 회전 최적화</title>
+  <style>
+    :root {
+      --planet_rgb: 153, 153, 255;
+      --outer_ring_color: rgba(255, 170, 170, 0.8);
+      --outer_dash_color: rgba(255, 170, 170, 0.6);
+      --outer_rune_circle_color: rgba(255, 170, 170, 0.8);
+      --outer_rune_text_color: rgba(255, 170, 170, 0.9);
+      --mid_ring_solid_color: rgba(255, 170, 170, 0.7);
+      --mid_ring_dash_color: rgba(255, 170, 170, 0.7);
+      --inner_rune_circle_color: rgba(255, 170, 170, 0.7);
+      --inner_rune_text_color: rgba(255, 170, 170, 0.8);
+      --octagram_main_color: rgba(255, 170, 170, 0.5);
+      --octagram_sub_color: rgba(255, 170, 170, 0.35);
+      --center_dash_circle_color: rgba(255, 170, 170, 0.4);
+      --icosa_face_color: #ffaaaa;
+      --icosa_wire_color: #ffaaaa;
+    }
+
+    html {
+        background-color : rgba(169, 179, 136, 1);
+    }
+
+    body {
+      margin: 0;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%; 
+      height: 100vh;
+      overflow: hidden; 
+    }
+
+    #container {
+      position: relative;
+      width: 85vh; 
+      height: 85vh;
+      max-width: 950px;
+      max-height: 950px;
+      margin: auto; 
+      overflow: visible; 
+      background-color: #050505;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #magic-circle-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .rotate-ccw {
+      animation: spinCCW 48s linear infinite;
+      transform-origin: center;
+    }
+
+    .rotate-cw {
+      animation: spinCW 40s linear infinite;
+      transform-origin: center;
+    }
+    
+    @keyframes spinCCW {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-360deg); }
+    }
+
+    @keyframes spinCW {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .glowing-core {
+        position: relative;
+        width: 7px;  
+        height: 7px; 
+        background-color: #ffffff;
+        border-radius: 50%;
+        will-change: transform, opacity;
+        opacity: calc(var(--fade, 1) * (0.3 + 0.7 * var(--progress, 0)));
+        box-shadow: 
+            0 0 calc(6px + 14px * var(--progress, 0)) #ffffff,
+            0 0 calc(15px + 35px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))),
+            0 0 calc(35px + 75px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.2 + 0.4 * var(--progress, 0))));
+        z-index: 3;
+    }
+
+    .glowing-core::before,
+    .glowing-core::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100px;  
+        height: 100px; 
+        pointer-events: none;
+    }
+
+    .glowing-core::before {
+        transform: translate(-50%, -50%) scale(calc(0.8 + 0.3 * var(--progress, 0)));
+        background: 
+            linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent),
+            linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent);
+        background-size: 100% 2px, 2px 100%;
+        background-repeat: no-repeat;
+        background-position: center;
+        filter: blur(1px);
+        opacity: calc(var(--fade, 1) * (0.3 + 0.6 * var(--progress, 0)));
+    }
+
+    .glowing-core::after {
+        transform: translate(-50%, -50%) rotate(45deg) scale(calc(0.8 + 0.3 * var(--progress, 0)));
+        background: 
+            linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent),
+            linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent);
+        background-size: 100% 2px, 2px 100%;
+        background-repeat: no-repeat;
+        background-position: center;
+        filter: blur(1px);
+        opacity: calc(var(--fade, 1) * (0.2 + 0.5 * var(--progress, 0)));
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <svg id="magic-circle-overlay" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="runePath" d="M 400, 400 m -356, 0 a 356,356 0 1,1 712,0 a 356,356 0 1,1 -712,0" fill="none" />
+        <path id="runePathInner" d="M 400, 400 m -305, 0 a 305,305 0 1,1 610,0 a 305,305 0 1,1 -610,0" fill="none" />
+      </defs>
+
+      <circle cx="400" cy="400" r="375" fill="none" stroke="var(--outer_ring_color)" stroke-width="2"/>
+      <circle cx="400" cy="400" r="370" fill="none" stroke="var(--outer_dash_color)" stroke-width="1.5" stroke-dasharray="6 4" />
+
+      <g class="rotate-ccw">
+        <circle cx="400" cy="400" r="355" fill="none" stroke="var(--outer_rune_circle_color)" stroke-width="3" />
+        <text fill="var(--outer_rune_text_color)" font-size="14" font-family="monospace" font-weight="bold" letter-spacing="4">
+          <textPath href="#runePath" startOffset="0%">
+            ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ
+          </textPath>
+        </text>
+      </g>
+
+      <g>
+        <circle cx="400" cy="400" r="325" fill="none" stroke="var(--mid_ring_solid_color)" stroke-width="1.5" />
+        <circle cx="400" cy="400" r="318" fill="none" stroke="var(--mid_ring_dash_color)" stroke-width="1" stroke-dasharray="3 8" />
+      </g>
+
+      <g class="rotate-cw">
+        <circle cx="400" cy="400" r="304" fill="none" stroke="var(--inner_rune_circle_color)" stroke-width="1.5" />
+        <text fill="var(--inner_rune_text_color)" font-size="12" font-family="monospace" font-weight="bold" letter-spacing="3">
+          <textPath href="#runePathInner" startOffset="0%">
+            ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᛒ ᛗ ᚾ ᚹ
+          </textPath>
+        </text>
+      </g>
+
+      <g>
+        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5"/>
+        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5" transform="rotate(45 400 400)"/>
+        <polygon points="400,150 562,238 650,400 562,562 400,650 238,562 150,400 238,238" fill="none" stroke="var(--octagram_sub_color)" stroke-width="1" />
+        <circle cx="400" cy="400" r="120" fill="none" stroke="var(--center_dash_circle_color)" stroke-width="1" stroke-dasharray="4 4" />
+      </g>
+    </svg>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
+  <script> 
+    const GROUP_SIZE = 8;             
+    const NUM_GROUPS = 13;            
+    const SQUARE_COUNT = GROUP_SIZE * NUM_GROUPS; 
+
+    const GROUP_DURATION = 4000;      
+    const SYSTEM_CYCLE = 6000;        
+    const REVOLUTION_DURATION = 6000; 
+    const PLANET_SIZE = 0.3;          
+    const EDGE_MARGIN = PLANET_SIZE / 2; 
+    
+    const ORBIT_RADIUS_MIN = 1;       
+    const OUTER_RADIUS_SCALE = 2;   
+
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 10, 0);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.setSize(container.clientWidth, container.clientHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.left = '0px';
+    labelRenderer.domElement.style.width = '100%';
+    labelRenderer.domElement.style.height = '100%';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    labelRenderer.domElement.style.overflow = 'visible'; 
+    container.appendChild(labelRenderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableRotate = false;
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.update();
+
+    function getCssColor(variableName) {
+      const val = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+      return new THREE.Color(val);
+    }
+
+    const faceColor = getCssColor('--icosa_face_color');
+    const wireColor = getCssColor('--icosa_wire_color');
+
+    const icosaRadius = 1.5; 
+    const icosaGeo = new THREE.IcosahedronGeometry(icosaRadius);
+    const icosaMat = new THREE.MeshStandardMaterial({
+      color: faceColor,
+      transparent: true,
+      opacity: 0.15,  
+      side: THREE.DoubleSide,
+    });
+    const icosaMesh = new THREE.Mesh(icosaGeo, icosaMat);
+    scene.add(icosaMesh);
+
+    const icosaEdges = new THREE.EdgesGeometry(icosaGeo);
+    const icosaWire = new THREE.LineSegments(
+      icosaEdges,
+      new THREE.LineBasicMaterial({ color: wireColor })
+    );
+    scene.add(icosaWire);
+
+    function createPlanet() {
+      const pDiv = document.createElement('div');
+      pDiv.className = 'glowing-core';
+      const planetObject = new THREE.CSS2DObject(pDiv);
+      return planetObject;
+    }
+
+    let maxOrbitRadius = 8;
+
+    function updateMaxOrbitRadius() {
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const viewHeight = 2 * Math.tan(fovRad / 2) * camera.position.y;
+      const viewWidth = viewHeight * camera.aspect;
+      maxOrbitRadius = Math.min(viewWidth, viewHeight) / 2 - EDGE_MARGIN;
+      if (maxOrbitRadius < ORBIT_RADIUS_MIN) {
+        maxOrbitRadius = ORBIT_RADIUS_MIN;
+      }
+    }
+
+    updateMaxOrbitRadius();
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      labelRenderer.setSize(container.clientWidth, container.clientHeight);
+      updateMaxOrbitRadius();
+    });
+
+    const squareGroup = new THREE.Group();
+    const squareMeshes = [];
+    for (let i = 0; i < SQUARE_COUNT; i++) {
+      const planet = createPlanet();
+      planet.position.set(maxOrbitRadius, 0, 0);
+
+      const groupIndex = Math.floor(i / GROUP_SIZE);
+      const localIdx = i % GROUP_SIZE;
+      const initialAngle = (localIdx / GROUP_SIZE) * Math.PI * 2;
+
+      planet.userData = { 
+        groupIndex: groupIndex,
+        initialAngle: initialAngle,
+        angle: initialAngle
+      };
+
+      squareGroup.add(planet);
+      squareMeshes.push(planet);
+    }
+    scene.add(squareGroup);
+
+    let startTime = null;
+    let lastTime = null;
+
+    function animate(timestamp) {
+      requestAnimationFrame(animate);
+
+      if (!startTime) startTime = timestamp;
+      if (!lastTime) lastTime = timestamp;
+
+      const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      const elapsed = timestamp - startTime;
+      const elapsedSeconds = elapsed / 1000;
+
+      icosaMesh.rotation.x = (elapsedSeconds / 240) * Math.PI * 4;
+      icosaMesh.rotation.y = (elapsedSeconds / 240) * Math.PI * 8;
+      icosaWire.rotation.copy(icosaMesh.rotation);
+
+      const currentStartRadius = maxOrbitRadius * OUTER_RADIUS_SCALE;
+
+      squareMeshes.forEach((mesh) => {
+        const groupIndex = mesh.userData.groupIndex;
+        const initialAngle = mesh.userData.initialAngle;
+        const startOffset = groupIndex * ( SYSTEM_CYCLE / NUM_GROUPS ); 
+
+        let activeElapsed = (elapsed - startOffset) % SYSTEM_CYCLE;
+        if (activeElapsed < 0) activeElapsed += SYSTEM_CYCLE;
+
+        if (mesh.userData.lastActiveElapsed === undefined || activeElapsed < mesh.userData.lastActiveElapsed) {
+          mesh.userData.angle = initialAngle;
+        }
+        mesh.userData.lastActiveElapsed = activeElapsed;
+
+        if (activeElapsed < GROUP_DURATION) {
+          const prLinear = activeElapsed / GROUP_DURATION;
+          const pr = Math.pow(prLinear, 1); 
+          const radius = currentStartRadius - (currentStartRadius - ORBIT_RADIUS_MIN) * pr;
+
+          const baseAngularSpeed = (Math.PI * 1) / REVOLUTION_DURATION;
+          
+          /* =================================================================
+             [회전 가속도 강화 적용 구간]
+             - 숫자를 키울수록(예: 3 -> 10) 중앙에 가까워질 때 회전 속도가 
+               훨씬 더 강력하고 역동적으로 빨라집니다.
+             ================================================================= */
+          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 5);
+          const angularSpeed = baseAngularSpeed * speedMultiplier;
+
+          const direction = 1; 
+          let finalDirection = direction;
+          
+          if (direction === 0) {
+            finalDirection = (groupIndex % 2 === 0) ? 1 : -1;
+          }
+
+          mesh.userData.angle += finalDirection * angularSpeed * (deltaTime * 1000);
+
+          mesh.position.set(
+            radius * Math.cos(mesh.userData.angle),
+            0,
+            radius * Math.sin(mesh.userData.angle)
+          );
+
+          let fadeAlpha = 1;
+          const fadeTime = 300; 
+          
+          if (activeElapsed < fadeTime) {
+            fadeAlpha = activeElapsed / fadeTime; 
+          } else if (activeElapsed > GROUP_DURATION - fadeTime) {
+            fadeAlpha = (GROUP_DURATION - activeElapsed) / fadeTime; 
+          }
+
+          if (mesh.element) {
+            mesh.element.style.opacity = '';
+            mesh.element.style.setProperty('--progress', prLinear);
+            mesh.element.style.setProperty('--fade', fadeAlpha);
+          }
+        } else {
+          if (mesh.element) {
+            mesh.element.style.opacity = 0;
+            mesh.element.style.setProperty('--progress', 0);
+            mesh.element.style.setProperty('--fade', 0);
+          }
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
