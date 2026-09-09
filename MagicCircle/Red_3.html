@@ -101,56 +101,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    .glowing-core {
-      position: relative;
-      width: 7px;
-      height: 7px;
-      background-color: #ffffff;
-      border-radius: 50%;
-      will-change: transform, opacity;
-      opacity: calc(var(--fade, 1) * (0.3 + 0.7 * var(--progress, 0)));
-      box-shadow:
-        0 0 calc(6px + 14px * var(--progress, 0)) #ffffff,
-        0 0 calc(15px + 35px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))),
-        0 0 calc(35px + 75px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.2 + 0.4 * var(--progress, 0))));
-      z-index: 3;
-    }
-
-    .glowing-core::before,
-    .glowing-core::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 100px;
-      height: 100px;
-      pointer-events: none;
-    }
-
-    .glowing-core::before {
-      transform: translate(-50%, -50%) scale(calc(0.8 + 0.3 * var(--progress, 0)));
-      background:
-        linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent),
-        linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent);
-      background-size: 100% 2px, 2px 100%;
-      background-repeat: no-repeat;
-      background-position: center;
-      filter: blur(1px);
-      opacity: calc(var(--fade, 1) * (0.3 + 0.6 * var(--progress, 0)));
-    }
-
-    .glowing-core::after {
-      transform: translate(-50%, -50%) rotate(45deg) scale(calc(0.8 + 0.3 * var(--progress, 0)));
-      background:
-        linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent),
-        linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent);
-      background-size: 100% 2px, 2px 100%;
-      background-repeat: no-repeat;
-      background-position: center;
-      filter: blur(1px);
-      opacity: calc(var(--fade, 1) * (0.2 + 0.5 * var(--progress, 0)));
-    }
-
     #status-bar {
       position: fixed;
       bottom: 0;
@@ -273,8 +223,6 @@
   <button id="manual-start">마법진 시작</button>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 
   <script>
     // ====== 화면 켜짐 유지 (Wake Lock) ======
@@ -294,20 +242,7 @@
       }
     });
 
-    // ====== Three.js 마법진 애니메이션 ======
-    const GROUP_SIZE = 8;
-    const NUM_GROUPS = 13;
-    const SQUARE_COUNT = GROUP_SIZE * NUM_GROUPS;
-
-    const GROUP_DURATION = 4000;
-    const SYSTEM_CYCLE = 6000;
-    const REVOLUTION_DURATION = 6000;
-    const PLANET_SIZE = 0.3;
-    const EDGE_MARGIN = PLANET_SIZE / 2;
-
-    const ORBIT_RADIUS_MIN = 1;
-    const OUTER_RADIUS_SCALE = 2;
-
+    // ====== 중심 정육십면체 (위성 없음) ======
     const container = document.getElementById('container');
     const scene = new THREE.Scene();
 
@@ -326,22 +261,12 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    const labelRenderer = new THREE.CSS2DRenderer();
-    labelRenderer.setSize(container.clientWidth, container.clientHeight);
-    labelRenderer.domElement.style.position = 'absolute';
-    labelRenderer.domElement.style.top = '0px';
-    labelRenderer.domElement.style.left = '0px';
-    labelRenderer.domElement.style.width = '100%';
-    labelRenderer.domElement.style.height = '100%';
-    labelRenderer.domElement.style.pointerEvents = 'none';
-    labelRenderer.domElement.style.overflow = 'visible';
-    container.appendChild(labelRenderer.domElement);
+    const ambientLight = new THREE.AmbientLight(0x444466, 0.6);
+    scene.add(ambientLight);
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableRotate = false;
-    controls.enableZoom = false;
-    controls.enablePan = false;
-    controls.update();
+    const pointLight = new THREE.PointLight(0xffaaaa, 1.2, 15);
+    pointLight.position.set(0, 5, 0);
+    scene.add(pointLight);
 
     function getCssColor(variableName) {
       const val = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
@@ -369,56 +294,13 @@
     );
     scene.add(icosaWire);
 
-    function createPlanet() {
-      const pDiv = document.createElement('div');
-      pDiv.className = 'glowing-core';
-      return new THREE.CSS2DObject(pDiv);
-    }
-
-    let maxOrbitRadius = 8;
-
-    function updateMaxOrbitRadius() {
-      const fovRad = (camera.fov * Math.PI) / 180;
-      const viewHeight = 2 * Math.tan(fovRad / 2) * camera.position.y;
-      const viewWidth = viewHeight * camera.aspect;
-      maxOrbitRadius = Math.min(viewWidth, viewHeight) / 2 - EDGE_MARGIN;
-      if (maxOrbitRadius < ORBIT_RADIUS_MIN) {
-        maxOrbitRadius = ORBIT_RADIUS_MIN;
-      }
-    }
-
-    updateMaxOrbitRadius();
     window.addEventListener('resize', () => {
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
-      labelRenderer.setSize(container.clientWidth, container.clientHeight);
-      updateMaxOrbitRadius();
     });
 
-    const squareGroup = new THREE.Group();
-    const squareMeshes = [];
-    for (let i = 0; i < SQUARE_COUNT; i++) {
-      const planet = createPlanet();
-      planet.position.set(maxOrbitRadius, 0, 0);
-
-      const groupIndex = Math.floor(i / GROUP_SIZE);
-      const localIdx = i % GROUP_SIZE;
-      const initialAngle = (localIdx / GROUP_SIZE) * Math.PI * 2;
-
-      planet.userData = {
-        groupIndex: groupIndex,
-        initialAngle: initialAngle,
-        angle: initialAngle
-      };
-
-      squareGroup.add(planet);
-      squareMeshes.push(planet);
-    }
-    scene.add(squareGroup);
-
     let startTime = null;
-    let lastTime = null;
     let animationActive = true;
     let chargingActive = false;
 
@@ -428,82 +310,14 @@
       if (!animationActive) return;
 
       if (!startTime) startTime = timestamp;
-      if (!lastTime) lastTime = timestamp;
 
-      const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
-      lastTime = timestamp;
-
-      const elapsed = timestamp - startTime;
-      const elapsedSeconds = elapsed / 1000;
+      const elapsedSeconds = (timestamp - startTime) / 1000;
 
       icosaMesh.rotation.x = (elapsedSeconds / 240) * Math.PI * 4;
       icosaMesh.rotation.y = (elapsedSeconds / 240) * Math.PI * 8;
       icosaWire.rotation.copy(icosaMesh.rotation);
 
-      const currentStartRadius = maxOrbitRadius * OUTER_RADIUS_SCALE;
-
-      squareMeshes.forEach((mesh) => {
-        const groupIndex = mesh.userData.groupIndex;
-        const initialAngle = mesh.userData.initialAngle;
-        const startOffset = groupIndex * (SYSTEM_CYCLE / NUM_GROUPS);
-
-        let activeElapsed = (elapsed - startOffset) % SYSTEM_CYCLE;
-        if (activeElapsed < 0) activeElapsed += SYSTEM_CYCLE;
-
-        if (mesh.userData.lastActiveElapsed === undefined || activeElapsed < mesh.userData.lastActiveElapsed) {
-          mesh.userData.angle = initialAngle;
-        }
-        mesh.userData.lastActiveElapsed = activeElapsed;
-
-        if (activeElapsed < GROUP_DURATION) {
-          const prLinear = activeElapsed / GROUP_DURATION;
-          const radius = currentStartRadius - (currentStartRadius - ORBIT_RADIUS_MIN) * prLinear;
-
-          const baseAngularSpeed = (Math.PI * 1) / REVOLUTION_DURATION;
-          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 5);
-          const angularSpeed = baseAngularSpeed * speedMultiplier;
-
-          const direction = 1;
-          let finalDirection = direction;
-
-          if (direction === 0) {
-            finalDirection = (groupIndex % 2 === 0) ? 1 : -1;
-          }
-
-          mesh.userData.angle += finalDirection * angularSpeed * (deltaTime * 1000);
-
-          mesh.position.set(
-            radius * Math.cos(mesh.userData.angle),
-            0,
-            radius * Math.sin(mesh.userData.angle)
-          );
-
-          let fadeAlpha = 1;
-          const fadeTime = 300;
-
-          if (activeElapsed < fadeTime) {
-            fadeAlpha = activeElapsed / fadeTime;
-          } else if (activeElapsed > GROUP_DURATION - fadeTime) {
-            fadeAlpha = (GROUP_DURATION - activeElapsed) / fadeTime;
-          }
-
-          if (mesh.element) {
-            mesh.element.style.opacity = '';
-            mesh.element.style.setProperty('--progress', prLinear);
-            mesh.element.style.setProperty('--fade', fadeAlpha);
-          }
-        } else {
-          if (mesh.element) {
-            mesh.element.style.opacity = 0;
-            mesh.element.style.setProperty('--progress', 0);
-            mesh.element.style.setProperty('--fade', 0);
-          }
-        }
-      });
-
-      controls.update();
       renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
     }
 
     requestAnimationFrame(animate);
@@ -528,7 +342,6 @@
         }
         acquireWakeLock();
         startTime = null;
-        lastTime = null;
       } else {
         statusBar.classList.add('hidden');
         batteryText.textContent = '충전 대기';
@@ -577,7 +390,6 @@
       batteryLevel.textContent = '';
       animationActive = true;
       startTime = null;
-      lastTime = null;
       acquireWakeLock();
     });
 
