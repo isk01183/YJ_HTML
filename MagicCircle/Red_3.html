@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="./Red_3_manifest.json" />
+  <title>마법진 충전 디스플레이</title>
+  <style>
+    :root {
+      --planet_rgb: 153, 153, 255;
+      --outer_ring_color: rgba(255, 170, 170, 0.8);
+      --outer_dash_color: rgba(255, 170, 170, 0.6);
+      --outer_rune_circle_color: rgba(255, 170, 170, 0.8);
+      --outer_rune_text_color: rgba(255, 170, 170, 0.9);
+      --mid_ring_solid_color: rgba(255, 170, 170, 0.7);
+      --mid_ring_dash_color: rgba(255, 170, 170, 0.7);
+      --inner_rune_circle_color: rgba(255, 170, 170, 0.7);
+      --inner_rune_text_color: rgba(255, 170, 170, 0.8);
+      --octagram_main_color: rgba(255, 170, 170, 0.5);
+      --octagram_sub_color: rgba(255, 170, 170, 0.35);
+      --center_dash_circle_color: rgba(255, 170, 170, 0.4);
+      --icosa_face_color: #ffaaaa;
+      --icosa_wire_color: #ffaaaa;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      background-color: #000;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vw;
+      max-width: 100vh;
+      max-height: 100vh;
+      margin: auto;
+      overflow: visible;
+      background-color: #050505;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #magic-circle-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .rotate-ccw {
+      animation: spinCCW 48s linear infinite;
+      transform-origin: center;
+    }
+
+    .rotate-cw {
+      animation: spinCW 40s linear infinite;
+      transform-origin: center;
+    }
+
+    @keyframes spinCCW {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(-360deg); }
+    }
+
+    @keyframes spinCW {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .glowing-core {
+      position: relative;
+      width: 7px;
+      height: 7px;
+      background-color: #ffffff;
+      border-radius: 50%;
+      will-change: transform, opacity;
+      opacity: calc(var(--fade, 1) * (0.3 + 0.7 * var(--progress, 0)));
+      box-shadow:
+        0 0 calc(6px + 14px * var(--progress, 0)) #ffffff,
+        0 0 calc(15px + 35px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))),
+        0 0 calc(35px + 75px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.2 + 0.4 * var(--progress, 0))));
+      z-index: 3;
+    }
+
+    .glowing-core::before,
+    .glowing-core::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100px;
+      height: 100px;
+      pointer-events: none;
+    }
+
+    .glowing-core::before {
+      transform: translate(-50%, -50%) scale(calc(0.8 + 0.3 * var(--progress, 0)));
+      background:
+        linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent),
+        linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent);
+      background-size: 100% 2px, 2px 100%;
+      background-repeat: no-repeat;
+      background-position: center;
+      filter: blur(1px);
+      opacity: calc(var(--fade, 1) * (0.3 + 0.6 * var(--progress, 0)));
+    }
+
+    .glowing-core::after {
+      transform: translate(-50%, -50%) rotate(45deg) scale(calc(0.8 + 0.3 * var(--progress, 0)));
+      background:
+        linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent),
+        linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent);
+      background-size: 100% 2px, 2px 100%;
+      background-repeat: no-repeat;
+      background-position: center;
+      filter: blur(1px);
+      opacity: calc(var(--fade, 1) * (0.2 + 0.5 * var(--progress, 0)));
+    }
+
+    /* 충전 상태 표시 */
+    #status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)) 20px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.6), transparent);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+      font-family: monospace;
+      font-size: 13px;
+      color: #ffaaaa;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #status-bar.hidden {
+      opacity: 0;
+    }
+
+    #status-bar .bolt {
+      display: inline-block;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* 설치 안내 배너 */
+    #install-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 14px 20px calc(14px + env(safe-area-inset-top, 0px)) 20px;
+      background: rgba(10, 10, 10, 0.92);
+      border-bottom: 1px solid rgba(255, 170, 170, 0.3);
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      font-family: monospace;
+      font-size: 12px;
+      color: #ffaaaa;
+      backdrop-filter: blur(8px);
+    }
+
+    #install-banner.visible {
+      display: flex;
+    }
+
+    #install-banner button {
+      background: rgba(255, 170, 170, 0.2);
+      border: 1px solid rgba(255, 170, 170, 0.4);
+      color: #ffaaaa;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #install-banner button:active {
+      background: rgba(255, 170, 170, 0.35);
+    }
+
+    /* 수동 시작 버튼 (충전 감지 불가 시) */
+    #manual-start {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 10, 10, 0.9);
+      border: 1px solid rgba(255, 170, 170, 0.4);
+      color: #ffaaaa;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      display: none;
+      backdrop-filter: blur(8px);
+    }
+
+    #manual-start:active {
+      background: rgba(255, 170, 170, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <svg id="magic-circle-overlay" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="runePath" d="M 400, 400 m -356, 0 a 356,356 0 1,1 712,0 a 356,356 0 1,1 -712,0" fill="none" />
+        <path id="runePathInner" d="M 400, 400 m -305, 0 a 305,305 0 1,1 610,0 a 305,305 0 1,1 -610,0" fill="none" />
+      </defs>
+
+      <circle cx="400" cy="400" r="375" fill="none" stroke="var(--outer_ring_color)" stroke-width="2"/>
+      <circle cx="400" cy="400" r="370" fill="none" stroke="var(--outer_dash_color)" stroke-width="1.5" stroke-dasharray="6 4" />
+
+      <g class="rotate-ccw">
+        <circle cx="400" cy="400" r="355" fill="none" stroke="var(--outer_rune_circle_color)" stroke-width="3" />
+        <text fill="var(--outer_rune_text_color)" font-size="14" font-family="monospace" font-weight="bold" letter-spacing="4">
+          <textPath href="#runePath" startOffset="0%">
+            ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ
+          </textPath>
+        </text>
+      </g>
+
+      <g>
+        <circle cx="400" cy="400" r="325" fill="none" stroke="var(--mid_ring_solid_color)" stroke-width="1.5" />
+        <circle cx="400" cy="400" r="318" fill="none" stroke="var(--mid_ring_dash_color)" stroke-width="1" stroke-dasharray="3 8" />
+      </g>
+
+      <g class="rotate-cw">
+        <circle cx="400" cy="400" r="304" fill="none" stroke="var(--inner_rune_circle_color)" stroke-width="1.5" />
+        <text fill="var(--inner_rune_text_color)" font-size="12" font-family="monospace" font-weight="bold" letter-spacing="3">
+          <textPath href="#runePathInner" startOffset="0%">
+            ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᛒ ᛗ ᚾ ᚹ
+          </textPath>
+        </text>
+      </g>
+
+      <g>
+        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5"/>
+        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5" transform="rotate(45 400 400)"/>
+        <polygon points="400,150 562,238 650,400 562,562 400,650 238,562 150,400 238,238" fill="none" stroke="var(--octagram_sub_color)" stroke-width="1" />
+        <circle cx="400" cy="400" r="120" fill="none" stroke="var(--center_dash_circle_color)" stroke-width="1" stroke-dasharray="4 4" />
+      </g>
+    </svg>
+  </div>
+
+  <!-- 충전 상태 표시 -->
+  <div id="status-bar">
+    <span class="bolt">⚡</span>
+    <span id="battery-text">충전 중</span>
+    <span id="battery-level">--%</span>
+  </div>
+
+  <!-- 수동 시작 버튼 (배터리 API 미지원 브라우저용) -->
+  <button id="manual-start">마법진 시작</button>
+
+  <!-- 설치 안내 배너 -->
+  <div id="install-banner">
+    <span>홈 화면에 추가하여 충전 시 자동 실행하세요</span>
+    <button id="install-btn">설치</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
+  <script>
+    // ====== Service Worker 등록 (오프라인 지원) ======
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./Red_3_sw.js').catch(() => {});
+      });
+    }
+
+    // ====== 화면 켜짐 유지 (Wake Lock) ======
+    let wakeLock = null;
+    async function acquireWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+      } catch (e) { /* wakeLock 실패 시 무시 */ }
+    }
+
+    // 화면이 꺼졌다 켜져도 Wake Lock 재획득
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && chargingActive && !wakeLock) {
+        acquireWakeLock();
+      }
+    });
+
+    // ====== Three.js 마법진 애니메이션 ======
+    const GROUP_SIZE = 8;
+    const NUM_GROUPS = 13;
+    const SQUARE_COUNT = GROUP_SIZE * NUM_GROUPS;
+
+    const GROUP_DURATION = 4000;
+    const SYSTEM_CYCLE = 6000;
+    const REVOLUTION_DURATION = 6000;
+    const PLANET_SIZE = 0.3;
+    const EDGE_MARGIN = PLANET_SIZE / 2;
+
+    const ORBIT_RADIUS_MIN = 1;
+    const OUTER_RADIUS_SCALE = 2;
+
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 10, 0);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.setSize(container.clientWidth, container.clientHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.left = '0px';
+    labelRenderer.domElement.style.width = '100%';
+    labelRenderer.domElement.style.height = '100%';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    labelRenderer.domElement.style.overflow = 'visible';
+    container.appendChild(labelRenderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableRotate = false;
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.update();
+
+    function getCssColor(variableName) {
+      const val = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+      return new THREE.Color(val);
+    }
+
+    const faceColor = getCssColor('--icosa_face_color');
+    const wireColor = getCssColor('--icosa_wire_color');
+
+    const icosaRadius = 1.5;
+    const icosaGeo = new THREE.IcosahedronGeometry(icosaRadius);
+    const icosaMat = new THREE.MeshStandardMaterial({
+      color: faceColor,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.DoubleSide,
+    });
+    const icosaMesh = new THREE.Mesh(icosaGeo, icosaMat);
+    scene.add(icosaMesh);
+
+    const icosaEdges = new THREE.EdgesGeometry(icosaGeo);
+    const icosaWire = new THREE.LineSegments(
+      icosaEdges,
+      new THREE.LineBasicMaterial({ color: wireColor })
+    );
+    scene.add(icosaWire);
+
+    function createPlanet() {
+      const pDiv = document.createElement('div');
+      pDiv.className = 'glowing-core';
+      return new THREE.CSS2DObject(pDiv);
+    }
+
+    let maxOrbitRadius = 8;
+
+    function updateMaxOrbitRadius() {
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const viewHeight = 2 * Math.tan(fovRad / 2) * camera.position.y;
+      const viewWidth = viewHeight * camera.aspect;
+      maxOrbitRadius = Math.min(viewWidth, viewHeight) / 2 - EDGE_MARGIN;
+      if (maxOrbitRadius < ORBIT_RADIUS_MIN) {
+        maxOrbitRadius = ORBIT_RADIUS_MIN;
+      }
+    }
+
+    updateMaxOrbitRadius();
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      labelRenderer.setSize(container.clientWidth, container.clientHeight);
+      updateMaxOrbitRadius();
+    });
+
+    const squareGroup = new THREE.Group();
+    const squareMeshes = [];
+    for (let i = 0; i < SQUARE_COUNT; i++) {
+      const planet = createPlanet();
+      planet.position.set(maxOrbitRadius, 0, 0);
+
+      const groupIndex = Math.floor(i / GROUP_SIZE);
+      const localIdx = i % GROUP_SIZE;
+      const initialAngle = (localIdx / GROUP_SIZE) * Math.PI * 2;
+
+      planet.userData = {
+        groupIndex: groupIndex,
+        initialAngle: initialAngle,
+        angle: initialAngle
+      };
+
+      squareGroup.add(planet);
+      squareMeshes.push(planet);
+    }
+    scene.add(squareGroup);
+
+    let startTime = null;
+    let lastTime = null;
+    let animationActive = true;
+    let chargingActive = false;
+
+    function animate(timestamp) {
+      requestAnimationFrame(animate);
+
+      if (!animationActive) return;
+
+      if (!startTime) startTime = timestamp;
+      if (!lastTime) lastTime = timestamp;
+
+      const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      const elapsed = timestamp - startTime;
+      const elapsedSeconds = elapsed / 1000;
+
+      icosaMesh.rotation.x = (elapsedSeconds / 240) * Math.PI * 4;
+      icosaMesh.rotation.y = (elapsedSeconds / 240) * Math.PI * 8;
+      icosaWire.rotation.copy(icosaMesh.rotation);
+
+      const currentStartRadius = maxOrbitRadius * OUTER_RADIUS_SCALE;
+
+      squareMeshes.forEach((mesh) => {
+        const groupIndex = mesh.userData.groupIndex;
+        const initialAngle = mesh.userData.initialAngle;
+        const startOffset = groupIndex * (SYSTEM_CYCLE / NUM_GROUPS);
+
+        let activeElapsed = (elapsed - startOffset) % SYSTEM_CYCLE;
+        if (activeElapsed < 0) activeElapsed += SYSTEM_CYCLE;
+
+        if (mesh.userData.lastActiveElapsed === undefined || activeElapsed < mesh.userData.lastActiveElapsed) {
+          mesh.userData.angle = initialAngle;
+        }
+        mesh.userData.lastActiveElapsed = activeElapsed;
+
+        if (activeElapsed < GROUP_DURATION) {
+          const prLinear = activeElapsed / GROUP_DURATION;
+          const radius = currentStartRadius - (currentStartRadius - ORBIT_RADIUS_MIN) * prLinear;
+
+          const baseAngularSpeed = (Math.PI * 1) / REVOLUTION_DURATION;
+          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 5);
+          const angularSpeed = baseAngularSpeed * speedMultiplier;
+
+          const direction = 1;
+          let finalDirection = direction;
+
+          if (direction === 0) {
+            finalDirection = (groupIndex % 2 === 0) ? 1 : -1;
+          }
+
+          mesh.userData.angle += finalDirection * angularSpeed * (deltaTime * 1000);
+
+          mesh.position.set(
+            radius * Math.cos(mesh.userData.angle),
+            0,
+            radius * Math.sin(mesh.userData.angle)
+          );
+
+          let fadeAlpha = 1;
+          const fadeTime = 300;
+
+          if (activeElapsed < fadeTime) {
+            fadeAlpha = activeElapsed / fadeTime;
+          } else if (activeElapsed > GROUP_DURATION - fadeTime) {
+            fadeAlpha = (GROUP_DURATION - activeElapsed) / fadeTime;
+          }
+
+          if (mesh.element) {
+            mesh.element.style.opacity = '';
+            mesh.element.style.setProperty('--progress', prLinear);
+            mesh.element.style.setProperty('--fade', fadeAlpha);
+          }
+        } else {
+          if (mesh.element) {
+            mesh.element.style.opacity = 0;
+            mesh.element.style.setProperty('--progress', 0);
+            mesh.element.style.setProperty('--fade', 0);
+          }
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+
+    requestAnimationFrame(animate);
+
+    // ====== 충전 상태 감지 ======
+    const statusBar = document.getElementById('status-bar');
+    const batteryText = document.getElementById('battery-text');
+    const batteryLevel = document.getElementById('battery-level');
+    const manualStart = document.getElementById('manual-start');
+
+    function onChargingChange(isCharging, level) {
+      chargingActive = isCharging;
+      animationActive = isCharging;
+
+      if (isCharging) {
+        statusBar.classList.remove('hidden');
+        batteryText.textContent = '충전 중';
+        if (level !== null && level !== undefined) {
+          batteryLevel.textContent = Math.round(level * 100) + '%';
+        } else {
+          batteryLevel.textContent = '';
+        }
+        acquireWakeLock();
+        if (!startTime) {
+          startTime = null;
+          lastTime = null;
+          requestAnimationFrame(animate);
+        }
+      } else {
+        statusBar.classList.add('hidden');
+        batteryText.textContent = '충전 대기';
+        batteryLevel.textContent = '';
+        if (wakeLock && wakeLock.release) {
+          wakeLock.release();
+          wakeLock = null;
+        }
+      }
+    }
+
+    async function initBatteryDetection() {
+      if ('getBattery' in navigator) {
+        try {
+          const battery = await navigator.getBattery();
+          onChargingChange(battery.charging, battery.level);
+
+          battery.addEventListener('chargingchange', () => {
+            onChargingChange(battery.charging, battery.level);
+          });
+          battery.addEventListener('levelchange', () => {
+            if (battery.charging) {
+              batteryLevel.textContent = Math.round(battery.level * 100) + '%';
+            }
+          });
+        } catch (e) {
+          showManualStart();
+        }
+      } else {
+        showManualStart();
+      }
+    }
+
+    function showManualStart() {
+      manualStart.style.display = 'block';
+      statusBar.classList.add('hidden');
+      // 배터리 API 미지원 시 항상 켜두기
+      chargingActive = true;
+      animationActive = true;
+      acquireWakeLock();
+    }
+
+    manualStart.addEventListener('click', () => {
+      manualStart.style.display = 'none';
+      statusBar.classList.remove('hidden');
+      batteryText.textContent = '실행 중';
+      batteryLevel.textContent = '';
+      animationActive = true;
+      startTime = null;
+      lastTime = null;
+      acquireWakeLock();
+    });
+
+    initBatteryDetection();
+
+    // ====== PWA 설치 프롬프트 ======
+    let deferredPrompt = null;
+    const installBanner = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBanner.classList.add('visible');
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const result = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBanner.classList.remove('visible');
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installBanner.classList.remove('visible');
+    });
+
+    // 이미 설치된 경우 배너 숨김
+    if (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) {
+      installBanner.style.display = 'none';
+    }
+  </script>
+</body>
+</html>
