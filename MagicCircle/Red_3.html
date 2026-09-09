@@ -7,7 +7,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="./Red_3_manifest.json" />
   <title>마법진 충전 디스플레이</title>
   <style>
     :root {
@@ -152,7 +151,6 @@
       opacity: calc(var(--fade, 1) * (0.2 + 0.5 * var(--progress, 0)));
     }
 
-    /* 충전 상태 표시 */
     #status-bar {
       position: fixed;
       bottom: 0;
@@ -186,45 +184,6 @@
       50% { opacity: 0.4; }
     }
 
-    /* 설치 안내 배너 */
-    #install-banner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      padding: 14px 20px calc(14px + env(safe-area-inset-top, 0px)) 20px;
-      background: rgba(10, 10, 10, 0.92);
-      border-bottom: 1px solid rgba(255, 170, 170, 0.3);
-      display: none;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 100;
-      font-family: monospace;
-      font-size: 12px;
-      color: #ffaaaa;
-      backdrop-filter: blur(8px);
-    }
-
-    #install-banner.visible {
-      display: flex;
-    }
-
-    #install-banner button {
-      background: rgba(255, 170, 170, 0.2);
-      border: 1px solid rgba(255, 170, 170, 0.4);
-      color: #ffaaaa;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    #install-banner button:active {
-      background: rgba(255, 170, 170, 0.35);
-    }
-
-    /* 수동 시작 버튼 (충전 감지 불가 시) */
     #manual-start {
       position: fixed;
       bottom: 60px;
@@ -245,6 +204,18 @@
 
     #manual-start:active {
       background: rgba(255, 170, 170, 0.2);
+    }
+
+    #info-overlay {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 20;
+      font-family: monospace;
+      font-size: 11px;
+      color: rgba(255, 170, 170, 0.5);
+      pointer-events: none;
+      padding-top: env(safe-area-inset-top, 0px);
     }
   </style>
 </head>
@@ -291,34 +262,21 @@
     </svg>
   </div>
 
-  <!-- 충전 상태 표시 -->
+  <div id="info-overlay">Red_3 · 충전 감지 마법진</div>
+
   <div id="status-bar">
     <span class="bolt">⚡</span>
     <span id="battery-text">충전 중</span>
     <span id="battery-level">--%</span>
   </div>
 
-  <!-- 수동 시작 버튼 (배터리 API 미지원 브라우저용) -->
   <button id="manual-start">마법진 시작</button>
-
-  <!-- 설치 안내 배너 -->
-  <div id="install-banner">
-    <span>홈 화면에 추가하여 충전 시 자동 실행하세요</span>
-    <button id="install-btn">설치</button>
-  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 
   <script>
-    // ====== Service Worker 등록 (오프라인 지원) ======
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./Red_3_sw.js').catch(() => {});
-      });
-    }
-
     // ====== 화면 켜짐 유지 (Wake Lock) ======
     let wakeLock = null;
     async function acquireWakeLock() {
@@ -327,10 +285,9 @@
           wakeLock = await navigator.wakeLock.request('screen');
           wakeLock.addEventListener('release', () => { wakeLock = null; });
         }
-      } catch (e) { /* wakeLock 실패 시 무시 */ }
+      } catch (e) {}
     }
 
-    // 화면이 꺼졌다 켜져도 Wake Lock 재획득
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && chargingActive && !wakeLock) {
         acquireWakeLock();
@@ -570,11 +527,8 @@
           batteryLevel.textContent = '';
         }
         acquireWakeLock();
-        if (!startTime) {
-          startTime = null;
-          lastTime = null;
-          requestAnimationFrame(animate);
-        }
+        startTime = null;
+        lastTime = null;
       } else {
         statusBar.classList.add('hidden');
         batteryText.textContent = '충전 대기';
@@ -611,7 +565,6 @@
     function showManualStart() {
       manualStart.style.display = 'block';
       statusBar.classList.add('hidden');
-      // 배터리 API 미지원 시 항상 켜두기
       chargingActive = true;
       animationActive = true;
       acquireWakeLock();
@@ -629,35 +582,6 @@
     });
 
     initBatteryDetection();
-
-    // ====== PWA 설치 프롬프트 ======
-    let deferredPrompt = null;
-    const installBanner = document.getElementById('install-banner');
-    const installBtn = document.getElementById('install-btn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBanner.classList.add('visible');
-    });
-
-    installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const result = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        installBanner.classList.remove('visible');
-      }
-    });
-
-    window.addEventListener('appinstalled', () => {
-      installBanner.classList.remove('visible');
-    });
-
-    // 이미 설치된 경우 배너 숨김
-    if (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches) {
-      installBanner.style.display = 'none';
-    }
   </script>
 </body>
 </html>
