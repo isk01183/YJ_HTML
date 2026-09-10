@@ -8,7 +8,7 @@ public final class ChargingTransitionSelfTest {
                 ChargingTransition.Event.CONNECT);
         check(ChargingTransition.State.COMPLETE, ChargingTransition.State.PLAYING,
                 ChargingTransition.Event.FINISH);
-        check(ChargingTransition.State.COMPLETE, ChargingTransition.State.COMPLETE,
+        check(ChargingTransition.State.PLAYING, ChargingTransition.State.COMPLETE,
                 ChargingTransition.Event.CONNECT);
         check(ChargingTransition.State.DISCONNECTED, ChargingTransition.State.PLAYING,
                 ChargingTransition.Event.DISCONNECT);

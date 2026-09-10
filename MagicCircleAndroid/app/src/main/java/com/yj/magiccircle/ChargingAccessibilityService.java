@@ -60,8 +60,8 @@ public final class ChargingAccessibilityService extends AccessibilityService {
     private void handle(ChargingTransition.Event event) {
         ChargingTransition.State previous = state;
         state = ChargingTransition.next(state, event);
-        if (previous != ChargingTransition.State.PLAYING
-                && state == ChargingTransition.State.PLAYING) {
+        if (event == ChargingTransition.Event.CONNECT) {
+            hideOverlay();
             if (!showOverlay()) state = ChargingTransition.State.COMPLETE;
         } else if (previous == ChargingTransition.State.PLAYING
                 && state != ChargingTransition.State.PLAYING) {
