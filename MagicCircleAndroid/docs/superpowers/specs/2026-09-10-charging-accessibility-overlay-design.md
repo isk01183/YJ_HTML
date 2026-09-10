@@ -1,8 +1,8 @@
-# Charging Accessibility Overlay Design
+# 7초 충전 접근성 오버레이 설계
 
 ## Goal
 
-Show the existing offline `magic_circle.html` animation automatically while a charger is connected, including above the Samsung lock screen when the platform permits it, and remove it immediately when charging ends.
+충전 단자가 연결되면 최대 7초 동안 오프라인 `magic_circle.html` 애니메이션을 표시하고 원래 화면으로 돌아간다. 플랫폼이 허용하면 삼성 잠금 화면 위에도 표시한다.
 
 ## Target devices
 
@@ -22,9 +22,11 @@ Replace the DreamService integration with one user-enabled `AccessibilityService
 2. The app explains why accessibility access is required and opens accessibility settings.
 3. Android binds `ChargingAccessibilityService` after the user enables it.
 4. The service registers for `ACTION_POWER_CONNECTED` and `ACTION_POWER_DISCONNECTED` and checks the sticky battery state.
-5. Connected or already charging: add one full-screen accessibility overlay containing the local animation.
-6. Disconnected: remove the overlay and destroy its WebView, revealing the existing lock screen or foreground app.
-7. Repeated broadcasts are idempotent: at most one overlay exists.
+5. 연결 시 전체 화면 접근성 오버레이를 한 번 표시한다.
+6. `0~1.8초` 연결 감지, `1.8~3초` 충전 실행, `3~5.8초` 마법진, `5.8~7초` 완료 및 종료 효과를 재생한다.
+7. 7초가 되면 충전 중이어도 오버레이와 WebView를 제거한다.
+8. 7초 전에 분리되면 즉시 제거한다.
+9. 같은 연결 상태의 중복 방송은 다시 재생하지 않고, 분리 후 재연결할 때만 다시 재생한다.
 
 ## Display behavior
 
@@ -66,7 +68,7 @@ Replace the DreamService integration with one user-enabled `AccessibilityService
 ## Acceptance criteria
 
 - Enabling the accessibility service once activates charging detection without reopening the app.
-- Connecting power shows one local magic-circle animation.
-- Disconnecting power removes it immediately and exposes the prior screen.
+- Connecting power shows one local magic-circle animation for at most seven seconds.
+- Finishing the animation or disconnecting power exposes the prior screen.
 - The animation works in airplane mode.
 - The debug APK installs on all three target devices.

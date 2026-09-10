@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">마법진 충전 애니메이션</string>
-    <string name="accessibility_service_description">충전 연결 중에만 오프라인 마법진 애니메이션을 표시합니다.</string>
+    <string name="accessibility_service_description">충전기를 연결할 때 오프라인 마법진 애니메이션을 최대 7초 동안 표시합니다.</string>
 </resources>

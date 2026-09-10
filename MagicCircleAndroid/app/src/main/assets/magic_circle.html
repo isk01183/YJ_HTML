@@ -1,409 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>마법진 + 내부 가속 회전 최적화</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>7초 충전 실행</title>
   <style>
-    :root {
-      --planet_rgb: 153, 153, 255;
-      --outer_ring_color: rgba(255, 170, 170, 0.8);
-      --outer_dash_color: rgba(255, 170, 170, 0.6);
-      --outer_rune_circle_color: rgba(255, 170, 170, 0.8);
-      --outer_rune_text_color: rgba(255, 170, 170, 0.9);
-      --mid_ring_solid_color: rgba(255, 170, 170, 0.7);
-      --mid_ring_dash_color: rgba(255, 170, 170, 0.7);
-      --inner_rune_circle_color: rgba(255, 170, 170, 0.7);
-      --inner_rune_text_color: rgba(255, 170, 170, 0.8);
-      --octagram_main_color: rgba(255, 170, 170, 0.5);
-      --octagram_sub_color: rgba(255, 170, 170, 0.35);
-      --center_dash_circle_color: rgba(255, 170, 170, 0.4);
-      --icosa_face_color: #ffaaaa;
-      --icosa_wire_color: #ffaaaa;
-    }
-
-    html {
-        background-color : rgba(169, 179, 136, 1);
-    }
-
+    :root { color-scheme:dark; --cyan:#8ffcff; --blue:#26c9ff; --gold:#ffd77a; }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#01050a; }
     body {
-      margin: 0;
-      background-color: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%; 
-      height: 100vh;
-      overflow: hidden; 
+      color:#fff; font-family:"Noto Sans KR","Malgun Gothic",sans-serif;
+      background:radial-gradient(circle at 50% 48%,rgba(11,110,146,.25),transparent 32%),
+                 radial-gradient(ellipse at 50% -10%,rgba(57,221,255,.28),transparent 38%),#01050a;
     }
-
-    #container {
-      position: relative;
-      width: 85vh; 
-      height: 85vh;
-      max-width: 950px;
-      max-height: 950px;
-      margin: auto; 
-      overflow: visible; 
-      background-color: #050505;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    body::before {
+      content:""; position:fixed; inset:0; pointer-events:none; opacity:.18;
+      background:repeating-linear-gradient(0deg,transparent 0 5px,rgba(126,240,255,.12) 6px);
+      animation:scan 1.1s linear infinite;
     }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 1;
+    #sequence { position:relative; width:100%; height:100%; animation:sequence 7s linear both; }
+    #sequence::before {
+      content:""; position:absolute; inset:0; opacity:.55;
+      background-image:radial-gradient(circle,rgba(179,249,255,.9) 0 1px,transparent 1.5px),
+                       radial-gradient(circle,rgba(255,215,122,.65) 0 1px,transparent 1.5px);
+      background-position:0 0,31px 47px; background-size:83px 79px,117px 109px;
+      animation:stars 7s ease-in both;
     }
-
-    #magic-circle-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 2;
-      pointer-events: none;
+    .arc {
+      position:absolute; left:50%; width:145vw; height:34vh; transform:translateX(-50%);
+      border:2px solid rgba(137,247,255,.9); border-radius:50%;
+      box-shadow:0 0 12px var(--cyan),0 0 50px rgba(38,201,255,.55),inset 0 0 38px rgba(38,201,255,.22);
+      animation:arc 7s ease-out both;
     }
-
-    .rotate-ccw {
-      animation: spinCCW 48s linear infinite;
-      transform-origin: center;
+    .arc.top { top:-27vh; }
+    .arc.bottom { bottom:-27vh; }
+    .message {
+      position:absolute; inset:0; display:grid; place-content:center; padding:8vw;
+      text-align:center; text-shadow:0 0 12px rgba(133,244,255,.9);
     }
-
-    .rotate-cw {
-      animation: spinCW 40s linear infinite;
-      transform-origin: center;
+    .eyebrow { color:var(--cyan); font:600 clamp(10px,2.8vw,17px)/1.5 monospace; letter-spacing:.34em; }
+    .message h1 { margin:.35em 0 .2em; font-size:clamp(30px,8vw,68px); font-weight:500; letter-spacing:.07em; }
+    .rule { width:min(68vw,520px); height:1px; margin:1.4rem auto; background:linear-gradient(90deg,transparent,var(--cyan),transparent); }
+    .detect { animation:detect 7s ease both; }
+    .execute { animation:execute 7s ease both; }
+    .execute h1 { font-size:clamp(50px,14vw,105px); letter-spacing:.16em; }
+    .execute h1::before { content:"["; color:var(--cyan); margin-right:.15em; }
+    .execute h1::after { content:"]"; color:var(--cyan); }
+    .system { position:absolute; inset:0; display:grid; place-items:center; animation:system 7s cubic-bezier(.2,.8,.2,1) both; }
+    .sigil { position:relative; width:min(94vw,82vh); aspect-ratio:1; filter:drop-shadow(0 0 18px rgba(70,221,255,.7)); }
+    .sigil::before,.sigil::after { content:""; position:absolute; inset:12%; border-radius:50%; pointer-events:none; }
+    .sigil::before { border:1px solid var(--cyan); box-shadow:0 0 35px rgba(38,201,255,.75),inset 0 0 35px rgba(38,201,255,.45); animation:breathe .72s ease-in-out infinite alternate; }
+    .sigil::after { inset:30%; background:radial-gradient(circle,#fff 0 2%,var(--cyan) 6%,rgba(38,201,255,.24) 24%,transparent 67%); animation:core .55s ease-in-out infinite alternate; }
+    svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+    .cyan { fill:none; stroke:var(--cyan); }
+    .gold { fill:none; stroke:var(--gold); }
+    .outer { transform-origin:400px 400px; animation:ccw 4s linear infinite; }
+    .middle { transform-origin:400px 400px; animation:cw 2.7s linear infinite; }
+    .inner { transform-origin:400px 400px; animation:ccw 1.8s linear infinite; }
+    .runes { fill:var(--gold); font:700 15px monospace; letter-spacing:7px; }
+    .status {
+      position:absolute; left:50%; bottom:9%; transform:translateX(-50%); width:92vw;
+      color:var(--gold); text-align:center; font:600 clamp(11px,3vw,18px)/1.5 monospace;
+      letter-spacing:.28em; text-shadow:0 0 10px rgba(255,215,122,.9);
     }
-    
-    @keyframes spinCCW {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(-360deg); }
+    .complete {
+      position:absolute; inset:0; display:grid; place-content:center; text-align:center;
+      font-size:clamp(26px,7vw,58px); letter-spacing:.12em; color:#fff;
+      text-shadow:0 0 8px #fff,0 0 28px var(--gold); animation:complete 7s ease both;
     }
-
-    @keyframes spinCW {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .glowing-core {
-        position: relative;
-        width: 7px;  
-        height: 7px; 
-        background-color: #ffffff;
-        border-radius: 50%;
-        will-change: transform, opacity;
-        opacity: calc(var(--fade, 1) * (0.3 + 0.7 * var(--progress, 0)));
-        box-shadow: 
-            0 0 calc(6px + 14px * var(--progress, 0)) #ffffff,
-            0 0 calc(15px + 35px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))),
-            0 0 calc(35px + 75px * var(--progress, 0)) rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.2 + 0.4 * var(--progress, 0))));
-        z-index: 3;
-    }
-
-    .glowing-core::before,
-    .glowing-core::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 100px;  
-        height: 100px; 
-        pointer-events: none;
-    }
-
-    .glowing-core::before {
-        transform: translate(-50%, -50%) scale(calc(0.8 + 0.3 * var(--progress, 0)));
-        background: 
-            linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent),
-            linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.4 + 0.5 * var(--progress, 0)))) 50%, transparent);
-        background-size: 100% 2px, 2px 100%;
-        background-repeat: no-repeat;
-        background-position: center;
-        filter: blur(1px);
-        opacity: calc(var(--fade, 1) * (0.3 + 0.6 * var(--progress, 0)));
-    }
-
-    .glowing-core::after {
-        transform: translate(-50%, -50%) rotate(45deg) scale(calc(0.8 + 0.3 * var(--progress, 0)));
-        background: 
-            linear-gradient(90deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent),
-            linear-gradient(0deg, transparent, rgba(var(--planet_rgb), calc(var(--fade, 1) * (0.3 + 0.4 * var(--progress, 0)))) 50%, transparent);
-        background-size: 100% 2px, 2px 100%;
-        background-repeat: no-repeat;
-        background-position: center;
-        filter: blur(1px);
-        opacity: calc(var(--fade, 1) * (0.2 + 0.5 * var(--progress, 0)));
-    }
+    .complete small { display:block; margin-top:1rem; color:var(--gold); font:600 clamp(10px,2.7vw,16px)/1.5 monospace; letter-spacing:.3em; }
+    .flash { position:absolute; inset:0; background:#eaffff; mix-blend-mode:screen; pointer-events:none; animation:flash 7s ease-out both; }
+    @keyframes detect { 0%{opacity:0;transform:scale(.96)} 5%,20%{opacity:1;transform:none} 26%,100%{opacity:0;transform:scale(1.03)} }
+    @keyframes execute { 0%,25%{opacity:0;transform:scale(.7)} 30%,38%{opacity:1;transform:scale(1)} 43%,100%{opacity:0;transform:scale(1.18)} }
+    @keyframes system { 0%,41%{opacity:0;transform:scale(.32) rotate(-12deg)} 47%{opacity:1;transform:scale(1)} 76%{opacity:1;transform:scale(1.03)} 83%{opacity:1;transform:scale(1.12)} 100%{opacity:0;transform:scale(1.48)} }
+    @keyframes complete { 0%,81%{opacity:0;transform:scale(.7)} 87%,92%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.08)} }
+    @keyframes flash { 0%,81%{opacity:0} 86%{opacity:.82} 91%{opacity:.08} 100%{opacity:0} }
+    @keyframes sequence { 0%,96%{opacity:1} 100%{opacity:0} }
+    @keyframes arc { 0%{opacity:0} 6%,82%{opacity:1} 100%{opacity:0;filter:blur(8px)} }
+    @keyframes stars { 0%{transform:scale(1);opacity:.2} 83%{transform:scale(1.22);opacity:.75} 100%{transform:scale(1.55);opacity:0} }
+    @keyframes scan { to{transform:translateY(6px)} }
+    @keyframes cw { to{transform:rotate(360deg)} }
+    @keyframes ccw { to{transform:rotate(-360deg)} }
+    @keyframes breathe { to{transform:scale(1.06);opacity:.55} }
+    @keyframes core { to{transform:scale(1.18);filter:brightness(1.5)} }
+    @media (prefers-reduced-motion:reduce) { .outer,.middle,.inner,.sigil::before,.sigil::after { animation-duration:7s; } }
   </style>
 </head>
 <body>
-  <div id="container">
-    <svg id="magic-circle-overlay" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <path id="runePath" d="M 400, 400 m -356, 0 a 356,356 0 1,1 712,0 a 356,356 0 1,1 -712,0" fill="none" />
-        <path id="runePathInner" d="M 400, 400 m -305, 0 a 305,305 0 1,1 610,0 a 305,305 0 1,1 -610,0" fill="none" />
-      </defs>
-
-      <circle cx="400" cy="400" r="375" fill="none" stroke="var(--outer_ring_color)" stroke-width="2"/>
-      <circle cx="400" cy="400" r="370" fill="none" stroke="var(--outer_dash_color)" stroke-width="1.5" stroke-dasharray="6 4" />
-
-      <g class="rotate-ccw">
-        <circle cx="400" cy="400" r="355" fill="none" stroke="var(--outer_rune_circle_color)" stroke-width="3" />
-        <text fill="var(--outer_rune_text_color)" font-size="14" font-family="monospace" font-weight="bold" letter-spacing="4">
-          <textPath href="#runePath" startOffset="0%">
-            ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ
-          </textPath>
-        </text>
-      </g>
-
-      <g>
-        <circle cx="400" cy="400" r="325" fill="none" stroke="var(--mid_ring_solid_color)" stroke-width="1.5" />
-        <circle cx="400" cy="400" r="318" fill="none" stroke="var(--mid_ring_dash_color)" stroke-width="1" stroke-dasharray="3 8" />
-      </g>
-
-      <g class="rotate-cw">
-        <circle cx="400" cy="400" r="304" fill="none" stroke="var(--inner_rune_circle_color)" stroke-width="1.5" />
-        <text fill="var(--inner_rune_text_color)" font-size="12" font-family="monospace" font-weight="bold" letter-spacing="3">
-          <textPath href="#runePathInner" startOffset="0%">
-            ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚪ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᛒ ᛗ ᚾ ᚹ
-          </textPath>
-        </text>
-      </g>
-
-      <g>
-        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5"/>
-        <polygon points="400,100 488,312 700,400 488,488 400,700 312,488 100,400 312,312" fill="none" stroke="var(--octagram_main_color)" stroke-width="1.5" transform="rotate(45 400 400)"/>
-        <polygon points="400,150 562,238 650,400 562,562 400,650 238,562 150,400 238,238" fill="none" stroke="var(--octagram_sub_color)" stroke-width="1" />
-        <circle cx="400" cy="400" r="120" fill="none" stroke="var(--center_dash_circle_color)" stroke-width="1" stroke-dasharray="4 4" />
-      </g>
-    </svg>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
-
-  <script> 
-    const GROUP_SIZE = 8;             
-    const NUM_GROUPS = 13;            
-    const SQUARE_COUNT = GROUP_SIZE * NUM_GROUPS; 
-
-    const GROUP_DURATION = 4000;      
-    const SYSTEM_CYCLE = 6000;        
-    const REVOLUTION_DURATION = 6000; 
-    const PLANET_SIZE = 0.3;          
-    const EDGE_MARGIN = PLANET_SIZE / 2; 
-    
-    const ORBIT_RADIUS_MIN = 1;       
-    const OUTER_RADIUS_SCALE = 2;   
-
-    const container = document.getElementById('container');
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 10, 0);
-    camera.up.set(0, 0, -1);
-    camera.lookAt(0, 0, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-
-    const labelRenderer = new THREE.CSS2DRenderer();
-    labelRenderer.setSize(container.clientWidth, container.clientHeight);
-    labelRenderer.domElement.style.position = 'absolute';
-    labelRenderer.domElement.style.top = '0px';
-    labelRenderer.domElement.style.left = '0px';
-    labelRenderer.domElement.style.width = '100%';
-    labelRenderer.domElement.style.height = '100%';
-    labelRenderer.domElement.style.pointerEvents = 'none';
-    labelRenderer.domElement.style.overflow = 'visible'; 
-    container.appendChild(labelRenderer.domElement);
-
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableRotate = false;
-    controls.enableZoom = false;
-    controls.enablePan = false;
-    controls.update();
-
-    function getCssColor(variableName) {
-      const val = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
-      return new THREE.Color(val);
-    }
-
-    const faceColor = getCssColor('--icosa_face_color');
-    const wireColor = getCssColor('--icosa_wire_color');
-
-    const icosaRadius = 1.5; 
-    const icosaGeo = new THREE.IcosahedronGeometry(icosaRadius);
-    const icosaMat = new THREE.MeshStandardMaterial({
-      color: faceColor,
-      transparent: true,
-      opacity: 0.15,  
-      side: THREE.DoubleSide,
-    });
-    const icosaMesh = new THREE.Mesh(icosaGeo, icosaMat);
-    scene.add(icosaMesh);
-
-    const icosaEdges = new THREE.EdgesGeometry(icosaGeo);
-    const icosaWire = new THREE.LineSegments(
-      icosaEdges,
-      new THREE.LineBasicMaterial({ color: wireColor })
-    );
-    scene.add(icosaWire);
-
-    function createPlanet() {
-      const pDiv = document.createElement('div');
-      pDiv.className = 'glowing-core';
-      const planetObject = new THREE.CSS2DObject(pDiv);
-      return planetObject;
-    }
-
-    let maxOrbitRadius = 8;
-
-    function updateMaxOrbitRadius() {
-      const fovRad = (camera.fov * Math.PI) / 180;
-      const viewHeight = 2 * Math.tan(fovRad / 2) * camera.position.y;
-      const viewWidth = viewHeight * camera.aspect;
-      maxOrbitRadius = Math.min(viewWidth, viewHeight) / 2 - EDGE_MARGIN;
-      if (maxOrbitRadius < ORBIT_RADIUS_MIN) {
-        maxOrbitRadius = ORBIT_RADIUS_MIN;
-      }
-    }
-
-    updateMaxOrbitRadius();
-    window.addEventListener('resize', () => {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      labelRenderer.setSize(container.clientWidth, container.clientHeight);
-      updateMaxOrbitRadius();
-    });
-
-    const squareGroup = new THREE.Group();
-    const squareMeshes = [];
-    for (let i = 0; i < SQUARE_COUNT; i++) {
-      const planet = createPlanet();
-      planet.position.set(maxOrbitRadius, 0, 0);
-
-      const groupIndex = Math.floor(i / GROUP_SIZE);
-      const localIdx = i % GROUP_SIZE;
-      const initialAngle = (localIdx / GROUP_SIZE) * Math.PI * 2;
-
-      planet.userData = { 
-        groupIndex: groupIndex,
-        initialAngle: initialAngle,
-        angle: initialAngle
-      };
-
-      squareGroup.add(planet);
-      squareMeshes.push(planet);
-    }
-    scene.add(squareGroup);
-
-    let startTime = null;
-    let lastTime = null;
-
-    function animate(timestamp) {
-      requestAnimationFrame(animate);
-
-      if (!startTime) startTime = timestamp;
-      if (!lastTime) lastTime = timestamp;
-
-      const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
-      lastTime = timestamp;
-
-      const elapsed = timestamp - startTime;
-      const elapsedSeconds = elapsed / 1000;
-
-      icosaMesh.rotation.x = (elapsedSeconds / 240) * Math.PI * 4;
-      icosaMesh.rotation.y = (elapsedSeconds / 240) * Math.PI * 8;
-      icosaWire.rotation.copy(icosaMesh.rotation);
-
-      const currentStartRadius = maxOrbitRadius * OUTER_RADIUS_SCALE;
-
-      squareMeshes.forEach((mesh) => {
-        const groupIndex = mesh.userData.groupIndex;
-        const initialAngle = mesh.userData.initialAngle;
-        const startOffset = groupIndex * ( SYSTEM_CYCLE / NUM_GROUPS ); 
-
-        let activeElapsed = (elapsed - startOffset) % SYSTEM_CYCLE;
-        if (activeElapsed < 0) activeElapsed += SYSTEM_CYCLE;
-
-        if (mesh.userData.lastActiveElapsed === undefined || activeElapsed < mesh.userData.lastActiveElapsed) {
-          mesh.userData.angle = initialAngle;
-        }
-        mesh.userData.lastActiveElapsed = activeElapsed;
-
-        if (activeElapsed < GROUP_DURATION) {
-          const prLinear = activeElapsed / GROUP_DURATION;
-          const pr = Math.pow(prLinear, 1); 
-          const radius = currentStartRadius - (currentStartRadius - ORBIT_RADIUS_MIN) * pr;
-
-          const baseAngularSpeed = (Math.PI * 1) / REVOLUTION_DURATION;
-          
-          /* =================================================================
-             [회전 가속도 강화 적용 구간]
-             - 숫자를 키울수록(예: 3 -> 10) 중앙에 가까워질 때 회전 속도가 
-               훨씬 더 강력하고 역동적으로 빨라집니다.
-             ================================================================= */
-          const speedMultiplier = 1 + 10 * Math.pow(prLinear, 5);
-          const angularSpeed = baseAngularSpeed * speedMultiplier;
-
-          const direction = 1; 
-          let finalDirection = direction;
-          
-          if (direction === 0) {
-            finalDirection = (groupIndex % 2 === 0) ? 1 : -1;
-          }
-
-          mesh.userData.angle += finalDirection * angularSpeed * (deltaTime * 1000);
-
-          mesh.position.set(
-            radius * Math.cos(mesh.userData.angle),
-            0,
-            radius * Math.sin(mesh.userData.angle)
-          );
-
-          let fadeAlpha = 1;
-          const fadeTime = 300; 
-          
-          if (activeElapsed < fadeTime) {
-            fadeAlpha = activeElapsed / fadeTime; 
-          } else if (activeElapsed > GROUP_DURATION - fadeTime) {
-            fadeAlpha = (GROUP_DURATION - activeElapsed) / fadeTime; 
-          }
-
-          if (mesh.element) {
-            mesh.element.style.opacity = '';
-            mesh.element.style.setProperty('--progress', prLinear);
-            mesh.element.style.setProperty('--fade', fadeAlpha);
-          }
-        } else {
-          if (mesh.element) {
-            mesh.element.style.opacity = 0;
-            mesh.element.style.setProperty('--progress', 0);
-            mesh.element.style.setProperty('--fade', 0);
-          }
-        }
-      });
-
-      controls.update();
-      renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
-    }
-
-    requestAnimationFrame(animate);
-  </script>
+  <main id="sequence" aria-label="충전 연결 애니메이션">
+    <div class="arc top"></div><div class="arc bottom"></div>
+    <section class="message detect">
+      <div class="eyebrow">SYSTEM SIGNAL DETECTED</div>
+      <h1>충전 단자가<br>연결되었습니다</h1>
+      <div class="rule"></div>
+      <div class="eyebrow">EXTERNAL POWER LINK · CONNECTED</div>
+    </section>
+    <section class="message execute">
+      <div class="eyebrow">ENERGY TRANSFER SEQUENCE</div>
+      <h1>충전 실행</h1>
+      <div class="rule"></div>
+    </section>
+    <section class="system" aria-hidden="true">
+      <div class="sigil">
+        <svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+          <defs><path id="rune" d="M400 400m-337 0a337 337 0 1 1 674 0a337 337 0 1 1-674 0"/></defs>
+          <g class="outer cyan">
+            <circle cx="400" cy="400" r="375" stroke-width="2"/><circle cx="400" cy="400" r="360" stroke-width="4" stroke-dasharray="3 13"/>
+            <path d="M400 18v72M400 710v72M18 400h72M710 400h72" stroke-width="4"/>
+            <text class="runes"><textPath href="#rune">ENERGY LINK · CIRCUIT OPEN · POWER TRANSFER · SYSTEM SYNCHRONIZED · </textPath></text>
+          </g>
+          <g class="middle gold">
+            <circle cx="400" cy="400" r="294" stroke-width="2" stroke-dasharray="34 9 3 9"/>
+            <polygon points="400,112 485,315 688,400 485,485 400,688 315,485 112,400 315,315" stroke-width="2"/>
+            <polygon points="400,112 485,315 688,400 485,485 400,688 315,485 112,400 315,315" stroke-width="1.5" transform="rotate(45 400 400)"/>
+          </g>
+          <g class="inner cyan">
+            <circle cx="400" cy="400" r="205" stroke-width="5" stroke-dasharray="2 18"/><circle cx="400" cy="400" r="166" stroke-width="2"/>
+            <path d="M400 225L552 488H248zM400 575L248 312h304z" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+      <div class="status">CHARGING CORE · ACTIVE</div>
+    </section>
+    <section class="complete">에너지 링크 확립<small>CHARGING ACTIVE</small></section>
+    <div class="flash"></div>
+  </main>
 </body>
 </html>
