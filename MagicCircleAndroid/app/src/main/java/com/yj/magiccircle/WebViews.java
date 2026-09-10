@@ -1,5 +1,6 @@
 package com.yj.magiccircle;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -11,6 +12,7 @@ import java.io.IOException;
 final class WebViews {
     private WebViews() {}
 
+    @SuppressLint("SetJavaScriptEnabled") // Required by the bundled animation; network loads remain blocked.
     static WebView magicCircle(Context context) {
         WebView view = new WebView(context);
         view.setBackgroundColor(0xFF000000);
