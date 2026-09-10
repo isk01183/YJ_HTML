@@ -24,7 +24,7 @@
 ### Task 1: Charging transition decision
 
 **Files:**
-- Create: `app/src/test/java/com/yj/magiccircle/ChargingTransitionSelfTest.java`
+- Create: `selftest/com/yj/magiccircle/ChargingTransitionSelfTest.java`
 - Create: `app/src/main/java/com/yj/magiccircle/ChargingTransition.java`
 
 **Interfaces:**
@@ -57,7 +57,7 @@ Run:
 
 ```powershell
 New-Item -ItemType Directory -Force app\build\selftest | Out-Null
-javac -d app\build\selftest app\src\test\java\com\yj\magiccircle\ChargingTransitionSelfTest.java
+javac -d app\build\selftest selftest\com\yj\magiccircle\ChargingTransitionSelfTest.java
 ```
 
 Expected: compilation fails because `ChargingTransition` does not exist.
@@ -84,7 +84,7 @@ final class ChargingTransition {
 Run:
 
 ```powershell
-javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java app\src\test\java\com\yj\magiccircle\ChargingTransitionSelfTest.java
+javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java selftest\com\yj\magiccircle\ChargingTransitionSelfTest.java
 java -ea -cp app\build\selftest com.yj.magiccircle.ChargingTransitionSelfTest
 ```
 
@@ -93,7 +93,7 @@ Expected: exit code 0 with no output.
 - [ ] **Step 5: Commit the transition and check**
 
 ```powershell
-git add app/src/main/java/com/yj/magiccircle/ChargingTransition.java app/src/test/java/com/yj/magiccircle/ChargingTransitionSelfTest.java
+git add app/src/main/java/com/yj/magiccircle/ChargingTransition.java selftest/com/yj/magiccircle/ChargingTransitionSelfTest.java
 git commit -m "test: define charging overlay transitions"
 ```
 
@@ -272,7 +272,7 @@ Expected: `BUILD SUCCESSFUL`.
 Run:
 
 ```powershell
-javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java app\src\test\java\com\yj\magiccircle\ChargingTransitionSelfTest.java
+javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java selftest\com\yj\magiccircle\ChargingTransitionSelfTest.java
 java -ea -cp app\build\selftest com.yj.magiccircle.ChargingTransitionSelfTest
 ```
 
@@ -419,7 +419,7 @@ Android 보안 화면이나 제조사 정책이 접근성 오버레이를 제한
 Run:
 
 ```powershell
-javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java app\src\test\java\com\yj\magiccircle\ChargingTransitionSelfTest.java
+javac -d app\build\selftest app\src\main\java\com\yj\magiccircle\ChargingTransition.java selftest\com\yj\magiccircle\ChargingTransitionSelfTest.java
 java -ea -cp app\build\selftest com.yj.magiccircle.ChargingTransitionSelfTest
 .\gradlew.bat test lintDebug assembleDebug
 ```
