@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityManager;
+import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -22,7 +23,8 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF000000);
 
-        root.addView(WebViews.magicCircle(this), new LinearLayout.LayoutParams(
+        WebView preview = WebViews.magicCircle(this);
+        root.addView(preview, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
 
         status = new TextView(this);
@@ -38,6 +40,7 @@ public final class MainActivity extends Activity {
         root.addView(settings, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(root);
+        preview.post(() -> WebViews.loadMagicCircle(preview));
     }
 
     @Override

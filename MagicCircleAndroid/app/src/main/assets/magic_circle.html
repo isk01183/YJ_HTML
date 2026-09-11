@@ -7,6 +7,7 @@
   <style>
     :root { color-scheme:dark; --gold:#f7d895; --moon:#fff8df; --violet:#9c76e8; --rose:#c64b70; }
     * { box-sizing:border-box; }
+    html:not(.running) *,html:not(.running) *::before,html:not(.running) *::after { animation-play-state:paused!important; }
     html,body { width:100%; height:100%; margin:0; overflow:hidden; background:#03020a; }
     body {
       color:var(--moon); font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
@@ -148,5 +149,6 @@
     <section class="complete"><div><h2>魔力回路</h2><p>接続完了</p></div></section>
     <div class="flare"></div>
   </main>
+  <script>window.startChargingAnimation=()=>document.documentElement.classList.add("running");</script>
 </body>
 </html>
