@@ -83,14 +83,13 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             @Override
             public void onPageFinished(WebView current, String url) {
                 if (overlay != current) return;
-                WebViews.startMagicCircle(current, ignored -> {
-                    if (overlay != current) return;
-                    current.postVisualStateCallback(0, new WebView.VisualStateCallback() {
-                        @Override
-                        public void onComplete(long requestId) {
-                            if (overlay == current) handle(ChargingTransition.Event.VISUAL_READY);
-                        }
-                    });
+                current.postVisualStateCallback(0, new WebView.VisualStateCallback() {
+                    @Override
+                    public void onComplete(long requestId) {
+                        if (overlay != current) return;
+                        handle(ChargingTransition.Event.VISUAL_READY);
+                        WebViews.startMagicCircle(current, null);
+                    }
                 });
             }
 
