@@ -12,7 +12,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.webkit.WebResourceError;
@@ -68,7 +67,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             if (!showOverlay()) state = ChargingTransition.State.COMPLETE;
         } else if (event == ChargingTransition.Event.VISUAL_READY) {
             if (overlay != null && state == ChargingTransition.State.PLAYING) {
-                overlay.setVisibility(View.VISIBLE);
+                overlay.setAlpha(1f);
             }
         } else if (event == ChargingTransition.Event.DISCONNECT
                 || event == ChargingTransition.Event.FINISH) {
@@ -78,7 +77,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
 
     private boolean showOverlay() {
         WebView view = WebViews.magicCircle(this);
-        view.setVisibility(View.INVISIBLE);
+        view.setAlpha(0f);
         view.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView current, String url) {
