@@ -58,16 +58,19 @@
     .begin h1 { font-size:clamp(52px,14vw,112px); letter-spacing:.18em; }
     .ritual { position:absolute; inset:0; display:grid; place-items:center; animation:ritual 7s cubic-bezier(.22,.75,.2,1) both; }
     .magic-circle { position:relative; width:min(96vw,86vh); aspect-ratio:1; filter:drop-shadow(0 0 13px rgba(156,118,232,.55)); }
-    .aura { position:absolute; inset:8%; border-radius:50%; background:repeating-conic-gradient(from 3deg,rgba(247,216,149,.18) 0 1deg,transparent 1deg 12deg); mask:radial-gradient(circle,transparent 0 25%,#000 61%,transparent 76%); animation:aura 1.1s ease-in-out infinite alternate; }
+    .aura { position:absolute; inset:8%; border-radius:50%; background:repeating-conic-gradient(from 3deg,rgba(247,216,149,.1) 0 1deg,transparent 1deg 12deg); mask:radial-gradient(circle,transparent 0 30%,#000 62%,transparent 76%); animation:aura 1.1s ease-in-out infinite alternate; }
     .core { position:absolute; inset:30%; border-radius:50%; background:radial-gradient(circle,var(--moon) 0 2%,var(--gold) 4%,rgba(198,75,112,.55) 14%,rgba(113,71,172,.25) 38%,transparent 68%); animation:core .8s ease-in-out infinite alternate; }
     svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
     .gold { fill:none; stroke:var(--gold); }
     .violet { fill:none; stroke:#bb9df1; }
     .orbit { transform-origin:400px 400px; animation:orbit 22s linear infinite; }
-    .runes { fill:var(--gold); font:500 14px "Yu Mincho",serif; letter-spacing:5px; }
+    .runes { fill:var(--gold); font:500 13px "Yu Mincho",serif; letter-spacing:0; }
+    .ticks { fill:none; stroke:var(--gold); stroke-width:8; stroke-dasharray:1 18; opacity:.13; }
     .seals { transform-origin:400px 400px; animation:seal-breath .9s ease-in-out infinite alternate; }
+    .octagram { stroke-width:2.4; }
+    .hexagram { stroke-width:1.7; opacity:.9; }
     .trace { stroke-dasharray:2200; animation:trace 7s ease both; }
-    .glyph { fill:var(--moon); font:400 38px "Yu Mincho",serif; text-anchor:middle; dominant-baseline:middle; text-shadow:0 0 10px var(--gold); }
+    .glyph { fill:var(--moon); stroke:rgba(3,2,10,.85); stroke-width:5px; paint-order:stroke fill; font:400 34px "Yu Mincho",serif; text-anchor:middle; dominant-baseline:middle; text-shadow:0 0 10px var(--gold); }
     .phase { position:absolute; left:50%; bottom:7%; transform:translateX(-50%); width:90vw; text-align:center; color:var(--gold); font-size:clamp(11px,2.8vw,17px); letter-spacing:.28em; text-shadow:0 0 12px rgba(247,216,149,.8); }
     .complete { position:absolute; inset:0; display:grid; place-content:center; text-align:center; animation:complete 7s ease both; }
     .complete h2 { margin:0; font-size:clamp(31px,8vw,66px); font-weight:500; letter-spacing:.16em; text-shadow:0 0 8px #fff,0 0 26px var(--violet),0 0 48px var(--rose); }
@@ -85,7 +88,7 @@
     @keyframes crescent { 0%{opacity:0} 8%,82%{opacity:.72} 100%{opacity:0;filter:blur(5px)} }
     @keyframes spark { 0%{opacity:0;transform:translateY(8vh) scale(.4)} 25%{opacity:.75} 70%{opacity:.35} 100%{opacity:0;transform:translateY(-18vh) scale(1.25)} }
     @keyframes orbit { to{transform:rotate(360deg)} }
-    @keyframes aura { to{opacity:.42;transform:scale(1.04)} }
+    @keyframes aura { to{opacity:.3;transform:scale(1.04)} }
     @keyframes core { to{transform:scale(1.18);filter:brightness(1.28)} }
     @keyframes seal-breath { to{opacity:.7;filter:drop-shadow(0 0 4px var(--gold))} }
     @keyframes trace { 0%,40%{stroke-dashoffset:2200} 70%,100%{stroke-dashoffset:0} }
@@ -124,19 +127,16 @@
           </defs>
           <g class="orbit gold" filter="url(#glow)">
             <circle cx="400" cy="400" r="376" stroke-width="2"/><circle cx="400" cy="400" r="362" stroke-width="1" stroke-dasharray="3 10"/>
-            <text class="runes"><textPath href="#outerPath">古き星の記憶　生命の環　光よ満ちよ　魂の灯火　古き星の記憶　生命の環　</textPath></text>
+            <text class="runes"><textPath href="#outerPath" textLength="2174" lengthAdjust="spacing">古き星の記憶　生命の環　光よ満ちよ　魂の灯火　古き星の記憶　生命の環　光よ満ちよ　魂の灯火　</textPath></text>
           </g>
+          <circle class="ticks" cx="400" cy="400" r="336"/>
           <g class="gold trace" opacity=".72">
             <circle cx="400" cy="400" r="318" stroke-width="2"/><circle cx="400" cy="400" r="282" stroke-width="1" stroke-dasharray="26 8 2 8"/>
           </g>
-          <g class="seals" filter="url(#glow)">
-            <g class="gold trace" stroke-width="2">
-              <polygon points="400,132 442,298 590,210 502,358 668,400 502,442 590,590 442,502 400,668 358,502 210,590 298,442 132,400 298,358 210,210 358,298"/>
-            </g>
-            <g class="violet trace" stroke-width="2.5">
-              <polygon points="400,188 584,507 216,507"/><polygon points="400,612 216,293 584,293"/>
-              <circle cx="400" cy="400" r="174" stroke-width="1.5"/>
-            </g>
+          <g class="seals" filter="url(#glow)" stroke-linecap="round" stroke-linejoin="round">
+            <polygon class="gold octagram" points="400,132 442,298 590,210 502,358 668,400 502,442 590,590 442,502 400,668 358,502 210,590 298,442 132,400 298,358 210,210 358,298"/>
+            <polygon class="violet hexagram" points="400,188 584,507 216,507"/><polygon class="violet hexagram" points="400,612 216,293 584,293"/>
+            <circle class="violet hexagram" cx="400" cy="400" r="174"/>
           </g>
           <g class="glyph">
             <text x="400" y="92">月</text><text x="708" y="400">火</text><text x="400" y="718">星</text><text x="92" y="400">風</text>
