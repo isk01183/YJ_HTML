@@ -40,6 +40,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        Log.d(TAG, "Service connected");
         windows = getSystemService(WindowManager.class);
         if (!receiverRegistered) {
             IntentFilter filter = new IntentFilter();
@@ -61,6 +62,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
     }
 
     private void handle(ChargingTransition.Event event) {
+        Log.d(TAG, "Event " + event + " from " + state);
         state = ChargingTransition.next(state, event);
         if (event == ChargingTransition.Event.CONNECT) {
             hideOverlay();
@@ -82,12 +84,16 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             @Override
             public void onPageFinished(WebView current, String url) {
                 if (overlay != current) return;
+                Log.d(TAG, "Page ready; attached=" + current.isAttachedToWindow()
+                        + " visibility=" + current.getWindowVisibility());
                 current.postVisualStateCallback(0, new WebView.VisualStateCallback() {
                     @Override
                     public void onComplete(long requestId) {
                         if (overlay != current) return;
                         handle(ChargingTransition.Event.VISUAL_READY);
                         WebViews.startMagicCircle(current, null);
+                        current.evaluateJavascript("document.documentElement.classList.contains('running')",
+                                result -> Log.d(TAG, "Animation running=" + result));
                     }
                 });
             }
@@ -108,6 +114,8 @@ public final class ChargingAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        // This is a service window, not an Activity: wake without unlocking.
+                        | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,

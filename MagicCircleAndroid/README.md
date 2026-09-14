@@ -38,6 +38,23 @@ v1.4에서는 중앙 팔망성·육망성의 선을 항상 완전히 연결하�
 
 개발 검증: `node selftest/circle-designs.test.js`, 기존 충전 상태 전환 Java selftest, `ThemeSelectionSelfTest`, `selftest/device-charging-overlay.ps1`을 사용합니다. 브라우저 검증 `selftest/circle-browser.test.js`는 설치된 Playwright를 사용하며 별도 패키지 다운로드가 필요하지 않습니다.
 
+## v1.6 화면 꺼짐 상태의 충전 재연결 수정
+
+노트20 울트라(Android 13)에서 화면을 끈 뒤 충전 연결을 모의 시험했을 때, 충전 감지와 애니메이션 시작은 성공했지만 화면은 절전 상태에 남아 있었습니다. 기존 `FLAG_KEEP_SCREEN_ON`은 이미 켜진 화면을 유지할 뿐 꺼진 화면을 켜지는 않습니다.
+
+충전 오버레이에 `FLAG_TURN_SCREEN_ON`을 추가해 새 연결마다 화면을 깨우도록 수정했습니다. 접근성 서비스의 창이므로 Activity 전용 `setTurnScreenOn()` 대신 창 옵션을 사용합니다. 잠금 해제·배터리 최적화 해제·추가 권한은 사용하지 않습니다. 최대 7초 종료, 충전 분리 시 즉시 종료, 매 연결마다 새 WebView로 재생하는 동작은 유지합니다. 연출 종료 후 화면이 다시 꺼지는 시점은 휴대폰의 화면 시간 제한 설정을 따릅니다.
+
+회귀 테스트는 앱을 홈 화면으로 보낸 상태에서 3회 재연결하며, 화면 켜짐·오버레이 생성·JavaScript 시작·7초 후 제거·빠른 재연결·분리 시 제거를 확인합니다. `-ScreenOff`는 매번 화면을 끈 뒤 시험합니다. 테스트 후 배터리 모의 상태는 실제 상태로 복구됩니다.
+
+```powershell
+.\selftest\device-charging-overlay.ps1 -Adb adb -ScreenOff
+.\selftest\device-charging-overlay.ps1 -Adb adb
+```
+
+ADB 모의 연결은 물리적 케이블·기기별 절전 정책의 모든 조건을 대신하지 않습니다. S26 울트라·탭 S11 울트라(Android 16)의 실제 케이블 연결과 보안 잠금 상태는 별도 확인이 필요합니다. 앱 설정에서 **강제 중지**하거나 접근성 권한을 끄면 감지하지 못합니다.
+
+참고: [Android 공식 창 옵션 설명](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_TURN_SCREEN_ON).
+
 ## 실기기 테스트
 
 - 잠금 해제 상태에서 케이블 연결/해제
