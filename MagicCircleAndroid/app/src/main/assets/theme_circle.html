@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:;">
+<title>魔法陣充電演出</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#030507}
+  :root{--ink:#efb5b3;--accent:#ffe9cf;--halo:#efb5b320;color-scheme:dark}
+  body{font-family:'Yu Mincho','Noto Serif JP',serif;color:#f6eedf;background:radial-gradient(ellipse at 50% 47%,var(--halo),transparent 53%),#030507}
+  html:not(.running) *,html:not(.running) *:before,html:not(.running) *:after{animation-play-state:paused!important}
+  .scene{height:100%;position:relative;animation:scene 7s linear both}
+  .intro,.finish{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:8vw}
+  .eyebrow{font:10px/1.8 sans-serif;letter-spacing:.35em;color:var(--ink)}
+  .intro h1{font-weight:400;letter-spacing:.08em;font-size:clamp(27px,7.2vw,62px);line-height:1.7;margin:20px 0}
+  .intro:before,.intro:after{content:'';width:74vw;height:1px;margin:auto;background:linear-gradient(90deg,transparent,var(--ink),transparent)}
+  .intro:before{margin-bottom:22px}.intro:after{margin-top:22px}
+  .connect{animation:connect 7s both}.begin{animation:begin 7s both}.begin h1{font-size:clamp(44px,12vw,92px)}
+  .ritual{position:absolute;inset:0;display:grid;grid-template-rows:1fr auto 1fr;justify-items:center;text-align:center;padding:5vh 2vw 4vh;animation:ritual 7s ease both}
+  .heading{align-self:center;max-width:90vw}.heading .diamond{font-size:17px;color:var(--ink);margin-bottom:14px;text-shadow:0 0 12px var(--ink)}
+  h2{font-size:clamp(20px,5.1vw,34px);font-weight:400;letter-spacing:.2em;margin:0 0 10px}
+  .heading p{font-size:9px;letter-spacing:.3em;color:var(--ink);margin:10px 0}.hairline{height:1px;background:linear-gradient(90deg,transparent,var(--ink),transparent);width:min(70vw,320px);margin:14px auto;opacity:.55}
+  .art{position:relative;width:min(98vw,60vh);aspect-ratio:1;align-self:center}.circle-svg{width:100%;height:100%;display:block;overflow:visible}
+  .ring-turn,.ring-reverse{transform-origin:300px 300px;animation:turn 65s linear infinite}.ring-reverse{animation-direction:reverse;animation-duration:90s}
+  .mote{animation:twinkle 3s ease-in-out infinite alternate;animation-delay:var(--delay)}.core-glow{transform-origin:300px 300px;animation:breathe 2.2s ease-in-out infinite alternate}
+  .readout{align-self:center;width:90%;color:var(--ink)}.percentage{font-size:clamp(37px,10vw,65px);font-weight:400;font-variant-numeric:tabular-nums;line-height:1.2}.percentage small{font-size:.45em;margin-left:2px}
+  .readout .state{font:10px/1.8 sans-serif;letter-spacing:.23em;margin-top:8px}.blessing{font-size:9px;line-height:1.9;letter-spacing:.3em;color:#c4b9a7;margin:13px 0 0}
+  .center-battery{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff9e9}.center-battery .percentage{font-size:clamp(32px,9vw,59px)}.center-battery .state{font-size:9px;letter-spacing:.17em;margin-top:5px}
+  .premium .center-battery{display:flex}.premium .readout>.percentage,.premium .readout>.state{display:none}
+  .metrics{display:none;grid-template-columns:repeat(3,1fr);margin:17px auto 0;max-width:420px;gap:8px}.premium .metrics{display:grid}
+  .metrics div+div{border-left:1px solid #ffffff20}.metrics strong{font:16px/1.6 sans-serif;color:#f7ecd6;display:block}.metrics span{font:9px/1.7 sans-serif;color:#b5b3ae;letter-spacing:.1em}
+  .meter{display:none;margin:12px auto 0;width:min(43vw,250px);height:6px;border-radius:9px;border:1px solid var(--ink);padding:1px}.layered .meter,.raphael .meter{display:block}.meter i{display:block;height:100%;border-radius:8px;background:var(--ink);box-shadow:0 0 8px var(--ink)}
+  .finish{animation:finish 7s ease both}.finish h2{font-size:clamp(30px,8vw,64px);text-shadow:0 0 22px var(--ink)}.finish p{font-size:14px;letter-spacing:.32em;color:var(--ink)}
+  .pulse{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,var(--halo),transparent 57%);animation:pulse 7s ease both}
+  .quiet .mote,.quiet .core-glow{animation:none}
+  @keyframes connect{0%{opacity:0;transform:translateY(10px)}8%,20%{opacity:1;transform:none}25%,100%{opacity:0;transform:translateY(-6px)}}
+  @keyframes begin{0%,25%{opacity:0;transform:scale(.95)}30%,37%{opacity:1;transform:none}42%,100%{opacity:0}}
+  @keyframes ritual{0%,39%{opacity:0;transform:scale(.92)}47%,79%{opacity:1;transform:none}84%,100%{opacity:0;transform:scale(1.025)}}
+  @keyframes finish{0%,81%{opacity:0;transform:translateY(6px)}87%,93%{opacity:1;transform:none}100%{opacity:0}}
+  @keyframes pulse{0%,78%,100%{opacity:0}85%{opacity:.65}}@keyframes scene{0%,96%{opacity:1}100%{opacity:0}}
+  @keyframes turn{to{transform:rotate(360deg)}}@keyframes twinkle{to{opacity:.85}}@keyframes breathe{to{opacity:.65;transform:scale(1.12)}}
+  @media(orientation:landscape){.ritual{grid-template-columns:1fr auto 1fr;grid-template-rows:1fr;padding:3vh 4vw;gap:2vw}.art{width:min(83vh,48vw)}.heading{max-width:22vw}.readout{max-width:22vw}h2{font-size:20px}.heading p{font-size:8px;line-height:1.8}.hairline{width:100%}.percentage{font-size:40px}.center-battery .percentage{font-size:42px}.metrics{grid-template-columns:1fr;gap:5px}.metrics div+div{border:0}.metrics strong{font-size:13px}.blessing{font-size:8px}.premium .blessing{display:none}}
+  @media(prefers-reduced-motion:reduce){.ring-turn,.ring-reverse,.mote,.core-glow{animation:none!important}}
+</style>
+</head>
+<body>
+<main class="scene">
+  <section class="intro connect"><div class="eyebrow">— 魔力の流入を確認 —</div><h1>充電端子が<br>接続されました</h1></section>
+  <section class="intro begin"><div class="eyebrow">— 術式を展開 —</div><h1>充電開始</h1></section>
+  <section class="ritual">
+    <header class="heading"><div class="diamond">✧</div><h2 id="theme-name"></h2><div class="hairline"></div><p>智慧は、明日を照らす。</p></header>
+    <div class="art"><div id="circle"></div><div class="center-battery"><div class="percentage"><span data-level>—</span><small>%</small></div><span class="state" data-status></span></div></div>
+    <footer class="readout"><div class="percentage"><span data-level>—</span><small>%</small></div><div class="meter"><i id="battery-fill"></i></div><div class="state" data-status></div><div class="hairline"></div><p class="blessing">KNOWLEDGE ILLUMINATES<br>A BRIGHTER TOMORROW</p><div class="metrics"><div><strong id="temperature">—</strong><span>バッテリー温度</span></div><div><strong id="health">不明</strong><span>バッテリー状態</span></div><div><strong id="connection">不明</strong><span>接続方式</span></div></div></footer>
+  </section>
+  <section class="finish"><h2>魔力回路</h2><p>接続完了</p></section><div class="pulse"></div>
+</main>
+<script src="circle-designs.js"></script>
+<script>
+  const params = new URLSearchParams(location.search), theme = CircleDesigns.get(params.get('theme'));
+  const info = CircleDesigns.battery(params);
+  document.documentElement.style.setProperty('--ink',theme.color);
+  document.documentElement.style.setProperty('--accent',theme.accent);
+  document.documentElement.style.setProperty('--halo',theme.color+'24');
+  document.body.className=theme.id+(theme.quiet?' quiet':'');
+  document.getElementById('theme-name').textContent=theme.name;
+  document.getElementById('circle').innerHTML=CircleDesigns.svg(theme.id,'scene');
+  document.querySelectorAll('[data-level]').forEach(node=>node.textContent=info.percent);
+  document.querySelectorAll('[data-status]').forEach(node=>node.textContent=info.status);
+  document.getElementById('temperature').textContent=info.temperature;
+  document.getElementById('health').textContent=info.health;
+  document.getElementById('connection').textContent=info.connection;
+  document.getElementById('battery-fill').style.width=(info.percent==='—'?0:info.percent)+'%';
+  window.startChargingAnimation=()=>{
+    if(document.documentElement.classList.contains('running'))return;
+    document.documentElement.classList.add('running');
+    if(!matchMedia('(prefers-reduced-motion: reduce)').matches)document.querySelectorAll('.orbit-motion').forEach(motion=>motion.beginElement());
+  };
+  if(params.get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);
+</script>
+</body>
+</html>

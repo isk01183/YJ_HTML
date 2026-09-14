@@ -149,6 +149,6 @@
     <section class="complete"><div><h2>魔力回路</h2><p>接続完了</p></div></section>
     <div class="flare"></div>
   </main>
-  <script>window.startChargingAnimation=()=>document.documentElement.classList.add("running");</script>
+  <script>window.startChargingAnimation=()=>document.documentElement.classList.add("running");if(new URLSearchParams(location.search).get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);</script>
 </body>
 </html>
