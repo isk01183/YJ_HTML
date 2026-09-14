@@ -14,7 +14,7 @@ if ((& $Adb shell settings get secure enabled_accessibility_services) -notmatch 
 function Get-ChargingOverlay {
     $dump = (& $Adb shell dumpsys window windows) -join "`n"
     [regex]::Matches($dump, '(?ms)^  Window #\d+ Window\{[^\r\n]*com\.yj\.magiccircle.*?(?=^  Window #|\z)') |
-        Where-Object { $_.Value -match 'ty=2032' } |
+        Where-Object { $_.Value -match 'ty=(2032|ACCESSIBILITY_OVERLAY)\b' } |
         Select-Object -First 1
 }
 

@@ -67,10 +67,6 @@ public final class ChargingAccessibilityService extends AccessibilityService {
         if (event == ChargingTransition.Event.CONNECT) {
             hideOverlay();
             if (!showOverlay()) state = ChargingTransition.State.COMPLETE;
-        } else if (event == ChargingTransition.Event.VISUAL_READY) {
-            if (overlay != null && state == ChargingTransition.State.PLAYING) {
-                overlay.setAlpha(1f);
-            }
         } else if (event == ChargingTransition.Event.DISCONNECT
                 || event == ChargingTransition.Event.FINISH) {
             hideOverlay();
@@ -78,8 +74,8 @@ public final class ChargingAccessibilityService extends AccessibilityService {
     }
 
     private boolean showOverlay() {
+        // Keep the root drawable: alpha=0 can stall the visual callback in the background.
         WebView view = WebViews.magicCircle(this);
-        view.setAlpha(0f);
         view.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView current, String url) {

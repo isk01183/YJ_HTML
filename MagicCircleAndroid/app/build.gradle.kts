@@ -10,8 +10,8 @@ android {
         applicationId = "com.yj.magiccircle"
         minSdk = 23
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
     }
 
     buildTypes {
