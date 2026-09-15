@@ -34,7 +34,6 @@
   .finish{animation:finish 7s ease both}.finish h2{font-size:clamp(30px,8vw,64px);text-shadow:0 0 22px var(--ink)}.finish p{font-size:14px;letter-spacing:.32em;color:var(--ink)}
   .pulse{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,var(--halo),transparent 57%);animation:pulse 7s ease both}
   .quiet .mote,.quiet .core-glow{animation:none}
-  body.reference{background:#000}.reference .pulse{display:none}.reference .reference-svg{overflow:hidden}
   @keyframes connect{0%{opacity:0;transform:translateY(10px)}8%,20%{opacity:1;transform:none}25%,100%{opacity:0;transform:translateY(-6px)}}
   @keyframes begin{0%,25%{opacity:0;transform:scale(.95)}30%,37%{opacity:1;transform:none}42%,100%{opacity:0}}
   @keyframes ritual{0%,39%{opacity:0;transform:scale(.92)}47%,79%{opacity:1;transform:none}84%,100%{opacity:0;transform:scale(1.025)}}
@@ -58,7 +57,7 @@
   </section>
   <section class="finish"><h2 data-i18n="circuit"></h2><p data-i18n="complete"></p></section><div class="pulse"></div>
 </main>
-<script src="i18n.js"></script><script src="reference-catalog.js"></script><script src="reference-art.js"></script><script src="circle-designs.js"></script>
+<script src="i18n.js"></script><script src="circle-designs.js"></script>
 <script>
   const params = new URLSearchParams(location.search), language = MagicI18n.normalize(params.get('lang') || navigator.language.split('-')[0]);
   const theme = MagicI18n.theme(CircleDesigns.get(params.get('theme')),language);
@@ -67,7 +66,7 @@
   document.documentElement.style.setProperty('--ink',theme.color);
   document.documentElement.style.setProperty('--accent',theme.accent);
   document.documentElement.style.setProperty('--halo',theme.color+'24');
-  document.body.className=theme.id+(theme.quiet?' quiet':'')+(theme.group==='reference'?' reference':'');
+  document.body.className=theme.id+(theme.quiet?' quiet':'');
   document.getElementById('theme-name').textContent=theme.name;
   document.getElementById('circle').innerHTML=CircleDesigns.svg(theme.id,'scene');
   document.querySelectorAll('[data-level]').forEach(node=>node.textContent=info.percent);

@@ -1,6 +1,5 @@
 (function (root) {
     'use strict';
-    const referenceArt = typeof module !== 'undefined' && module.exports ? require('./reference-art.js') : root.ReferenceArt;
     const list = [
         {id:'moon', name:'月影のルーン', group:'signature', tag:'01 / MOON', color:'#efb5b3', accent:'#ffe9cf', rings:2, orbits:2, core:'crystal', desc:'淡いローズの細線と、月を巡る光の軌道。静かな輝きで充電の始まりを告げます。'},
         {id:'raphael', name:'智慧の大賢者', group:'signature', tag:'02 / SAGE', color:'#f4dfa7', accent:'#91d8ff', rings:4, orbits:3, core:'crystal', desc:'金と蒼の二重ルーン、三つの光軌道。幾何学の結晶に智慧の光が集まります。'},
@@ -65,7 +64,6 @@
         list.push({id, name:ja, names:{ja,ko,en}, desc:descJa, descriptions:{ja:descJa,ko:descKo,en:descEn},
             group:'collection', tag:String(index+1).padStart(2,'0')+' / '+id.toUpperCase().replace(/-/g,' '), color, accent, rings:3, orbits:0, core:'collection'});
     });
-    list.unshift(...referenceArt.list);
     const get = id => list.find(theme => theme.id === id) || list.find(theme => theme.id === 'classic');
     function battery(params) {
         const number = key => {
@@ -403,7 +401,6 @@
     }
     function svg(id, prefix) {
         const t = get(id);
-        if (t.group === 'reference') return referenceArt.svg(t);
         const p = String(prefix || t.id).replace(/[^a-zA-Z0-9_-]/g, '') || 'circle';
         if (t.group === 'collection') return collectionSvg(t,p);
         const circle = (r, attrs = '') => '<circle cx="300" cy="300" r="' + r + '" ' + attrs + '/>';
