@@ -23,71 +23,28 @@
   dialog{border:1px solid #63573e;border-radius:12px;padding:0;background:#030507;color:#f4e7cd;width:min(420px,96vw);height:94vh;max-height:94vh;overflow:hidden}dialog::backdrop{background:#000b}dialog iframe{border:0;width:100%;height:100%}.close{position:absolute;top:10px;right:10px;z-index:1;background:#191b22c9;color:#fff;border:1px solid #6d6d76;border-radius:20px;min-height:40px;padding:7px 14px}
   @media(min-width:640px){.page{padding-top:38px}.hero{grid-template-columns:260px 1fr;gap:36px;padding:20px 36px}.hero h2{font-size:31px}.hero p{font-size:13px}.grid{grid-template-columns:repeat(4,minmax(0,1fr))}h1{font-size:37px}.hero .label{font-size:11px}.card .name{font-size:13px}}
   @media(max-width:340px){.page{padding-left:13px;padding-right:13px}.hero{gap:9px;padding:13px 9px}.hero h2{font-size:18px}.hero p{font-size:10px}.tabs{gap:5px}.tab{padding:7px 10px}}
+  .languages{display:flex;align-items:center;gap:5px;margin:20px 0 0;flex-wrap:wrap}.languages>span{font-size:10px;color:#a5aaaf;margin-right:auto}.languages button{border:1px solid #333943;background:#10151c;min-height:40px;padding:8px 12px;border-radius:7px;font-size:11px}.languages button[aria-pressed=true]{border-color:#bdac8d;background:#28251f;color:#f6e2bb}
+  [data-i18n]{white-space:pre-line}.art img{width:100%;height:100%;display:block}.search{width:100%;min-height:44px;border:1px solid #353944;background:#0c1016;border-radius:9px;padding:11px 14px;color:#eee4d3;font:inherit;font-size:12px;margin-bottom:17px}.search:focus{outline:2px solid #bdac8d;outline-offset:2px}.empty{color:#a6aab2;font-size:13px;text-align:center;padding:24px}
   @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
 <main class="page">
-  <div class="masthead"><span class="brand">ARCANE / COLLECTION</span><button id="settings" class="settings">接続設定 ↗</button></div>
-  <h1>魔法陣の書庫</h1><p class="intro">充電のひとときに、あなたの術式を。<br>好きな魔法陣を選んで、光の演出をお楽しみください。</p>
-  <div class="statusline" id="service-state"><i class="dot"></i><span id="service-label">アプリで接続設定を確認</span><span class="sep">/</span><span>最大7秒</span><span class="sep">/</span><span>オフライン</span></div>
-  <section class="hero" aria-label="選択した魔法陣"><div id="hero-art"></div><div><div class="label" id="hero-tag"></div><h2 id="hero-title"></h2><p id="hero-description"></p><div class="saved" id="hero-saved"></div></div></section>
-  <p id="service-hint" class="hint" hidden>充電時の表示には、ユーザー補助サービスを有効にしてください。上の「接続設定」から設定できます。</p>
-  <div class="section-head"><h2>術式を選ぶ</h2><span class="count">13 DESIGNS</span></div>
-  <nav class="tabs" aria-label="デザインの分類"><button class="tab" data-group="all" aria-pressed="true">すべて</button><button class="tab" data-group="signature" aria-pressed="false">代表作 · 4</button><button class="tab" data-group="variation" aria-pressed="false">変奏 · 8</button><button class="tab" data-group="classic" aria-pressed="false">従来</button></nav>
-  <div class="grid" id="design-grid"></div><p class="note">中央の星形は回転しません。動きのある術式は、外周のルーン環と光の軌道だけがゆっくり巡ります。<br>端子を外すと終了し、再接続すると最初から再生します。</p>
+  <div class="masthead"><span class="brand" data-i18n="brand"></span><button id="settings" class="settings" data-i18n="settings"></button></div>
+  <div class="languages" role="group" data-i18n-label="language"><span data-i18n="language"></span><button data-language="ko" lang="ko" aria-pressed="false">한국어</button><button data-language="ja" lang="ja" aria-pressed="false">日本語</button><button data-language="en" lang="en" aria-pressed="false">English</button></div>
+  <h1 data-i18n="galleryTitle"></h1><p class="intro" data-i18n="intro"></p>
+  <div class="statusline" id="service-state"><i class="dot"></i><span id="service-label"></span><span class="sep">/</span><span data-i18n="maxTime"></span><span class="sep">/</span><span data-i18n="offline"></span></div>
+  <section class="hero" data-i18n-label="selectedCircle"><div id="hero-art"></div><div><div class="label" id="hero-tag"></div><h2 id="hero-title"></h2><p id="hero-description"></p><div class="saved" id="hero-saved"></div></div></section>
+  <p id="service-hint" class="hint" hidden data-i18n="serviceHint"></p>
+  <div class="section-head"><h2 data-i18n="choose"></h2><span class="count" id="design-count"></span></div>
+  <nav class="tabs" data-i18n-label="categories"><button class="tab" data-group="all" aria-pressed="true"></button><button class="tab" data-group="collection" aria-pressed="false"></button><button class="tab" data-group="signature" aria-pressed="false"></button><button class="tab" data-group="variation" aria-pressed="false"></button><button class="tab" data-group="classic" aria-pressed="false"></button></nav>
+  <input id="search" class="search" type="search" autocomplete="off" data-i18n-label="search">
+  <div class="grid" id="design-grid"></div><p class="empty" id="empty" hidden data-i18n="noResults"></p><p class="note" data-i18n="note"></p>
 </main>
-<footer class="actions"><div class="action-inner"><div class="action-label" id="selection-status" aria-live="polite"></div><div class="buttons"><button id="preview">▷ 7秒プレビュー</button><button class="apply" id="apply">この魔法陣を適用</button></div></div></footer>
-<dialog id="browser-preview"><button class="close" id="close-preview">閉じる ×</button><iframe title="魔法陣プレビュー"></iframe></dialog>
+<footer class="actions"><div class="action-inner"><div class="action-label" id="selection-status" aria-live="polite"></div><div class="buttons"><button id="preview" data-i18n="preview"></button><button class="apply" id="apply"></button></div></div></footer>
+<dialog id="browser-preview"><button class="close" id="close-preview" data-i18n="close"></button><iframe title="Magic circle preview"></iframe></dialog>
+<script src="i18n.js"></script>
 <script src="circle-designs.js"></script>
-<script>
-  let selected='classic', focused='classic', native=false, initialized=false, activeGroup='all';
-  const grid=document.getElementById('design-grid');
-  grid.innerHTML=CircleDesigns.list.map(t=>'<button type="button" class="card" data-theme="'+t.id+'" aria-pressed="false" aria-label="'+t.name+'を選択"><span class="check">✓</span><span class="applied-badge" hidden>適用中</span><div class="art">'+CircleDesigns.svg(t.id,'card-'+t.id)+'</div><span class="name">'+t.name+'</span><span class="tag">'+t.tag+'</span></button>').join('');
-  function render(){
-    const t=CircleDesigns.get(focused);
-    document.documentElement.style.setProperty('--ink',t.color);
-    document.getElementById('hero-art').innerHTML=CircleDesigns.svg(t.id,'hero');
-    document.getElementById('hero-tag').textContent=t.tag;
-    document.getElementById('hero-title').textContent=t.name;
-    document.getElementById('hero-description').textContent=t.desc;
-    document.getElementById('hero-saved').textContent=focused===selected?'✓ 適用中の魔法陣':'選択中 · 適用すると次の充電から反映';
-    document.getElementById('selection-status').textContent='適用中：'+CircleDesigns.get(selected).name;
-    document.getElementById('apply').disabled=focused===selected;
-    document.getElementById('apply').textContent=focused===selected?'✓ 適用済み':'この魔法陣を適用';
-    document.querySelectorAll('.card').forEach(card=>{
-      card.setAttribute('aria-pressed',String(card.dataset.theme===focused));
-      card.querySelector('.applied-badge').hidden=card.dataset.theme!==selected;
-      card.hidden=activeGroup!=='all'&&CircleDesigns.get(card.dataset.theme).group!==activeGroup;
-    });
-  }
-  window.setGalleryState=state=>{
-    native=true;selected=CircleDesigns.get(state.selected).id;
-    if(!initialized){focused=selected;initialized=true;}
-    document.getElementById('service-label').textContent=state.enabled?'充電アニメーション：有効':'充電アニメーション：無効';
-    document.getElementById('service-state').classList.toggle('enabled',!!state.enabled);
-    document.getElementById('service-hint').hidden=!!state.enabled;
-    render();
-  };
-  grid.addEventListener('click',event=>{const card=event.target.closest('[data-theme]');if(card){focused=card.dataset.theme;render();}});
-  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{activeGroup=button.dataset.group;document.querySelectorAll('.tab').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));render();}));
-  document.getElementById('apply').addEventListener('click',()=>{
-    if(native)location.href='magiccircle://select?theme='+encodeURIComponent(focused);
-    else{selected=focused;render();document.getElementById('selection-status').textContent='ブラウザ確認用 · アプリへの保存は行われません';}
-  });
-  const dialog=document.getElementById('browser-preview');let timer;
-  function closePreview(){clearTimeout(timer);dialog.close();dialog.querySelector('iframe').src='about:blank';}
-  dialog.addEventListener('cancel',()=>{clearTimeout(timer);dialog.querySelector('iframe').src='about:blank';});
-  document.getElementById('close-preview').addEventListener('click',closePreview);
-  document.getElementById('preview').addEventListener('click',()=>{
-    if(native){location.href='magiccircle://preview?theme='+encodeURIComponent(focused);return;}
-    const file=focused==='classic'?'magic_circle.html':'theme_circle.html';
-    dialog.querySelector('iframe').src=file+'?theme='+focused+'&demo=1';dialog.showModal();timer=setTimeout(closePreview,7400);
-  });
-  document.getElementById('settings').addEventListener('click',()=>{
-    if(native)location.href='magiccircle://settings';else document.getElementById('selection-status').textContent='接続設定はAndroidアプリで開いてください';
-  });
-  render();
-</script>
+<script src="gallery.js"></script>
 </body>
 </html>

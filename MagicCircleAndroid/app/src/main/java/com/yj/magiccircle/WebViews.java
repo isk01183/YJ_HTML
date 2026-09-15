@@ -11,9 +11,12 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import java.util.Locale;
+
 final class WebViews {
     private static final String PREFERENCES = "magic_circle";
     private static final String SELECTED_STYLE = "selected_style";
+    private static final String LANGUAGE = "language";
 
     private WebViews() {}
 
@@ -61,6 +64,17 @@ final class WebViews {
                 .edit().putString(SELECTED_STYLE, id).apply();
     }
 
+    static String selectedLanguage(Context context) {
+        return LanguageSelection.resolve(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .getString(LANGUAGE, null), Locale.getDefault().getLanguage());
+    }
+
+    static void selectLanguage(Context context, String language) {
+        if (!LanguageSelection.isValid(language)) return;
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .edit().putString(LANGUAGE, language).apply();
+    }
+
     static void loadMagicCircle(WebView view) {
         loadMagicCircle(view, selectedTheme(view.getContext()));
     }
@@ -78,6 +92,7 @@ final class WebViews {
         String page = "classic".equals(theme) ? "magic_circle.html" : "theme_circle.html";
         Uri uri = Uri.parse("file:///android_asset/" + page).buildUpon()
                 .appendQueryParameter("theme", theme)
+                .appendQueryParameter("lang", selectedLanguage(view.getContext()))
                 .appendQueryParameter("battery", Integer.toString(percent))
                 .appendQueryParameter("temperature", temperature)
                 .appendQueryParameter("health", Integer.toString(battery == null

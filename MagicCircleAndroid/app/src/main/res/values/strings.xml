@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">魔法陣充電アニメーション</string>
-    <string name="accessibility_service_description">充電端子を接続すると、オフラインの魔法陣アニメーションを最大7秒間表示します。</string>
+    <string name="app_name">Magic Circle Charging</string>
+    <string name="accessibility_service_description">Displays an offline magic circle animation for up to 7 seconds when a charger is connected.</string>
+    <string name="close_preview">Close</string>
 </resources>

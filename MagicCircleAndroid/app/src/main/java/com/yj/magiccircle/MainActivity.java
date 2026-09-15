@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
@@ -24,6 +25,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
+
+import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String GALLERY_URL = "file:///android_asset/gallery.html";
@@ -72,6 +75,15 @@ public final class MainActivity extends Activity {
             startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             return;
         }
+        if ("language".equals(action)) {
+            if (uri.getQueryParameterNames().size() != 1
+                    || uri.getQueryParameters("lang").size() != 1) return;
+            String language = uri.getQueryParameter("lang");
+            if (!LanguageSelection.isValid(language)) return;
+            WebViews.selectLanguage(this, language);
+            updateGalleryState();
+            return;
+        }
         if (uri.getQueryParameterNames().size() != 1
                 || uri.getQueryParameters("theme").size() != 1) return;
         String theme = uri.getQueryParameter("theme");
@@ -86,10 +98,11 @@ public final class MainActivity extends Activity {
 
     private void updateGalleryState() {
         if (gallery == null || !GALLERY_URL.equals(gallery.getUrl())) return;
-        // The ID is allowlisted; no user-provided text is inserted into JavaScript.
+        // The theme and language are allowlisted before insertion into JavaScript.
         gallery.evaluateJavascript("if (typeof window.setGalleryState === 'function') "
                 + "window.setGalleryState({selected:'" + WebViews.selectedTheme(this)
-                + "',enabled:" + isServiceEnabled() + "})", null);
+                + "',enabled:" + isServiceEnabled() + ",language:'"
+                + WebViews.selectedLanguage(this) + "'})", null);
     }
 
     private void showPreview(String theme) {
@@ -101,7 +114,9 @@ public final class MainActivity extends Activity {
         root.addView(preview, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         Button close = new Button(this);
-        close.setText("閉じる");
+        Configuration localized = new Configuration(getResources().getConfiguration());
+        localized.setLocale(new Locale(WebViews.selectedLanguage(this)));
+        close.setText(createConfigurationContext(localized).getString(R.string.close_preview));
         close.setTextColor(0xFFF1DEC0);
         close.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC17212A));
         close.setOnClickListener(v -> dismissPreview());

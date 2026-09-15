@@ -41,24 +41,28 @@
   @keyframes pulse{0%,78%,100%{opacity:0}85%{opacity:.65}}@keyframes scene{0%,96%{opacity:1}100%{opacity:0}}
   @keyframes turn{to{transform:rotate(360deg)}}@keyframes twinkle{to{opacity:.85}}@keyframes breathe{to{opacity:.65;transform:scale(1.12)}}
   @media(orientation:landscape){.ritual{grid-template-columns:1fr auto 1fr;grid-template-rows:1fr;padding:3vh 4vw;gap:2vw}.art{width:min(83vh,48vw)}.heading{max-width:22vw}.readout{max-width:22vw}h2{font-size:20px}.heading p{font-size:8px;line-height:1.8}.hairline{width:100%}.percentage{font-size:40px}.center-battery .percentage{font-size:42px}.metrics{grid-template-columns:1fr;gap:5px}.metrics div+div{border:0}.metrics strong{font-size:13px}.blessing{font-size:8px}.premium .blessing{display:none}}
+  [data-i18n]{white-space:pre-line}html[lang=en] .eyebrow{letter-spacing:.14em}html[lang=en] .begin h1{font-size:clamp(34px,9vw,80px)}html[lang=en] h2{letter-spacing:.06em}html[lang=en] .intro h1{line-height:1.35}html[lang=ko] body{font-family:'Noto Serif KR','Batang',serif}
+  @media(orientation:portrait) and (max-height:700px){.ritual{padding:2vh 2vw}.art{width:min(94vw,52vh)}.heading .diamond{margin-bottom:4px;font-size:13px}h2{font-size:19px;margin-bottom:5px}.heading p{margin:5px 0;font-size:8px}.hairline{margin:7px auto}.percentage{font-size:32px}.blessing{margin-top:7px;font-size:8px;line-height:1.5;letter-spacing:.15em}.metrics{margin-top:8px}.metrics strong{font-size:12px}.metrics span{font-size:8px}.readout .state{font-size:9px;margin-top:4px}.center-battery .percentage{font-size:31px}.center-battery .state{font-size:8px}}
   @media(prefers-reduced-motion:reduce){.ring-turn,.ring-reverse,.mote,.core-glow{animation:none!important}}
 </style>
 </head>
 <body>
 <main class="scene">
-  <section class="intro connect"><div class="eyebrow">— 魔力の流入を確認 —</div><h1>充電端子が<br>接続されました</h1></section>
-  <section class="intro begin"><div class="eyebrow">— 術式を展開 —</div><h1>充電開始</h1></section>
+  <section class="intro connect"><div class="eyebrow" data-i18n="detected"></div><h1 data-i18n="connected"></h1></section>
+  <section class="intro begin"><div class="eyebrow" data-i18n="deploy"></div><h1 data-i18n="begin"></h1></section>
   <section class="ritual">
-    <header class="heading"><div class="diamond">✧</div><h2 id="theme-name"></h2><div class="hairline"></div><p>智慧は、明日を照らす。</p></header>
+    <header class="heading"><div class="diamond">✧</div><h2 id="theme-name"></h2><div class="hairline"></div><p data-i18n="wisdom"></p></header>
     <div class="art"><div id="circle"></div><div class="center-battery"><div class="percentage"><span data-level>—</span><small>%</small></div><span class="state" data-status></span></div></div>
-    <footer class="readout"><div class="percentage"><span data-level>—</span><small>%</small></div><div class="meter"><i id="battery-fill"></i></div><div class="state" data-status></div><div class="hairline"></div><p class="blessing">KNOWLEDGE ILLUMINATES<br>A BRIGHTER TOMORROW</p><div class="metrics"><div><strong id="temperature">—</strong><span>バッテリー温度</span></div><div><strong id="health">不明</strong><span>バッテリー状態</span></div><div><strong id="connection">不明</strong><span>接続方式</span></div></div></footer>
+    <footer class="readout"><div class="percentage"><span data-level>—</span><small>%</small></div><div class="meter"><i id="battery-fill"></i></div><div class="state" data-status></div><div class="hairline"></div><p class="blessing" data-i18n="blessing"></p><div class="metrics"><div><strong id="temperature">—</strong><span data-i18n="temperature"></span></div><div><strong id="health">—</strong><span data-i18n="health"></span></div><div><strong id="connection">—</strong><span data-i18n="connection"></span></div></div></footer>
   </section>
-  <section class="finish"><h2>魔力回路</h2><p>接続完了</p></section><div class="pulse"></div>
+  <section class="finish"><h2 data-i18n="circuit"></h2><p data-i18n="complete"></p></section><div class="pulse"></div>
 </main>
-<script src="circle-designs.js"></script>
+<script src="i18n.js"></script><script src="circle-designs.js"></script>
 <script>
-  const params = new URLSearchParams(location.search), theme = CircleDesigns.get(params.get('theme'));
-  const info = CircleDesigns.battery(params);
+  const params = new URLSearchParams(location.search), language = MagicI18n.normalize(params.get('lang') || navigator.language.split('-')[0]);
+  const theme = MagicI18n.theme(CircleDesigns.get(params.get('theme')),language);
+  MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
+  const info = MagicI18n.battery(CircleDesigns.battery(params),language);
   document.documentElement.style.setProperty('--ink',theme.color);
   document.documentElement.style.setProperty('--accent',theme.accent);
   document.documentElement.style.setProperty('--halo',theme.color+'24');

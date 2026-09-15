@@ -10,14 +10,20 @@ android {
         applicationId = "com.yj.magiccircle"
         minSdk = 23
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    bundle {
+        language {
+            // All three languages remain available offline, including native preview controls.
+            enableSplit = false
         }
     }
     compileOptions {

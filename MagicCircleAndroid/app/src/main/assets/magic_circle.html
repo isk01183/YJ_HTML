@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:;">
   <title>魔法陣充電演出</title>
   <style>
     :root { color-scheme:dark; --gold:#f7d895; --moon:#fff8df; --violet:#9c76e8; --rose:#c64b70; }
@@ -92,11 +93,12 @@
     @keyframes core { to{transform:scale(1.18);filter:brightness(1.28)} }
     @keyframes seal-breath { to{opacity:.7;filter:drop-shadow(0 0 4px var(--gold))} }
     @keyframes trace { 0%,40%{stroke-dashoffset:2200} 70%,100%{stroke-dashoffset:0} }
+    [data-i18n]{white-space:pre-line}html[lang=en] .kicker{letter-spacing:.12em}html[lang=en] .begin h1{font-size:clamp(34px,9vw,80px);letter-spacing:.06em}html[lang=en] .glyph{font-size:20px}html[lang=ko] body{font-family:'Noto Serif KR','Batang',serif}html[lang=ko] .glyph{font-size:29px}
     @media (prefers-reduced-motion:reduce) { .orbit,.aura,.core,.seals,.sparks i { animation-play-state:paused; } }
   </style>
 </head>
 <body>
-  <main id="scene" aria-label="充電開始アニメーション">
+  <main id="scene" data-i18n-label="animationTitle">
     <div class="mist"></div><div class="crescent top"></div><div class="crescent bottom"></div>
     <div class="sparks" aria-hidden="true">
       <i style="--x:9%;--y:76%;--s:3px;--d:3.4s;--delay:-1.2s"></i><i style="--x:21%;--y:42%;--s:2px;--d:4.1s;--delay:-.4s"></i>
@@ -106,14 +108,14 @@
     </div>
 
     <section class="message connect">
-      <div class="kicker">― 魔力の流入を確認 ―</div>
-      <h1>充電端子が<br>接続されました</h1>
+      <div class="kicker" data-i18n="detected"></div>
+      <h1 data-i18n="connected"></h1>
       <div class="ornament">◇</div>
     </section>
 
     <section class="message begin">
-      <div class="kicker">― 術式を展開 ―</div>
-      <h1>充電開始</h1>
+      <div class="kicker" data-i18n="deploy"></div>
+      <h1 data-i18n="begin"></h1>
       <div class="ornament">✦</div>
     </section>
 
@@ -127,7 +129,7 @@
           </defs>
           <g class="orbit gold" filter="url(#glow)">
             <circle cx="400" cy="400" r="376" stroke-width="2"/><circle cx="400" cy="400" r="362" stroke-width="1" stroke-dasharray="3 10"/>
-            <text class="runes"><textPath href="#outerPath" textLength="2174" lengthAdjust="spacing">古き星の記憶　生命の環　光よ満ちよ　魂の灯火　古き星の記憶　生命の環　光よ満ちよ　魂の灯火　</textPath></text>
+            <text class="runes"><textPath id="rune-verse" href="#outerPath" textLength="2174" lengthAdjust="spacingAndGlyphs"></textPath></text>
           </g>
           <circle class="ticks" cx="400" cy="400" r="336"/>
           <g class="gold trace" opacity=".72">
@@ -139,16 +141,23 @@
             <circle class="violet hexagram" cx="400" cy="400" r="174"/>
           </g>
           <g class="glyph">
-            <text x="400" y="92">月</text><text x="708" y="400">火</text><text x="400" y="718">星</text><text x="92" y="400">風</text>
+            <text x="400" y="92" data-i18n="moonGlyph"></text><text x="708" y="400" data-i18n="fireGlyph"></text><text x="400" y="718" data-i18n="starGlyph"></text><text x="92" y="400" data-i18n="windGlyph"></text>
           </g>
         </svg>
       </div>
-      <div class="phase">魔力回路　接続中</div>
+      <div class="phase" data-i18n="circuitConnecting"></div>
     </section>
 
-    <section class="complete"><div><h2>魔力回路</h2><p>接続完了</p></div></section>
+    <section class="complete"><div><h2 data-i18n="circuit"></h2><p data-i18n="complete"></p></div></section>
     <div class="flare"></div>
   </main>
-  <script>window.startChargingAnimation=()=>document.documentElement.classList.add("running");if(new URLSearchParams(location.search).get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);</script>
+  <script src="i18n.js"></script>
+  <script>
+    const params=new URLSearchParams(location.search), language=MagicI18n.normalize(params.get('lang') || navigator.language.split('-')[0]);
+    MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
+    document.getElementById('rune-verse').textContent=MagicI18n.t('runeVerse',language).repeat(language==='en'?1:2);
+    window.startChargingAnimation=()=>document.documentElement.classList.add('running');
+    if(params.get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);
+  </script>
 </body>
 </html>
