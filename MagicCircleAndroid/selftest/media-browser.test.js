@@ -5,6 +5,7 @@ const {pathToFileURL} = require('node:url');
 const {chromium} = require('playwright');
 const sharp = require('sharp');
 const designs = require('../app/src/main/assets/circle-designs.js');
+const builtins = designs.list.concat(require('../app/src/main/assets/collection-catalog.js').list);
 const assets = path.resolve(__dirname, '../app/src/main/assets');
 const file = name => pathToFileURL(path.join(assets, name)).href;
 const id = '12345678-90ab-4cde-8123-456789abcdef';
@@ -24,7 +25,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     assert.equal(await page.locator('#import-media').count(),1,'Users need an import action in the existing gallery');
     const media=[{id,name:'<img src=x onerror=alert(1)> 여행 사진.jpg',url:mediaUrl,mime:'image/jpeg'}];
     await page.evaluate(({id,media})=>window.setGalleryState({selected:id,language:'ko',enabled:true,hidden:['classic','moon'],media}),{id,media});
-    assert.equal(await page.locator('.card:visible').count(),designs.list.length-1);
+    assert.equal(await page.locator('.card:visible').count(),builtins.length-1);
     assert.equal(await page.locator('#hero-title').textContent(),media[0].name,'Imported names must remain plain text');
     assert.equal(await page.locator('#hero-title img').count(),0);
     assert.equal(await page.locator('#import-media').isEnabled(),true);
@@ -40,7 +41,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     await page.locator('#search').fill('여행');
     assert.equal(await page.locator('.card:visible').count(),1);
     // The native delete round trip removes the selected item. No stale preview may remain.
-    await page.evaluate(hidden=>window.setGalleryState({selected:'',language:'ko',enabled:true,hidden,media:[]}),designs.list.map(x=>x.id));
+    await page.evaluate(hidden=>window.setGalleryState({selected:'',language:'ko',enabled:true,hidden,media:[]}),builtins.map(x=>x.id));
     assert.equal(await page.locator('.card:visible').count(),0);
     assert.equal(await page.locator('#preview').isDisabled(),true);
     assert.equal(await page.locator('#apply').isDisabled(),true);
@@ -49,7 +50,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     // Restore must immediately recover a valid selection even after an entirely empty library.
     await page.evaluate(()=>window.setGalleryState({selected:'classic',language:'en',enabled:true,hidden:[],media:[]}));
     await page.locator('[data-group="all"]').click(); await page.locator('#search').fill('');
-    assert.equal(await page.locator('.card:visible').count(),designs.list.length);
+    assert.equal(await page.locator('.card:visible').count(),builtins.length);
     assert.equal(await page.locator('#preview').isEnabled(),true);
     await page.evaluate(({id,media})=>window.setGalleryState({selected:id,language:'en',enabled:true,hidden:[],media}),{id,media});
     assert.equal(await page.locator('#hero-title').textContent(),media[0].name,'A newly imported selected file should be focused immediately');

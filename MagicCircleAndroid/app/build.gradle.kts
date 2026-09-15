@@ -11,8 +11,8 @@ android {
         minSdk = 23
         targetSdk = 37
         // Increase code for every distributed APK, including restorations and hotfixes.
-        versionCode = 12
-        versionName = "1.9"
+        versionCode = 13
+        versionName = "1.10"
     }
 
     buildTypes {

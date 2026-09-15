@@ -12,7 +12,7 @@ const designs = require('../app/src/main/assets/circle-designs.js');
         page.on('pageerror', error => errors.push(error.message));
         const assets = path.resolve(__dirname,'../app/src/main/assets');
         await page.goto(pathToFileURL(path.join(assets,'gallery.html')).href+'?lang=ja');
-        assert.equal(await page.locator('.card').count(),designs.list.length);
+        assert.equal(await page.locator('.card').count(),designs.list.length+118);
         await page.locator('[data-theme="raphael"]').click();
         assert.equal(await page.locator('#hero-title').textContent(),'智慧の大賢者');
         assert.equal(await page.locator('#apply').isEnabled(),true);

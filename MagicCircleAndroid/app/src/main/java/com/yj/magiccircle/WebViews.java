@@ -17,6 +17,8 @@ import java.util.Locale;
 import java.util.Collections;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.zip.GZIPInputStream;
 import android.view.ViewGroup;
 
 final class WebViews {
@@ -91,8 +93,7 @@ final class WebViews {
                 ? Math.round(level * 100f / scale) : -1;
         String temperature = battery != null && battery.hasExtra(BatteryManager.EXTRA_TEMPERATURE)
                 ? Integer.toString(battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) : "";
-        String page = media != null ? "media_circle.html"
-                : "classic".equals(theme) ? "magic_circle.html" : "theme_circle.html";
+        String page = media != null ? "media_circle.html" : ThemeSelection.page(theme);
         Uri uri = Uri.parse("file:///android_asset/" + page).buildUpon()
                 .appendQueryParameter("theme", theme)
                 .appendQueryParameter("media", media == null ? "" : media.id)
@@ -134,8 +135,12 @@ final class WebViews {
 
     static class LocalClient extends WebViewClient {
         private final MediaLibrary library;
+        private final android.content.res.AssetManager assets;
 
-        LocalClient(Context context) { library = MediaLibrary.get(context); }
+        LocalClient(Context context) {
+            library = MediaLibrary.get(context);
+            assets = context.getAssets();
+        }
 
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -151,6 +156,18 @@ final class WebViews {
             String path = uri.getPath();
             if ("file".equals(uri.getScheme()) && (uri.getAuthority() == null || uri.getAuthority().isEmpty())
                     && path != null && path.startsWith("/android_asset/") && !path.contains("..")) return null;
+            String collectionAsset = CollectionCatalog.assetPath(uri.toString());
+            if (collectionAsset != null) try {
+                InputStream packed = assets.open(collectionAsset);
+                try {
+                    java.util.Map<String, String> headers = new java.util.HashMap<>();
+                    headers.put("Cache-Control", "no-store");
+                    headers.put("X-Content-Type-Options", "nosniff");
+                    headers.put("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+                    return new WebResourceResponse("image/svg+xml", "UTF-8", 200, "OK",
+                            headers, new GZIPInputStream(packed));
+                } catch (IOException error) { packed.close(); }
+            } catch (IOException ignored) { /* Missing or invalid packaged SVG is never a network fallback. */ }
             String id = MediaValidation.resourceId(uri.toString());
             if (id != null) {
                 boolean thumb = "thumb=1".equals(uri.getEncodedQuery());

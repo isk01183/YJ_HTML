@@ -19,6 +19,7 @@
     add('designCount', '{count} 種の術式', '마법진 {count}종', '{count} designs');
     add('categories', 'デザインの分類', '디자인 분류', 'Design categories');
     add('all', 'すべて', '전체', 'All');
+    add('reference', '参照コレクション', '첨부 도안', 'Reference collection');
     add('collection', '幻想の書', '환상의 서', 'Fantasy collection');
     add('signature', '代表作', '대표작', 'Signature');
     add('variation', '変奏', '변주', 'Variations');

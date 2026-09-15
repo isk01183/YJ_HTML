@@ -2,11 +2,11 @@ let selected='classic', focused='classic', native=false, initialized=false, enab
 let language=MagicI18n.normalize(new URLSearchParams(location.search).get('lang') || navigator.language.split('-')[0]);
 const grid=document.getElementById('design-grid');
 let hidden=new Set(), media=[], busy=false, readable=true;
-const visibleDesigns=()=>readable?CircleDesigns.list.filter(t=>!hidden.has(t.id)).concat(media):[];
+const visibleDesigns=()=>readable?CircleDesigns.list.concat(ReferenceDesigns.list).filter(t=>!hidden.has(t.id)).concat(media):[];
 const translatedTheme=id=>{
     const custom=media.find(t=>t.id===id);
     return custom?{...custom,desc:text(custom.mime==='image/gif'?'mediaAnimated':'mediaStill'),color:'#d5c5a2',group:'uploads'}
-        :MagicI18n.theme(CircleDesigns.get(id),language);
+        :MagicI18n.theme(ReferenceDesigns.get(id)||CircleDesigns.get(id),language);
 };
 const text=(key,values)=>MagicI18n.t(key,language,values);
 const cards=new Map();
@@ -14,7 +14,7 @@ function loadArt(card){
     const image=card.querySelector('img');
     if(!image.hasAttribute('src')){
         const custom=media.find(t=>t.id===card.dataset.theme);
-        image.src=custom?custom.url+'?thumb=1':'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
+        image.src=custom?custom.url+'?thumb=1':ReferenceDesigns.get(card.dataset.theme)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
     }
 }
 // Decode only nearby thumbnails. A long collection should not create thousands of live SVG nodes.
@@ -32,7 +32,7 @@ function syncCards(){
     grid.appendChild(card);cards.set(theme.id,card);
     if(observer)observer.observe(card);else loadArt(card);
 });
-    if(!ids.has(selected))selected=designs[0]?.id||'';
+    if(selected&&!ids.has(selected))selected=designs[0]?.id||'';
     if(!ids.has(focused))focused=selected;
 }
 function render(){
@@ -43,7 +43,7 @@ function render(){
     const hero=document.getElementById('hero-art');
     if(hero.dataset.renderedTheme!==focused){
         hero.replaceChildren();
-        if(theme?.url){const image=document.createElement('img');image.alt='';image.src=theme.url+'?thumb=1';hero.appendChild(image);}
+        if(theme?.url||theme?.thumb){const image=document.createElement('img');image.alt='';image.src=theme.thumb||theme.url+'?thumb=1';hero.appendChild(image);}
         else if(theme)hero.innerHTML=CircleDesigns.svg(focused,'hero');
         else{const empty=document.createElement('span');empty.className='empty-art';empty.textContent='◇';hero.appendChild(empty);}
         hero.dataset.renderedTheme=focused;
@@ -122,7 +122,7 @@ document.getElementById('close-preview').addEventListener('click',closePreview);
 document.getElementById('preview').addEventListener('click',()=>{
     if(!focused)return;
     if(native){location.href='magiccircle://preview?theme='+encodeURIComponent(focused);return;}
-    const file=focused==='classic'?'magic_circle.html':'theme_circle.html';
+    const file=ReferenceDesigns.get(focused)?'collection_circle.html':focused==='classic'?'magic_circle.html':'theme_circle.html';
     dialog.querySelector('iframe').src=file+'?theme='+focused+'&lang='+language+'&demo=1';
     dialog.showModal();timer=setTimeout(closePreview,7400);
 });

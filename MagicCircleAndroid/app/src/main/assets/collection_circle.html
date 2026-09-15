@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://appassets.androidplatform.net;">
+<title>Magic Circle Charging</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020407;color:#e7edf2;font-family:system-ui,sans-serif}
+.scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding:max(18px,env(safe-area-inset-top)) 10px max(20px,env(safe-area-inset-bottom));opacity:0}
+.heading{flex:none;text-align:center;padding:clamp(6px,3vh,28px) 16px 10px;position:relative;z-index:2}.eyebrow{font-size:9px;letter-spacing:.2em;color:#abbcc9;margin:0 0 9px}h1{font:400 clamp(17px,3vh,26px)/1.5 Georgia,'Yu Mincho',serif;letter-spacing:.08em;margin:0;white-space:pre-line}
+.artwork{position:relative;flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+#collection-art{display:block;object-fit:contain;width:100%;height:100%;transform:none}
+.readout{flex:none;text-align:center;position:relative;z-index:2;padding:12px 14px 5px}.level{font:300 clamp(30px,5vh,48px)/1.2 Georgia,serif;letter-spacing:.02em}.percent{font-size:.42em;margin-left:4px}.caption{font-size:9px;letter-spacing:.18em;color:#b9c5cd;margin:9px 0 0}.rule{height:1px;width:70px;background:linear-gradient(90deg,transparent,#e7d9ac,transparent);margin:15px auto 0}
+.preparing{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:16px;padding:25px;color:#b9cbd8;font:400 18px/1.8 Georgia,serif;white-space:pre-line}.preparing small{font:11px/1.6 system-ui;color:#71818c}.running .preparing{display:none}
+.motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}.motes i{position:absolute;left:var(--x);top:var(--y);width:2px;height:2px;border-radius:50%;background:#eaf7ff;box-shadow:0 0 7px #a8dbff;opacity:0}
+.running .scene{animation:reveal 7s both linear}.running .motes i{animation:light 7s both ease-in-out}
+@keyframes reveal{0%{opacity:0}10%,83%{opacity:1}100%{opacity:0}}
+@keyframes light{0%,13%,100%{opacity:0;translate:0 7px}30%,70%{opacity:var(--a)}85%{opacity:0;translate:0 -12px}}
+.portrait .heading{padding:5px 12px}.portrait .heading h1{font-size:16px}.portrait .readout{padding:5px}.portrait .level{font-size:28px}.portrait .rule{display:none}
+.artwork .readout{position:absolute;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);padding:0;width:24%;max-width:140px}.artwork .readout .level{font-size:clamp(22px,6vw,42px)}.artwork .readout .caption{font-size:8px;letter-spacing:.07em}.artwork .readout .rule{display:none}
+@media(orientation:landscape){.scene{padding:10px 12px}.heading{position:absolute;top:16px;left:18px;max-width:24%;text-align:left;padding:0}h1{font-size:15px}.eyebrow{font-size:8px}.readout{position:absolute;right:22px;bottom:20px}.artwork{height:100%;max-width:70%}.portrait .artwork{max-width:65%}}
+@media(prefers-reduced-motion:reduce){.running .motes i{animation:none}}
+</style></head><body>
+<main class="scene"><header class="heading"><p class="eyebrow" id="art-name"></p><h1 data-i18n="begin"></h1></header><div class="artwork"><img id="collection-art" alt=""></div><div class="motes" aria-hidden="true"></div><footer class="readout"><div class="level"><span data-level>—</span><span class="percent">%</span></div><p class="caption" data-i18n="charging"></p><div class="rule"></div></footer></main>
+<div class="preparing"><span data-i18n="connected"></span><small id="loading" data-i18n="mediaLoading"></small></div>
+<script src="i18n.js"></script><script src="collection-catalog.js"></script>
+<script>
+'use strict';
+const params=new URLSearchParams(location.search),language=MagicI18n.normalize(params.get('lang'));
+const theme=ReferenceDesigns.get(params.get('theme')),image=document.getElementById('collection-art');
+MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
+if(theme){document.getElementById('art-name').textContent=theme.names[language];document.documentElement.classList.toggle('portrait',theme.portrait);}
+if(theme?.code==='U04')document.querySelector('.artwork').appendChild(document.querySelector('.readout'));
+const level=Number(params.get('battery'));
+document.querySelector('[data-level]').textContent=params.has('battery')&&Number.isInteger(level)&&level>=0&&level<=100?String(level):'—';
+// Separate, sparse particles; no rotation or reconstruction of connected geometry during playback.
+for(let i=0;i<18;i++){
+ const dot=document.createElement('i');dot.style.cssText='--x:'+((i*37+7)%97)+'%;--y:'+((i*23+11)%95)+'%;--a:'+(0.25+i%4*.12);document.querySelector('.motes').appendChild(dot);
+}
+let requested=false,ready=false,deadline=0;
+window.chargingCollectionError=false;
+function reveal(){
+ if(!requested||!ready||document.documentElement.classList.contains('running'))return;
+ const remaining=deadline-performance.now();
+ if(image.naturalWidth<=0||remaining<250){window.chargingCollectionError=true;return;}
+ document.documentElement.classList.add('running');
+ document.getAnimations().forEach(a=>a.playbackRate=7000/remaining);
+}
+// Start asset loading with the page, not after PAGE_READY starts the native startup timeout.
+// Playback still waits for the native start call and its original connection-time budget.
+if(theme){
+ image.onload=()=>{ready=true;reveal();};
+ image.onerror=()=>{window.chargingCollectionError=true;document.getElementById('loading').textContent=MagicI18n.t('mediaFailed',language);};
+ const run=/^\d+$/.test(params.get('run')||'')?params.get('run'):String(Date.now());
+ image.src='https://appassets.androidplatform.net/collection/'+theme.code+'.svg?run='+run;
+}
+window.startChargingAnimation=(remainingMs=7000)=>{
+ if(!theme||window.chargingCollectionError)return false;
+ if(document.documentElement.classList.contains('running'))return performance.now()<deadline;
+ if(!requested){
+  requested=true;deadline=performance.now()+(Number.isFinite(remainingMs)?Math.min(7000,Math.max(0,remainingMs)):7000);
+  reveal();
+ }
+ return document.documentElement.classList.contains('running');
+};
+if(params.get('demo')==='1')window.startChargingAnimation();
+</script></body></html>
