@@ -23,9 +23,12 @@
     add('signature', '代表作', '대표작', 'Signature');
     add('variation', '変奏', '변주', 'Variations');
     add('classic', '従来', '기존', 'Classic');
+    add('reference', '原画すべて', '첨부 원본 전체', 'All reference art');
+    add('previous', '以前のデザイン', '이전 디자인', 'Previous designs');
+    for (let sheet=1;sheet<=5;sheet++) add('sheet-'+sheet,'画像 '+sheet,'이미지 '+sheet,'Image '+sheet);
     add('search', '魔法陣の名前を検索', '마법진 이름 검색', 'Search magic circles');
     add('noResults', '該当する魔法陣はありません。', '검색 결과가 없습니다.', 'No circles found.');
-    add('note', '中央の星形は回転しません。外周の光と粒子が静かに巡ります。\n端子を外すと終了し、再接続すると最初から再生します。', '가운데 별은 고정되고 바깥 빛과 입자가 은은하게 움직입니다.\n충전기를 분리하면 종료되며, 다시 연결하면 처음부터 재생됩니다.', 'The central stars stay still while outer lights and particles drift gently.\nDisconnect to dismiss; reconnect to play again from the beginning.');
+    add('note', '原画は回転させず、そのままフェード表示します。画像2は文様を切らないよう原画内の文字も残しています。拡大時の精細さは元画像の解像度に依存します。\n端子を外すと終了し、再接続すると最初から再生します。', '첨부 원본은 회전 없이 그대로 나타났다가 사라집니다. 이미지 2는 문양이 잘리지 않도록 원본 속 글자도 보존했습니다. 확대 선명도는 원본 해상도에 제한됩니다.\n충전기를 분리하면 종료되며, 다시 연결하면 처음부터 재생됩니다.', 'Reference artwork fades in and out without rotation. Image 2 retains its original captions to avoid cutting the circles. Enlargement is limited by the source resolution.\nDisconnect to dismiss; reconnect to play again from the beginning.');
     add('preview', '▷ 7秒プレビュー', '▷ 7초 미리보기', '▷ 7-second preview');
     add('apply', 'この魔法陣を適用', '이 마법진 적용', 'Apply this circle');
     add('applied', '✓ 適用済み', '✓ 적용됨', '✓ Applied');

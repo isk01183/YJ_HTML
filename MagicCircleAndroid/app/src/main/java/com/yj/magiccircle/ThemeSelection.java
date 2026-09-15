@@ -22,7 +22,7 @@ final class ThemeSelection {
             case "wind-spirit": case "light-rosette": case "dream-constellation": case "twilight-balance":
                 return true;
             default:
-                return false;
+                return id.matches("\\Aref-(?:[15]-0[1-5]|[234]-(?:0[1-9]|[12][0-9]|30))\\z");
         }
     }
 

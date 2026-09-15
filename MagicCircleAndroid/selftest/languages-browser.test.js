@@ -14,6 +14,7 @@ const url = name => pathToFileURL(path.join(assets,name)).href;
         const errors=[]; page.on('pageerror', error=>errors.push(error.message));
         await page.goto(url('gallery.html'));
         assert.equal(await page.locator('[data-language]').count(),3, 'Three in-app language choices must be available');
+        await page.locator('[data-group="previous"]').click();
         for (const [language,title,charging] of [['ko','마법진 보관함','충전 시작'],['en','The Arcane Archive','Charging begins'],['ja','魔法陣の書庫','充電開始']]) {
             await page.locator('[data-language="'+language+'"]').click();
             assert.equal(await page.locator('h1').textContent(),title);
