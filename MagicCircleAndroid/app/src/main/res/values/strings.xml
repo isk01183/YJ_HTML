@@ -3,4 +3,20 @@
     <string name="app_name">Magic Circle Charging</string>
     <string name="accessibility_service_description">Displays an offline magic circle animation for up to 7 seconds when a charger is connected.</string>
     <string name="close_preview">Close</string>
+    <string name="library_importing">Copying image to the app…</string>
+    <string name="library_imported">Image added and selected.</string>
+    <string name="library_invalid">Choose a readable GIF, PNG, or JPEG image.</string>
+    <string name="library_too_large">This file is too large. Choose an image of 20 MiB or less.</string>
+    <string name="library_dimensions">This image or GIF animation is too large. Use a smaller image or a shorter GIF.</string>
+    <string name="library_storage_error">The change could not be completed. Check file access and free storage, then try again.</string>
+    <string name="library_load_error">The saved library could not be read. Its files have been kept, and changes are disabled to protect them.</string>
+    <string name="library_picker_error">No file picker is available on this device.</string>
+    <string name="library_delete_title">Delete imported image?</string>
+    <string name="library_delete_message">Only the copy stored in this app will be deleted. Your original file will be kept.</string>
+    <string name="library_hide_title">Hide built-in design?</string>
+    <string name="library_hide_message">This design will be hidden from the list. Restore built-ins brings it back.</string>
+    <string name="library_delete">Delete app copy</string>
+    <string name="library_hide">Hide</string>
+    <string name="library_cancel">Cancel</string>
+    <string name="library_cleanup_pending">Removed from the list. The app will retry deleting its private copies when opened again. Your original file is unchanged.</string>
 </resources>

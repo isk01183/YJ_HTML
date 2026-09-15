@@ -3,4 +3,20 @@
     <string name="app_name">魔法陣充電アニメーション</string>
     <string name="accessibility_service_description">充電端子を接続すると、オフラインの魔法陣アニメーションを最大7秒間表示します。</string>
     <string name="close_preview">閉じる</string>
+    <string name="library_importing">画像をアプリにコピーしています…</string>
+    <string name="library_imported">画像を追加して選択しました。</string>
+    <string name="library_invalid">読み取れる GIF、PNG、JPEG 画像を選択してください。</string>
+    <string name="library_too_large">ファイルが大きすぎます。20 MiB 以下の画像を選択してください。</string>
+    <string name="library_dimensions">画像または GIF アニメーションが大きすぎます。小さい画像か短い GIF を使用してください。</string>
+    <string name="library_storage_error">変更を完了できませんでした。ファイルへのアクセスと空き容量を確認し、もう一度お試しください。</string>
+    <string name="library_load_error">保存した一覧を読み取れませんでした。ファイルは保持し、保護のため変更を停止しました。</string>
+    <string name="library_picker_error">この端末ではファイル選択機能を利用できません。</string>
+    <string name="library_delete_title">追加した画像を削除しますか？</string>
+    <string name="library_delete_message">このアプリに保存したコピーだけを削除します。元のファイルはそのまま残ります。</string>
+    <string name="library_hide_title">内蔵デザインを非表示にしますか？</string>
+    <string name="library_hide_message">一覧からデザインを隠します。内蔵デザインの復元で再表示できます。</string>
+    <string name="library_delete">アプリのコピーを削除</string>
+    <string name="library_hide">非表示</string>
+    <string name="library_cancel">キャンセル</string>
+    <string name="library_cleanup_pending">一覧から削除しました。次回アプリを開いたときに内部コピーの削除を再試行します。元のファイルは変更されません。</string>
 </resources>

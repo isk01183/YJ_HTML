@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://appassets.androidplatform.net;">
+<title>Charging</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050609;color:#f4ede1;font-family:system-ui,sans-serif}
+.scene{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;position:relative;padding:clamp(20px,4vh,56px) 18px;opacity:0}
+.artwork{position:relative;flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#media-art{object-fit:contain;max-width:100%;max-height:100%;width:100%;height:100%}
+.readout{flex:none;text-align:center;padding:clamp(12px,3vh,30px) 0 max(14px,env(safe-area-inset-bottom));width:100%;color:#e6decf}
+.caption{font-size:10px;letter-spacing:.16em;color:#b9b6b0;margin:0 0 7px}.level{font:300 clamp(30px,5vh,50px)/1.2 Georgia,serif}.percent{font-size:.43em;margin-left:3px}.rule{width:34px;height:1px;background:#bca985;margin:13px auto 0;box-shadow:0 0 8px #d7c59955}
+.preparing{position:absolute;bottom:8%;width:100%;margin:0;text-align:center;color:#8f918f;font-size:12px}.running .preparing{display:none}
+.running .scene{animation:reveal 7s both cubic-bezier(.22,.61,.36,1)}
+.running:not(.gif) #media-art{animation:drift 7s both linear}
+@keyframes reveal{0%{opacity:0}12%,82%{opacity:1}98%,100%{opacity:0}}
+@keyframes drift{from{transform:scale(.975)}to{transform:scale(1.015)}}
+@media(orientation:landscape){.scene{padding:12px 24px}.readout{position:absolute;bottom:8px;right:18px;width:auto;padding:8px 14px;background:#050609b3;border-radius:12px}.level{font-size:28px}.rule{margin-top:7px}}
+@media(prefers-reduced-motion:reduce){.running:not(.gif) #media-art{animation:none}}
+</style>
+</head>
+<body>
+<main class="scene"><div class="artwork"><img id="media-art" alt=""></div><div class="readout"><p class="caption" data-i18n="charging"></p><div class="level"><span data-level>—</span><span class="percent">%</span></div><div class="rule"></div></div></main>
+<p class="preparing" id="loading" data-i18n="mediaLoading"></p>
+<script src="i18n.js"></script>
+<script>
+'use strict';
+const params=new URLSearchParams(location.search), language=MagicI18n.normalize(params.get('lang'));
+MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
+const media=params.get('media'), image=document.getElementById('media-art');
+const valid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(media||'');
+const level=Number(params.get('battery'));
+document.querySelector('[data-level]').textContent=params.has('battery')&&Number.isInteger(level)&&level>=0&&level<=100?String(level):'—';
+if(params.get('mime')==='image/gif')document.documentElement.classList.add('gif');
+let requested=false;
+window.chargingMediaError=false;
+window.startChargingAnimation=(remainingMs=7000)=>{
+    if(!valid||window.chargingMediaError)return false;
+    if(document.documentElement.classList.contains('running'))return true;
+    if(!requested){
+        requested=true;
+        const started=performance.now(), budget=Number.isFinite(remainingMs)?Math.min(7000,Math.max(0,remainingMs)):7000;
+        image.onload=()=>{
+            const remaining=budget-(performance.now()-started);
+            if(image.naturalWidth<=0||remaining<250){window.chargingMediaError=true;return;}
+            document.documentElement.classList.add('running');
+            document.getAnimations().forEach(animation=>animation.playbackRate=7000/remaining);
+        };
+        image.onerror=()=>{window.chargingMediaError=true;document.getElementById('loading').textContent=MagicI18n.t('mediaFailed',language);};
+        image.src='https://appassets.androidplatform.net/media/'+media+'?run='+encodeURIComponent(params.get('run')||Date.now());
+    }
+    return false;
+};
+if(params.get('demo')==='1')window.startChargingAnimation();
+</script>
+</body></html>

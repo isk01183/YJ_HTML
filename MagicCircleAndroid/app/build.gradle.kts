@@ -10,8 +10,9 @@ android {
         applicationId = "com.yj.magiccircle"
         minSdk = 23
         targetSdk = 37
-        versionCode = 9
-        versionName = "1.8"
+        // Increase code for every distributed APK, including restorations and hotfixes.
+        versionCode = 12
+        versionName = "1.9"
     }
 
     buildTypes {

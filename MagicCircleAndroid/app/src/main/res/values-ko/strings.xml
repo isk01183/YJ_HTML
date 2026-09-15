@@ -3,4 +3,20 @@
     <string name="app_name">마법진 충전 애니메이션</string>
     <string name="accessibility_service_description">충전기를 연결하면 인터넷 없이 마법진 애니메이션을 최대 7초 동안 표시합니다.</string>
     <string name="close_preview">닫기</string>
+    <string name="library_importing">이미지를 앱에 복사하는 중…</string>
+    <string name="library_imported">이미지를 추가하고 선택했습니다.</string>
+    <string name="library_invalid">읽을 수 있는 GIF, PNG 또는 JPEG 이미지를 선택해 주세요.</string>
+    <string name="library_too_large">파일이 너무 큽니다. 20 MiB 이하의 이미지를 선택해 주세요.</string>
+    <string name="library_dimensions">이미지나 GIF 애니메이션이 너무 큽니다. 더 작은 이미지나 짧은 GIF를 사용해 주세요.</string>
+    <string name="library_storage_error">변경을 완료하지 못했습니다. 파일 접근 권한과 저장 공간을 확인한 후 다시 시도해 주세요.</string>
+    <string name="library_load_error">저장된 목록을 읽지 못했습니다. 파일은 보존했으며, 파일 보호를 위해 변경을 중지했습니다.</string>
+    <string name="library_picker_error">이 기기에서 파일 선택기를 사용할 수 없습니다.</string>
+    <string name="library_delete_title">추가한 이미지를 삭제할까요?</string>
+    <string name="library_delete_message">이 앱에 저장된 복사본만 삭제합니다. 원본 파일은 그대로 보존합니다.</string>
+    <string name="library_hide_title">기본 디자인을 숨길까요?</string>
+    <string name="library_hide_message">목록에서 디자인을 숨깁니다. 기본 디자인 복원으로 다시 표시할 수 있습니다.</string>
+    <string name="library_delete">앱 복사본 삭제</string>
+    <string name="library_hide">숨기기</string>
+    <string name="library_cancel">취소</string>
+    <string name="library_cleanup_pending">목록에서 제거했습니다. 앱을 다시 열면 앱 내부 복사본 삭제를 재시도합니다. 원본 파일은 그대로 보존합니다.</string>
 </resources>

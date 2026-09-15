@@ -1,21 +1,48 @@
 param(
     [string]$Adb = "adb",
     [ValidateRange(1, 10)][int]$Cycles = 3,
-    [switch]$ScreenOff
+    [switch]$ScreenOff,
+    [switch]$DiagnosticsOnly
 )
 
 $ErrorActionPreference = "Stop"
 
 if ((& $Adb get-state) -ne "device") { throw "ADB device is not authorized." }
-if ((& $Adb shell settings get secure enabled_accessibility_services) -notmatch "com\.yj\.magiccircle") {
-    throw "MagicCircle accessibility service is not enabled."
-}
 
 function Get-ChargingOverlay {
     $dump = (& $Adb shell dumpsys window windows) -join "`n"
     [regex]::Matches($dump, '(?ms)^  Window #\d+ Window\{[^\r\n]*com\.yj\.magiccircle.*?(?=^  Window #|\z)') |
         Where-Object { $_.Value -match 'ty=(2032|ACCESSIBILITY_OVERLAY)\b' } |
         Select-Object -First 1
+}
+
+function Write-ChargingDiagnostics {
+    Write-Output 'PACKAGE'
+    & $Adb shell dumpsys package com.yj.magiccircle |
+        Select-String 'versionName=|versionCode=|stopped=' | ForEach-Object { $_.Line }
+    Write-Output 'ACCESSIBILITY'
+    & $Adb shell settings get secure enabled_accessibility_services
+    & $Adb shell dumpsys accessibility | Select-String 'com\.yj\.magiccircle' |
+        ForEach-Object { $_.Line }
+    Write-Output 'POWER'
+    & $Adb shell dumpsys power | Select-String 'mWakefulness=|mIsPowered=|Display Power:' |
+        ForEach-Object { $_.Line }
+    Write-Output 'BATTERY'
+    & $Adb shell dumpsys battery
+    Write-Output 'OVERLAY'
+    $current = Get-ChargingOverlay
+    if ($current) { $current.Value } else { 'No active charging overlay' }
+    Write-Output 'CHARGING LOG'
+    & $Adb logcat -d -t 200 -v time -s MagicCircleCharging:D '*:S'
+}
+
+if ($DiagnosticsOnly) {
+    Write-ChargingDiagnostics
+    return
+}
+if ((& $Adb shell settings get secure enabled_accessibility_services) -notmatch "com\.yj\.magiccircle") {
+    Write-ChargingDiagnostics
+    throw "MagicCircle accessibility service is not enabled."
 }
 
 try {
@@ -42,11 +69,18 @@ try {
         if (-not $overlay) { throw "Cycle ${cycle}: charging overlay was not created." }
         if ($overlay.Value -notmatch 'mViewVisibility=0x0') { throw "Overlay is not VISIBLE." }
         if ($overlay.Value -notmatch 'mHasSurface=true') { throw "Overlay has no drawable surface." }
-        $log = ((& $Adb logcat -d -v epoch -s MagicCircleCharging:D '*:S') | Where-Object {
-            $_ -match '^\s*(\d+)\.\d+' -and [long]$Matches[1] -ge $since
-        }) -join "`n"
+        do {
+            $log = ((& $Adb logcat -d -v epoch -s MagicCircleCharging:D '*:S') | Where-Object {
+                $_ -match '^\s*(\d+)\.\d+' -and [long]$Matches[1] -ge $since
+            }) -join "`n"
+            if ($log -match 'Animation running=true' -and $log -match 'Visual callback ready') { break }
+            Start-Sleep -Milliseconds 250
+        } while ($timer.ElapsedMilliseconds -lt 5500)
         if ($log -notmatch 'Event CONNECT' -or $log -notmatch 'Animation running=true') {
             throw "Cycle ${cycle}: no confirmed JavaScript animation start. $log"
+        }
+        if ($log -notmatch 'Visual callback ready') {
+            throw "Cycle ${cycle}: JavaScript started, but rendering remains unconfirmed. $log"
         }
 
         # Allow 0.5 seconds for ADB transport and the window-removal transaction.
@@ -69,6 +103,9 @@ try {
     Start-Sleep -Milliseconds 300
     if (Get-ChargingOverlay) { throw "Overlay remained after final disconnect." }
     Write-Output "DEVICE_OVERLAY_READY"
+} catch {
+    Write-ChargingDiagnostics
+    throw
 } finally {
     & $Adb shell cmd battery reset -f | Out-Null
 }

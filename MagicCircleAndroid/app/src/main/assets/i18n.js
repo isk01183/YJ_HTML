@@ -70,6 +70,20 @@
     add('fireGlyph', '火', '불', 'FIRE');
     add('starGlyph', '星', '별', 'STAR');
     add('windGlyph', '風', '바람', 'WIND');
+    add('yourMedia', 'あなただけの光を', '나만의 빛을 담아 보세요', 'Make this moment yours');
+    add('mediaHint', 'GIF · PNG · JPG / 端末内に保存、オフライン再生', 'GIF · PNG · JPG / 기기에만 저장 · 오프라인 재생', 'GIF · PNG · JPG / saved on your device, played offline');
+    add('importMedia', '＋ ファイルを追加', '＋ 파일 가져오기', '＋ Import a file');
+    add('uploads', 'マイファイル', '내 파일', 'My files');
+    add('deleteDesign', '選択項目を削除', '선택 항목 삭제', 'Remove selected');
+    add('restoreDesigns', '標準デザインを復元', '기본 마법진 복원', 'Restore built-in designs');
+    add('removeConfirm', 'この項目を一覧から削除しますか？ 元の写真は削除されません。', '이 항목을 목록에서 삭제할까요? 원본 사진은 삭제되지 않습니다.', 'Remove this item from your library? The original photo will not be deleted.');
+    add('nothingSelected', '表示する項目がありません', '선택된 항목이 없습니다', 'No design selected');
+    add('emptyLibrary', 'ファイルを追加するか、標準デザインを復元してください。', '파일을 가져오거나 기본 마법진을 복원해 주세요.', 'Import a file or restore the built-in designs.');
+    add('mediaStill', '元の比率を保ち、ゆっくり現れて静かに消えます。', '원래 비율을 유지하며 부드럽게 나타났다가 사라집니다.', 'Your image gently appears and fades away, keeping its original proportions.');
+    add('mediaAnimated', '接続するたび、GIFを最初から再生します。', '충전기를 연결할 때마다 GIF를 처음부터 재생합니다.', 'Your GIF starts fresh every time you connect.');
+    add('mediaLoading', 'ファイルを準備中', '파일 준비 중', 'Preparing your image');
+    add('mediaFailed', 'ファイルを読み込めませんでした', '파일을 불러오지 못했습니다', 'Unable to load this image');
+    add('libraryUnavailable', '一覧を読み込めません。保護のためファイルは変更していません。', '목록을 읽을 수 없습니다. 파일 보호를 위해 변경하지 않았습니다.', 'The library cannot be read. Your files have been left unchanged for safety.');
 
     const originalThemes = {
         moon:{ko:['달그림자의 룬','은은한 장밋빛 선과 달을 맴도는 빛의 궤도. 고요한 빛으로 충전의 시작을 알립니다.'],en:['Moonlit Runes','Fine rose lines and lunar orbits announce each charge with a quiet glow.']},

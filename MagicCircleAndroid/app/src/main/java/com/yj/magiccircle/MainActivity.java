@@ -2,8 +2,10 @@ package com.yj.magiccircle;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
 import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
 import android.graphics.Insets;
@@ -22,14 +24,27 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
+import android.webkit.RenderProcessGoneDetail;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.Toast;
+
+import org.json.JSONException;
+
+import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String GALLERY_URL = "file:///android_asset/gallery.html";
+    private static final int IMPORT_DOCUMENT = 20;
+    private static final ExecutorService LIBRARY_IO = Executors.newSingleThreadExecutor();
+    private static final Handler LIBRARY_UI = new Handler(Looper.getMainLooper());
+    private static WeakReference<MainActivity> activeActivity = new WeakReference<>(null);
+    private static boolean libraryBusy;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable finishPreview = this::dismissPreview;
     private WebView gallery;
@@ -38,11 +53,12 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        activeActivity = new WeakReference<>(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF05080B);
         fitSystemInsets(getWindow(), root);
         gallery = WebViews.magicCircle(this);
-        gallery.setWebViewClient(new WebViewClient() {
+        gallery.setWebViewClient(new WebViews.LocalClient(this) {
             @Override
             public boolean shouldOverrideUrlLoading(WebView current, String url) {
                 handleGalleryLink(current, Uri.parse(url));
@@ -59,11 +75,26 @@ public final class MainActivity extends Activity {
             public void onPageFinished(WebView current, String url) {
                 if (current == gallery && GALLERY_URL.equals(url)) updateGalleryState();
             }
+
+            @Override
+            public boolean onRenderProcessGone(WebView current, RenderProcessGoneDetail detail) {
+                boolean owned = current == gallery;
+                if (owned) gallery = null;
+                super.onRenderProcessGone(current, detail);
+                if (owned && !isFinishing() && !isDestroyed()) recreate();
+                return true;
+            }
         });
         root.addView(gallery, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         gallery.loadUrl(GALLERY_URL);
+        MediaLibrary library = MediaLibrary.get(this);
+        if (!library.isReadable()) message(R.string.library_load_error);
+        else LIBRARY_IO.execute(() -> {
+            try { library.retryPendingDeletes(); }
+            catch (IOException ignored) { /* Durable pending IDs are retried on the next app opening. */ }
+        });
     }
 
     private void handleGalleryLink(WebView current, Uri uri) {
@@ -71,6 +102,7 @@ public final class MainActivity extends Activity {
                 || !"magiccircle".equals(uri.getScheme()) || !uri.isHierarchical()
                 || uri.getFragment() != null || (uri.getPath() != null && !uri.getPath().isEmpty())) return;
         String action = uri.getAuthority();
+        MediaLibrary library = MediaLibrary.get(this);
         if ("settings".equals(action) && uri.getQuery() == null) {
             startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             return;
@@ -84,25 +116,107 @@ public final class MainActivity extends Activity {
             updateGalleryState();
             return;
         }
+        if ("import".equals(action) && uri.getQuery() == null) {
+            if (!libraryBusy) chooseMedia();
+            return;
+        }
+        if ("restore".equals(action) && uri.getQuery() == null) {
+            changeLibrary(library::restore, 0);
+            return;
+        }
         if (uri.getQueryParameterNames().size() != 1
                 || uri.getQueryParameters("theme").size() != 1) return;
         String theme = uri.getQueryParameter("theme");
-        if (!ThemeSelection.isValid(theme)) return;
+        if (!library.available(theme)) return;
         if ("select".equals(action)) {
-            WebViews.selectTheme(this, theme);
-            updateGalleryState();
+            changeLibrary(() -> library.select(theme), 0);
         } else if ("preview".equals(action)) {
             showPreview(theme);
+        } else if ("delete".equals(action) && !libraryBusy) {
+            boolean builtin = ThemeSelection.isValid(theme);
+            new AlertDialog.Builder(this)
+                    .setTitle(localizedString(builtin ? R.string.library_hide_title : R.string.library_delete_title))
+                    .setMessage(localizedString(builtin ? R.string.library_hide_message : R.string.library_delete_message))
+                    .setNegativeButton(localizedString(R.string.library_cancel), null)
+                    .setPositiveButton(localizedString(builtin ? R.string.library_hide : R.string.library_delete),
+                            (dialog, which) -> changeLibrary(() -> library.remove(theme), 0))
+                    .show();
         }
     }
 
     private void updateGalleryState() {
         if (gallery == null || !GALLERY_URL.equals(gallery.getUrl())) return;
-        // The theme and language are allowlisted before insertion into JavaScript.
-        gallery.evaluateJavascript("if (typeof window.setGalleryState === 'function') "
-                + "window.setGalleryState({selected:'" + WebViews.selectedTheme(this)
-                + "',enabled:" + isServiceEnabled() + ",language:'"
-                + WebViews.selectedLanguage(this) + "'})", null);
+        try {
+            String json = MediaLibrary.get(this).galleryState(isServiceEnabled(), WebViews.selectedLanguage(this))
+                    .put("busy", libraryBusy).toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
+            gallery.evaluateJavascript("if (typeof window.setGalleryState === 'function') "
+                    + "window.setGalleryState(" + json + ")", null);
+        } catch (JSONException error) { message(R.string.library_storage_error); }
+    }
+
+    private void chooseMedia() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+                .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"image/gif", "image/png", "image/jpeg"})
+                .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            libraryBusy = true;
+            updateGalleryState();
+            startActivityForResult(intent, IMPORT_DOCUMENT);
+        } catch (ActivityNotFoundException error) {
+            libraryBusy = false;
+            updateGalleryState();
+            message(R.string.library_picker_error);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != IMPORT_DOCUMENT) return;
+        libraryBusy = false;
+        if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri uri = data.getData();
+            MediaLibrary library = MediaLibrary.get(this);
+            message(R.string.library_importing);
+            changeLibrary(() -> library.importDocument(uri), R.string.library_imported);
+        } else updateGalleryState();
+    }
+
+    private interface LibraryChange { void run() throws IOException; }
+
+    private void changeLibrary(LibraryChange change, int successMessage) {
+        if (libraryBusy) return;
+        libraryBusy = true;
+        updateGalleryState();
+        LIBRARY_IO.execute(() -> {
+            int result = successMessage;
+            try { change.run(); }
+            catch (MediaValidation.InvalidMedia error) {
+                result = "too_large".equals(error.code) ? R.string.library_too_large
+                        : "dimensions".equals(error.code) ? R.string.library_dimensions : R.string.library_invalid;
+            } catch (MediaLibrary.CleanupPending error) { result = R.string.library_cleanup_pending; }
+            catch (IOException | RuntimeException error) { result = R.string.library_storage_error; }
+            final int messageId = result;
+            LIBRARY_UI.post(() -> {
+                libraryBusy = false;
+                MainActivity current = activeActivity.get();
+                if (current == null || current.isDestroyed() || current.isFinishing()) return;
+                current.updateGalleryState();
+                if (messageId != 0) current.message(messageId);
+            });
+        });
+    }
+
+    private String localizedString(int resource) {
+        Configuration localized = new Configuration(getResources().getConfiguration());
+        localized.setLocale(new Locale(WebViews.selectedLanguage(this)));
+        return createConfigurationContext(localized).getString(resource);
+    }
+
+    private void message(int resource) {
+        Toast.makeText(this, localizedString(resource), Toast.LENGTH_LONG).show();
     }
 
     private void showPreview(String theme) {
@@ -111,12 +225,31 @@ public final class MainActivity extends Activity {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
         WebView preview = WebViews.magicCircle(this);
+        long previewDeadline = android.os.SystemClock.uptimeMillis() + 7000L;
+        preview.setWebViewClient(new WebViews.LocalClient(this) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView current, String url) { return true; }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView current, WebResourceRequest request) { return true; }
+
+            @Override
+            public void onPageFinished(WebView current, String url) {
+                if (previewDialog == dialog) WebViews.startMagicCircle(current,
+                        previewDeadline - android.os.SystemClock.uptimeMillis(), null);
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView current, RenderProcessGoneDetail detail) {
+                super.onRenderProcessGone(current, detail);
+                if (previewDialog == dialog) dismissPreview();
+                return true;
+            }
+        });
         root.addView(preview, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         Button close = new Button(this);
-        Configuration localized = new Configuration(getResources().getConfiguration());
-        localized.setLocale(new Locale(WebViews.selectedLanguage(this)));
-        close.setText(createConfigurationContext(localized).getString(R.string.close_preview));
+        close.setText(localizedString(R.string.close_preview));
         close.setTextColor(0xFFF1DEC0);
         close.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC17212A));
         close.setOnClickListener(v -> dismissPreview());
@@ -186,10 +319,7 @@ public final class MainActivity extends Activity {
     }
 
     private static void destroyWebView(WebView view) {
-        view.setWebViewClient(new WebViewClient());
-        view.stopLoading();
-        if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
-        view.destroy();
+        WebViews.destroy(view);
     }
 
     @Override
@@ -208,6 +338,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (activeActivity.get() == this) activeActivity.clear();
         dismissPreview();
         handler.removeCallbacks(finishPreview);
         if (gallery != null) {

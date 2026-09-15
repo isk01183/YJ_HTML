@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; frame-src 'self'; img-src 'self' data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; frame-src 'self'; img-src 'self' data: https://appassets.androidplatform.net;">
 <title>魔法陣の書庫</title>
 <style>
   :root{color-scheme:dark;--ink:#f7d895;--accent:#bb9df1;--surface:#101318;--muted:#a5aaaF}
@@ -26,6 +26,11 @@
   .languages{display:flex;align-items:center;gap:5px;margin:20px 0 0;flex-wrap:wrap}.languages>span{font-size:10px;color:#a5aaaf;margin-right:auto}.languages button{border:1px solid #333943;background:#10151c;min-height:40px;padding:8px 12px;border-radius:7px;font-size:11px}.languages button[aria-pressed=true]{border-color:#bdac8d;background:#28251f;color:#f6e2bb}
   [data-i18n]{white-space:pre-line}.art img{width:100%;height:100%;display:block}.search{width:100%;min-height:44px;border:1px solid #353944;background:#0c1016;border-radius:9px;padding:11px 14px;color:#eee4d3;font:inherit;font-size:12px;margin-bottom:17px}.search:focus{outline:2px solid #bdac8d;outline-offset:2px}.empty{color:#a6aab2;font-size:13px;text-align:center;padding:24px}
   @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  .library-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:24px 0 8px;padding:17px;border:1px solid #37362f;border-radius:13px;background:linear-gradient(120deg,#211e184f,#10151b)}
+  .library-copy{flex:1;min-width:130px}.library-copy strong{display:block;font-size:13px;font-weight:500;color:#e8ddc6}.library-copy p{font-size:10px;line-height:1.7;color:#a5aaaf;margin:6px 0 0}
+  .library-tools button,.manage button{border:1px solid #514b3f;background:#26221b;color:#f2dfba;min-height:44px;border-radius:9px;padding:10px 14px;font-size:11px}
+  button:disabled{opacity:.55}.manage{display:flex;justify-content:flex-end;gap:10px;margin:13px 0 0;flex-wrap:wrap}.manage button{background:transparent;border-color:#363a42;color:#b7bbc4}.manage #delete-design{color:#dfb2ad}
+  .manage [hidden]{display:none}.card .art img,#hero-art img{object-fit:contain;width:100%;height:100%;border-radius:7px}.card .name,#hero-title{overflow-wrap:anywhere}.empty-art{display:grid;place-items:center;height:100%;color:#857c69;font:200 52px/1 serif}
 </style>
 </head>
 <body>
@@ -36,8 +41,10 @@
   <div class="statusline" id="service-state"><i class="dot"></i><span id="service-label"></span><span class="sep">/</span><span data-i18n="maxTime"></span><span class="sep">/</span><span data-i18n="offline"></span></div>
   <section class="hero" data-i18n-label="selectedCircle"><div id="hero-art"></div><div><div class="label" id="hero-tag"></div><h2 id="hero-title"></h2><p id="hero-description"></p><div class="saved" id="hero-saved"></div></div></section>
   <p id="service-hint" class="hint" hidden data-i18n="serviceHint"></p>
+  <div class="manage"><button id="restore-designs" hidden data-i18n="restoreDesigns"></button><button id="delete-design" data-i18n="deleteDesign"></button></div>
+  <section class="library-tools"><div class="library-copy"><strong data-i18n="yourMedia"></strong><p data-i18n="mediaHint"></p></div><button id="import-media" data-i18n="importMedia" disabled></button></section>
   <div class="section-head"><h2 data-i18n="choose"></h2><span class="count" id="design-count"></span></div>
-  <nav class="tabs" data-i18n-label="categories"><button class="tab" data-group="all" aria-pressed="true"></button><button class="tab" data-group="collection" aria-pressed="false"></button><button class="tab" data-group="signature" aria-pressed="false"></button><button class="tab" data-group="variation" aria-pressed="false"></button><button class="tab" data-group="classic" aria-pressed="false"></button></nav>
+  <nav class="tabs" data-i18n-label="categories"><button class="tab" data-group="all" aria-pressed="true"></button><button class="tab" data-group="uploads" aria-pressed="false"></button><button class="tab" data-group="collection" aria-pressed="false"></button><button class="tab" data-group="signature" aria-pressed="false"></button><button class="tab" data-group="variation" aria-pressed="false"></button><button class="tab" data-group="classic" aria-pressed="false"></button></nav>
   <input id="search" class="search" type="search" autocomplete="off" data-i18n-label="search">
   <div class="grid" id="design-grid"></div><p class="empty" id="empty" hidden data-i18n="noResults"></p><p class="note" data-i18n="note"></p>
 </main>

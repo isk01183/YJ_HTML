@@ -7,16 +7,22 @@ import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.Locale;
+import java.util.Collections;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import android.view.ViewGroup;
 
 final class WebViews {
     private static final String PREFERENCES = "magic_circle";
-    private static final String SELECTED_STYLE = "selected_style";
     private static final String LANGUAGE = "language";
+    private static final Object DESTROYED = new Object();
 
     private WebViews() {}
 
@@ -34,7 +40,7 @@ final class WebViews {
         settings.setBlockNetworkLoads(true);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setOffscreenPreRaster(true);
-        view.setWebViewClient(new WebViewClient() {
+        view.setWebViewClient(new LocalClient(context) {
             @Override
             public boolean shouldOverrideUrlLoading(WebView current, String url) {
                 return true;
@@ -54,14 +60,7 @@ final class WebViews {
     }
 
     static String selectedTheme(Context context) {
-        return ThemeSelection.normalize(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .getString(SELECTED_STYLE, "classic"));
-    }
-
-    static void selectTheme(Context context, String id) {
-        if (!ThemeSelection.isValid(id)) return;
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .edit().putString(SELECTED_STYLE, id).apply();
+        return MediaLibrary.get(context).selected();
     }
 
     static String selectedLanguage(Context context) {
@@ -80,7 +79,10 @@ final class WebViews {
     }
 
     static void loadMagicCircle(WebView view, String id) {
-        String theme = ThemeSelection.normalize(id);
+        MediaLibrary library = MediaLibrary.get(view.getContext());
+        if (!library.available(id)) return;
+        String theme = id;
+        MediaLibrary.Item media = library.find(theme);
         Intent battery = view.getContext().registerReceiver(null,
                 new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         int level = battery == null ? -1 : battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
@@ -89,9 +91,12 @@ final class WebViews {
                 ? Math.round(level * 100f / scale) : -1;
         String temperature = battery != null && battery.hasExtra(BatteryManager.EXTRA_TEMPERATURE)
                 ? Integer.toString(battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) : "";
-        String page = "classic".equals(theme) ? "magic_circle.html" : "theme_circle.html";
+        String page = media != null ? "media_circle.html"
+                : "classic".equals(theme) ? "magic_circle.html" : "theme_circle.html";
         Uri uri = Uri.parse("file:///android_asset/" + page).buildUpon()
                 .appendQueryParameter("theme", theme)
+                .appendQueryParameter("media", media == null ? "" : media.id)
+                .appendQueryParameter("mime", media == null ? "" : media.mime)
                 .appendQueryParameter("lang", selectedLanguage(view.getContext()))
                 .appendQueryParameter("battery", Integer.toString(percent))
                 .appendQueryParameter("temperature", temperature)
@@ -109,6 +114,63 @@ final class WebViews {
     }
 
     static void startMagicCircle(WebView view, android.webkit.ValueCallback<String> callback) {
-        view.evaluateJavascript("window.startChargingAnimation()", callback);
+        startMagicCircle(view, 7000L, callback);
+    }
+
+    static void startMagicCircle(WebView view, long remainingMs, android.webkit.ValueCallback<String> callback) {
+        long duration = Math.max(0L, Math.min(7000L, remainingMs));
+        view.evaluateJavascript("typeof window.startChargingAnimation==='function' && "
+                + "(window.startChargingAnimation(" + duration + "),document.documentElement.classList.contains('running'))", callback);
+    }
+
+    static void destroy(WebView view) {
+        if (view.getTag() == DESTROYED) return;
+        view.setTag(DESTROYED);
+        view.setWebViewClient(new WebViewClient());
+        view.stopLoading();
+        if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
+        view.destroy();
+    }
+
+    static class LocalClient extends WebViewClient {
+        private final MediaLibrary library;
+
+        LocalClient(Context context) { library = MediaLibrary.get(context); }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            return intercept(request.getUrl());
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
+            return intercept(Uri.parse(url));
+        }
+
+        private WebResourceResponse intercept(Uri uri) {
+            String path = uri.getPath();
+            if ("file".equals(uri.getScheme()) && (uri.getAuthority() == null || uri.getAuthority().isEmpty())
+                    && path != null && path.startsWith("/android_asset/") && !path.contains("..")) return null;
+            String id = MediaValidation.resourceId(uri.toString());
+            if (id != null) {
+                boolean thumb = "thumb=1".equals(uri.getEncodedQuery());
+                MediaLibrary.Item item = library.find(id);
+                if (item != null) try {
+                    java.util.Map<String, String> headers = new java.util.HashMap<>();
+                    headers.put("Cache-Control", "no-store");
+                    headers.put("X-Content-Type-Options", "nosniff");
+                    return new WebResourceResponse(thumb ? "image/png" : item.mime, null, 200, "OK",
+                            headers, library.open(id, thumb));
+                } catch (IOException ignored) { /* Missing private file is never a network fallback. */ }
+            }
+            return new WebResourceResponse("text/plain", "UTF-8", 403, "Blocked",
+                    Collections.singletonMap("Cache-Control", "no-store"), new ByteArrayInputStream(new byte[0]));
+        }
+
+        @Override
+        public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+            destroy(view);
+            return true;
+        }
     }
 }

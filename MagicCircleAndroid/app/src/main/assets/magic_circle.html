@@ -156,8 +156,14 @@
     const params=new URLSearchParams(location.search), language=MagicI18n.normalize(params.get('lang') || navigator.language.split('-')[0]);
     MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
     document.getElementById('rune-verse').textContent=MagicI18n.t('runeVerse',language).repeat(language==='en'?1:2);
-    window.startChargingAnimation=()=>document.documentElement.classList.add('running');
-    if(params.get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);
+    window.startChargingAnimation=(remainingMs=7000)=>{
+      if(document.documentElement.classList.contains('running'))return true;
+      document.documentElement.classList.add('running');
+      const remaining=Number.isFinite(remainingMs)?Math.max(1,Math.min(7000,remainingMs)):7000;
+      document.getAnimations().forEach(animation=>animation.playbackRate=7000/remaining);
+      return true;
+    };
+    if(params.get('demo')==='1')requestAnimationFrame(()=>window.startChargingAnimation());
   </script>
 </body>
 </html>

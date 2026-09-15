@@ -75,12 +75,15 @@
   document.getElementById('health').textContent=info.health;
   document.getElementById('connection').textContent=info.connection;
   document.getElementById('battery-fill').style.width=(info.percent==='—'?0:info.percent)+'%';
-  window.startChargingAnimation=()=>{
-    if(document.documentElement.classList.contains('running'))return;
+  window.startChargingAnimation=(remainingMs=7000)=>{
+    if(document.documentElement.classList.contains('running'))return true;
     document.documentElement.classList.add('running');
+    const remaining=Number.isFinite(remainingMs)?Math.max(1,Math.min(7000,remainingMs)):7000;
+    document.getAnimations().forEach(animation=>animation.playbackRate=7000/remaining);
     if(!matchMedia('(prefers-reduced-motion: reduce)').matches)document.querySelectorAll('.orbit-motion').forEach(motion=>motion.beginElement());
+    return true;
   };
-  if(params.get('demo')==='1')requestAnimationFrame(window.startChargingAnimation);
+  if(params.get('demo')==='1')requestAnimationFrame(()=>window.startChargingAnimation());
 </script>
 </body>
 </html>

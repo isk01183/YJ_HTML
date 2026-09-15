@@ -1,5 +1,9 @@
 package com.yj.magiccircle;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+
 public final class ThemeSelectionSelfTest {
     public static void main(String[] args) {
         for (String id : new String[] {"classic", "moon", "raphael", "layered", "premium",
@@ -24,6 +28,22 @@ public final class ThemeSelectionSelfTest {
                 throw new AssertionError("Invalid selection did not safely fall back: " + id);
             }
         }
+        // Losing the current position must not jump to a hidden/deleted selection.
+        java.util.List<String> order = Arrays.asList("classic", "moon", "imported-a", "imported-b");
+        check("imported-b".equals(ThemeSelection.nextVisible("imported-a", order,
+                new HashSet<>(Arrays.asList("moon", "imported-a")))), "deletion chooses next visible item");
+        check("classic".equals(ThemeSelection.nextVisible("imported-b", order,
+                Collections.singleton("imported-b"))), "deletion wraps to first visible item");
+        check("".equals(ThemeSelection.nextVisible("moon", order,
+                new HashSet<>(order))), "empty library has no selection");
+        check("moon".equals(ThemeSelection.nextVisible("moon", order,
+                Collections.emptySet())), "unchanged selection retained");
+        check("classic".equals(ThemeSelection.nextVisible("../bad", order,
+                Collections.emptySet())), "invalid saved selection chooses first visible");
         System.out.println("THEME_SELECTION_OK");
+    }
+
+    private static void check(boolean result, String message) {
+        if (!result) throw new AssertionError(message);
     }
 }
