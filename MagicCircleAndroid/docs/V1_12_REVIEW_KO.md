@@ -60,6 +60,6 @@
 
 ## GitHub CI 디버그 APK
 
-공개 저장소 `isk01183/YJ_HTML`의 `codex/stellar-sanctuary-v112` 브랜치에서 Android/워크플로 변경을 push하면 표준 Ubuntu runner가 JDK17·Android37로 단위 검사, lint, debug 빌드를 실행합니다. 기본 브랜치 `main`에는 이 workflow가 없으므로 현재 수동 실행은 불가능하며 브랜치 push가 실행 경로입니다. 성공한 경우에만 해당 소스 커밋/실행에 고유한 태그의 **GitHub prerelease 다운로드 자산**으로 APK와 SHA-256 텍스트를 게시합니다. Actions의 artifact 탭에 업로드하지 않고 캐시·빌드 스캔·의존성 제출도 사용하지 않습니다. 첫 push 및 원격 실행 결과는 아직 **미확인**이며, 완료한 실행/릴리스 링크·원격 APK SHA-256은 실행 후 기록해야 합니다. 실패하거나 저장소가 비공개로 바뀌면 성공으로 취급하지 않습니다.
+공개 저장소 `isk01183/YJ_HTML`의 `codex/stellar-sanctuary-v112` 브랜치에서 Android/워크플로 변경을 push하면 표준 Ubuntu runner가 JDK17·Android37로 단위 검사, lint, debug 빌드를 실행합니다. 기본 브랜치 `main`에는 이 workflow가 없으므로 현재 수동 실행은 불가능하며 브랜치 push가 실행 경로입니다. 성공한 경우에만 해당 소스 커밋/실행에 고유한 태그의 **GitHub prerelease 다운로드 자산**으로 APK와 SHA-256 텍스트를 게시합니다. Actions의 artifact 탭에 업로드하지 않고 캐시·빌드 스캔·의존성 제출도 사용하지 않습니다. 첫 원격 실행 `35557392183`은 준비 action 뒤 `sdkmanager`를 찾지 못해 빌드 전 exit127로 실패했으며 APK/Release가 생성되지 않았습니다. runner의 공식 SDK 절대 경로와 설치된 `platforms;android-37.0`을 검증하도록 수정했지만 재실행 결과는 아직 **대기 중**입니다. 성공한 실행/릴리스 링크·원격 APK SHA-256은 재실행 후 기록해야 하며, 실패하거나 저장소가 비공개로 바뀌면 성공으로 취급하지 않습니다.
 
 CI APK는 runner의 임시 debug 서명으로 생성되어 위 로컬 APK(SHA-256 `ce3e9e7bd248909e0efc36944a3cbf10392aa9d3c9c5ecec311e38442c714cb9`)와 다른 바이너리입니다. 기존 설치 앱의 업데이트 호환성을 보장하지 않으며, 로컬 서명키를 GitHub에 업로드하거나 기존 앱 삭제를 요구하지 않습니다. 배포 전에 기기에서 실제 설치 가능성, 원격 APK 서명·버전·SHA-256, code15가 기존 배포 최댓값보다 높은지를 다시 확인합니다. 실제 충전 오버레이/재연결/API23/태블릿/원본 대비 품질 검사는 위의 미검증 상태 그대로입니다.

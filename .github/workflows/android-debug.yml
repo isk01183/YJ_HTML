@@ -38,8 +38,13 @@ jobs:
           validate-wrappers: true
           build-scan-publish: false
           develocity-injection-enabled: false
-      - name: Install Android 37 SDK
-        run: sdkmanager --install 'platforms;android-37'
+      - name: Verify Android 37 SDK
+        run: |
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          platform_jar="$ANDROID_SDK_ROOT/platforms/android-37.0/android.jar"
+          test -x "$sdkmanager" || { echo "::error::Android SDK manager is not executable: $sdkmanager"; exit 1; }
+          test -f "$platform_jar" || "$sdkmanager" --install 'platforms;android-37.0'
+          test -f "$platform_jar" || { echo "::error::Android 37 platform is missing: $platform_jar"; exit 1; }
       - name: Test, lint, and build
         run: |
           chmod +x gradlew
