@@ -1,6 +1,7 @@
 package com.yj.magiccircle
 
 import android.graphics.Canvas
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -19,6 +20,10 @@ class MagicCircleRenderer {
     private val goldRunes = runeBand(SanctuaryLayout.goldRunes(), 1f)
     private val blueRunes = runeBand(SanctuaryLayout.blueRunes(), .8f)
     private val staticArt = Picture()
+    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private lateinit var fixedPixels: Bitmap
+    private lateinit var goldPixels: Bitmap
+    private lateinit var bluePixels: Bitmap
 
     init {
         val canvas = staticArt.beginRecording(864, 1536)
@@ -57,7 +62,7 @@ class MagicCircleRenderer {
             val path = Path().apply { addOval(ellipse, Path.Direction.CW) }
             val matrix = Matrix().apply { setRotate(orbit.rotation, cx, cy) }
             path.transform(matrix)
-            ink.glow(canvas, path, SanctuaryInk.CYAN, 1.8f)
+            ink.glow(canvas, path, SanctuaryInk.CYAN, 3.2f)
         }
         val nodes = SanctuaryLayout.orbitNodes(orbits)
         for (i in nodes.indices step 2) ink.flare(canvas, nodes[i], nodes[i + 1], 10f, true)
@@ -88,17 +93,22 @@ class MagicCircleRenderer {
         ink.fill(canvas, SanctuaryInk.crescent(cx, cy + 222f, 18f), SanctuaryInk.GOLD)
         drawCore(canvas)
         staticArt.endRecording()
+        // Three bounded, code-painted design-space caches (~15.2MiB total); never reference artwork.
+        fun pixels(paint: (Canvas) -> Unit): Bitmap = Bitmap.createBitmap(864, 1536, Bitmap.Config.ARGB_8888).also { paint(Canvas(it)) }
+        fixedPixels = pixels { it.drawPicture(staticArt) }
+        goldPixels = pixels { ink.glow(it, goldRunes, SanctuaryInk.GOLD, 1.45f) }
+        bluePixels = pixels { ink.glow(it, blueRunes, SanctuaryInk.CYAN, 1.05f) }
     }
 
     fun draw(canvas: Canvas, goldAngle: Float, blueAngle: Float) {
-        canvas.drawPicture(staticArt)
+        canvas.drawBitmap(fixedPixels, 0f, 0f, bitmapPaint)
         canvas.save()
         canvas.rotate(goldAngle, SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y)
-        ink.glow(canvas, goldRunes, SanctuaryInk.GOLD, 1.45f)
+        canvas.drawBitmap(goldPixels, 0f, 0f, bitmapPaint)
         canvas.restore()
         canvas.save()
         canvas.rotate(blueAngle, SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y)
-        ink.glow(canvas, blueRunes, SanctuaryInk.CYAN, 1.05f)
+        canvas.drawBitmap(bluePixels, 0f, 0f, bitmapPaint)
         canvas.restore()
     }
 
@@ -113,13 +123,13 @@ class MagicCircleRenderer {
         val random = Random(901)
         val dust = Path()
         val mist = Path()
-        for (i in 0 until 700) {
+        for (i in 0 until 2600) {
             val angle = random.nextFloat() * Math.PI * 2
             val r = radius * kotlin.math.sqrt(random.nextFloat())
             val x = cx + cos(angle).toFloat() * r
             val y = cy + sin(angle).toFloat() * r
-            if (r > 100f) mist.addCircle(x, y, random.nextFloat() * 3.2f + .4f, Path.Direction.CW)
-            if (r > 82f || i % 9 == 0) dust.addCircle(x, y, random.nextFloat() * .75f + .2f, Path.Direction.CW)
+            if (r > 100f) mist.addCircle(x, y, random.nextFloat() * 1.2f + .3f, Path.Direction.CW)
+            if (r > 82f || i % 9 == 0) dust.addCircle(x, y, random.nextFloat() * .5f + .15f, Path.Direction.CW)
         }
         ink.fill(canvas, mist, 0xff168dc9.toInt(), 36)
         ink.fill(canvas, dust, 0xff90dfff.toInt(), 130)

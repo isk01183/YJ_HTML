@@ -88,6 +88,7 @@ public final class MainActivity extends Activity {
         root.addView(gallery, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        DebugReview.install(this, root);
         gallery.loadUrl(GALLERY_URL);
         MediaLibrary library = MediaLibrary.get(this);
         if (!library.isReadable()) message(R.string.library_load_error);

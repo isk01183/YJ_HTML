@@ -111,7 +111,7 @@ class ChargeStatusPanelRenderer {
         val x = 432f - width / 2f
         runs.add(TextRun(number, x, 754f, numberPaint))
         runs.add(TextRun(suffix, x + numberWidth + gap * factor, 754f, suffixPaint))
-        addText(status, 432f, 795f, 214f, 23f * scale, 31f)
+        addText(if (snapshot.plugged == 0) connection else status, 432f, 795f, 214f, 23f * scale, 31f)
         addText(temperature, 174f, 1327f, 224f, 40f * scale, 49f)
         addText(health, 432f, 1327f, 220f, 38f * scale, 49f)
         addText(connection, 690f, 1327f, 224f, 34f * scale, 49f)

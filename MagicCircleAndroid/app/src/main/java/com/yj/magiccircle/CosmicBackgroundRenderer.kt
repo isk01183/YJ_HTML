@@ -1,11 +1,13 @@
 package com.yj.magiccircle
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Picture
 import android.graphics.RadialGradient
+import android.graphics.Rect
 import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
@@ -19,7 +21,9 @@ import kotlin.math.sin
 /** Full-viewport background. Call outside the View's circle/panel design-space transform. */
 class CosmicBackgroundRenderer {
     private val ink = SanctuaryInk()
-    private val scene = Picture()
+    private var scene: Bitmap? = null
+    private val sceneBounds = Rect()
+    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val galaxyArt = Array(4) { galaxy(8341L + it * 177L, if (it % 2 == 0) 5 else 4) }
     private val centersX = floatArrayOf(118f, 768f, 104f, 786f)
     private val centersY = floatArrayOf(162f, 231f, 1275f, 1300f)
@@ -36,16 +40,22 @@ class CosmicBackgroundRenderer {
         this.width = width
         this.height = height
         scale = min(width / 864f, height / 1536f)
-        val canvas = scene.beginRecording(width, height)
+        // Cache our own procedural paint at native resolution; no reference/image asset is loaded.
+        // ponytail: at most 4M pixels (16MiB); larger displays use a uniformly downsampled cache.
+        val cacheScale = min(1f, kotlin.math.sqrt(4194304.0 / (width.toDouble() * height)).toFloat())
+        val nextScene = Bitmap.createBitmap(max(1, (width * cacheScale).toInt()), max(1, (height * cacheScale).toInt()), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(nextScene)
+        canvas.scale(cacheScale, cacheScale)
+        sceneBounds.set(0, 0, width, height)
         val random = Random(73123L)
         val faintStars = Array(3) { Path() }
-        for (i in 0 until 3600) {
+        for (i in 0 until 11000) {
             val x = random.nextFloat() * width
             val y = random.nextFloat() * height
-            val size = (.2f + random.nextFloat() * .85f) * scale
+            val size = (.18f + random.nextFloat() * .65f) * scale
             faintStars[i % 3].addCircle(x, y, size, Path.Direction.CW)
         }
-        for (i in faintStars.indices) ink.fill(canvas, faintStars[i], if (i == 0) SanctuaryInk.GOLD else SanctuaryInk.CYAN, 45 + i * 25)
+        for (i in faintStars.indices) ink.fill(canvas, faintStars[i], if (i == 0) SanctuaryInk.GOLD else SanctuaryInk.CYAN, 60 + i * 35)
         for (i in galaxyArt.indices) {
             canvas.save()
             canvas.translate(centersX[i] / 864f * width, centersY[i] / 1536f * height)
@@ -68,14 +78,14 @@ class CosmicBackgroundRenderer {
             for (i in cluster.indices step 2) ink.flare(canvas, cluster[i] / 864f * width, cluster[i + 1] / 1536f * height, 3f * scale)
         }
         ink.stroke(canvas, constellation, SanctuaryInk.GOLD, .6f * scale, 130)
-        for (i in 0 until 95) {
+        for (i in 0 until 180) {
             val x = random.nextFloat() * width
             val y = random.nextFloat() * height
             ink.flare(canvas, x, y, (1f + random.nextFloat() * 3f) * scale, i % 5 == 0)
         }
         planet(canvas, 61f / 864f * width, 1081f / 1536f * height, 44f * scale, false)
         planet(canvas, 787f / 864f * width, 1146f / 1536f * height, 44f * scale, true)
-        scene.endRecording()
+        scene = nextScene
         if (!textureAttempted && Build.VERSION.SDK_INT >= 33) {
             textureAttempted = true
             texture = try { Api33Nebula() } catch (_: RuntimeException) { null } catch (_: LinkageError) { null }
@@ -86,7 +96,7 @@ class CosmicBackgroundRenderer {
         canvas.drawColor(0xff01040a.toInt())
         if (width == 0 || height == 0) return
         // The complete Canvas scene is always present; shader failure removes only an enhancement.
-        canvas.drawPicture(scene)
+        scene?.let { canvas.drawBitmap(it, null, sceneBounds, bitmapPaint) }
         if (!forceCanvas && canvas.isHardwareAccelerated) {
             val activeTexture = texture
             if (activeTexture != null) {
@@ -127,8 +137,8 @@ class CosmicBackgroundRenderer {
             for (j in 0..140) {
                 val t = j / 140f
                 val r = 8f + t * 225f
-                val angle = arm * Math.PI * 2 / arms + ln(1.0 + t * 8) * 2.4
-                val jitter = sin(t * 54 + arm) * 1.3f + sin(t * 117) * .8f
+                val angle = arm * Math.PI * 2 / arms + ln(1.0 + t * 8) * 4.8 + sin(t * 41 + arm) * .04
+                val jitter = sin(t * 54 + arm) * 2.3f + sin(t * 117) * 1.8f
                 val x = cos(angle).toFloat() * (r + jitter)
                 val y = sin(angle).toFloat() * (r + jitter)
                 val wx = cos(angle - .085).toFloat() * r * .97f
@@ -137,15 +147,15 @@ class CosmicBackgroundRenderer {
                 val dy = sin(angle + .055).toFloat() * r
                 if (j == 0) { cloud.moveTo(x, y); warm.moveTo(wx, wy); dark.moveTo(dx, dy); filament.moveTo(x, y) }
                 else { cloud.lineTo(x, y); warm.lineTo(wx, wy); dark.lineTo(dx, dy); filament.lineTo(x * 1.025f, y * 1.025f) }
-                for (k in 0 until 9) {
-                    val spread = (2 + t * 14) * random.nextGaussian().toFloat()
+                for (k in 0 until 24) {
+                    val spread = (3 + t * 22) * random.nextGaussian().toFloat()
                     val a = angle + spread / max(r, 10f)
                     val rr = r + random.nextGaussian().toFloat() * (2 + t * 4)
                     val sx = cos(a).toFloat() * rr
                     val sy = sin(a).toFloat() * rr
-                    val dot = .22f + random.nextFloat() * if (k < 2) 1.15f else .55f
-                    if (k < 2) blueDust.addCircle(sx, sy, 1.4f + random.nextFloat() * 3f, Path.Direction.CW)
-                    if (k == 3 && t < .75f) warmDust.addCircle(sx, sy, .6f + random.nextFloat() * 1.9f, Path.Direction.CW)
+                    val dot = .15f + random.nextFloat() * if (k < 2) .85f else .4f
+                    if (k < 3) blueDust.addCircle(sx, sy, .6f + random.nextFloat() * 1.8f, Path.Direction.CW)
+                    if (k == 3 && t < .9f) warmDust.addCircle(sx, sy, .4f + random.nextFloat() * 1.2f, Path.Direction.CW)
                     (if (k % 4 == 0) hotStars else coolStars).addCircle(sx, sy, dot, Path.Direction.CW)
                 }
             }
@@ -153,9 +163,9 @@ class CosmicBackgroundRenderer {
             ink.stroke(canvas, cloud, 0xff197bb7.toInt(), 19f, 28)
             ink.stroke(canvas, cloud, 0xff2596cc.toInt(), 8f, 40)
             ink.stroke(canvas, warm, 0xffefb266.toInt(), 12f, 30)
-            ink.stroke(canvas, warm, 0xffffd59c.toInt(), 3.5f, 88)
+            ink.stroke(canvas, warm, 0xffffd59c.toInt(), 2f, 45)
             ink.stroke(canvas, dark, 0xff010713.toInt(), 4.2f, 190)
-            ink.stroke(canvas, filament, 0xff7bceff.toInt(), .8f, 100)
+            ink.stroke(canvas, filament, 0xff7bceff.toInt(), .5f, 40)
         }
         ink.fill(canvas, blueDust, 0xff3a92d1.toInt(), 44)
         ink.fill(canvas, warmDust, 0xffeebd75.toInt(), 55)
@@ -164,7 +174,7 @@ class CosmicBackgroundRenderer {
         for (i in 0 until 26) {
             val t = random.nextFloat()
             val r = 18f + t * 205f
-            val angle = (i % arms) * Math.PI * 2 / arms + ln(1.0 + t * 8) * 2.4
+            val angle = (i % arms) * Math.PI * 2 / arms + ln(1.0 + t * 8) * 4.8
             ink.flare(canvas, cos(angle).toFloat() * r, sin(angle).toFloat() * r, .65f + random.nextFloat() * 1.7f, i % 3 != 0)
         }
         paint.shader = RadialGradient(0f, 0f, 54f, intArrayOf(0xfffffff2.toInt(), 0xd8ffe0a1.toInt(), 0x50e79839, 0x00ba6a25), floatArrayOf(0f, .13f, .42f, 1f), Shader.TileMode.CLAMP)
@@ -180,12 +190,19 @@ class CosmicBackgroundRenderer {
         canvas.save(); canvas.translate(x, y)
         if (mirror) canvas.scale(-1f, 1f)
         val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(radius * .4f, -radius * .3f, radius * 1.5f, intArrayOf(0xff163b56.toInt(), 0xff01040b.toInt()), null, Shader.TileMode.CLAMP)
+            shader = RadialGradient(-radius * .3f, 0f, radius * 1.4f, intArrayOf(0xff000207.toInt(), 0xff020914.toInt(), 0xff194052.toInt()), floatArrayOf(0f, .7f, 1f), Shader.TileMode.CLAMP)
         }
         canvas.drawCircle(0f, 0f, radius, p)
         val edge = Path().apply { addCircle(0f, 0f, radius, Path.Direction.CW) }
         ink.stroke(canvas, edge, SanctuaryInk.CYAN, radius * .05f, 90)
-        ink.fill(canvas, SanctuaryInk.crescent(0f, 0f, radius), SanctuaryInk.GOLD, 215)
+        val rim = Path().apply {
+            moveTo(0f, -radius)
+            cubicTo(radius * 1.333333f, -radius, radius * 1.333333f, radius, 0f, radius)
+            cubicTo(radius * 1.2f, radius * .84f, radius * 1.2f, -radius * .84f, 0f, -radius)
+            close()
+        }
+        ink.fill(canvas, rim, SanctuaryInk.GOLD, 235)
+        ink.stroke(canvas, rim, 0xfffff3db.toInt(), .8f, 205)
         canvas.restore()
     }
 

@@ -5,7 +5,7 @@ const assert=require('node:assert/strict'), fs=require('node:fs'), path=require(
 const root=path.resolve(__dirname,'..'), output=path.join(root,'docs');
 const ids=['A','B'].flatMap(g=>Array.from({length:30},(_,i)=>g+String(i+1).padStart(2,'0')))
   .concat(['E01','E02','E03','E04','E05','E06','E07','E08','F01','F02','F03','F04','F05','G01','G02','G03','G04','G05','U01','U02','U03','U04','W01','W02','W04','W05']);
-const reference=path.resolve(root,'../magic-circle-master/reference');
+const reference=process.env.MAGIC_CIRCLE_REFERENCE_DIR || path.resolve(root,'../magic-circle-master/reference');
 async function main(){
   if(process.argv.includes('--sources')) {
     const sharp=require('sharp'), manifest=JSON.parse(fs.readFileSync(path.join(reference,'manifest.json')));
