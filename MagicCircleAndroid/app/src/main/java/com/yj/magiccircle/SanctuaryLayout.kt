@@ -38,6 +38,7 @@ object SanctuaryLayout {
         polygon(300f, 3, 1, -90f), polygon(300f, 3, 1, 90f),
         polygon(228f, 4, 1, -90f), polygon(228f, 4, 1, -45f),
     )
+    // Triples: center x/y, then baseline rotation. Local +x is tangent; glyph up (-y) points outward.
     private fun runes(radius: Float, count: Int): FloatArray = FloatArray(count * 3).also { points ->
         for (i in 0 until count) {
             val angle = i * 360f / count

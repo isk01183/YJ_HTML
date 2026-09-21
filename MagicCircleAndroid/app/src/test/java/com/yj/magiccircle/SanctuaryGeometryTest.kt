@@ -2,7 +2,9 @@ package com.yj.magiccircle
 
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 
 class SanctuaryGeometryTest {
     @Test fun closedTriangleReturnsToItsActualStart() {
@@ -57,5 +59,27 @@ class SanctuaryGeometryTest {
         val changed = SanctuaryLayout.orbitNodes(arrayOf(SanctuaryLayout.Orbit(100f, 40f, 90f)))
         assertEquals(432f, changed[0], .001f)
         assertEquals(818f, changed[1], .001f)
+    }
+
+    @Test fun runeBaselinesAreTangentAndGlyphTopsPointOutward() {
+        for (points in arrayOf(SanctuaryLayout.goldRunes(), SanctuaryLayout.blueRunes())) {
+            for (i in points.indices step 3) {
+                val x = points[i]
+                val y = points[i + 1]
+                val radialLength = hypot(x - 432f, y - 718f)
+                val radialX = (x - 432f) / radialLength
+                val radialY = (y - 718f) / radialLength
+                val rotation = Math.toRadians(points[i + 2].toDouble())
+                val c = cos(rotation).toFloat()
+                val s = sin(rotation).toFloat()
+                // Apply the renderer's rotate-then-translate transform to local (1,0) and (0,-1).
+                val baselineX = (x + c) - x
+                val baselineY = (y + s) - y
+                val glyphUpX = (x + s) - x
+                val glyphUpY = (y - c) - y
+                assertEquals("Baseline must be perpendicular to the radius", 0f, baselineX * radialX + baselineY * radialY, .0001f)
+                assertEquals("Glyph top must face away from the circle center", 1f, glyphUpX * radialX + glyphUpY * radialY, .0001f)
+            }
+        }
     }
 }
