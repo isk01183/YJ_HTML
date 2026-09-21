@@ -84,12 +84,14 @@ jobs:
           test -s "$apk"
           refs="$(git ls-remote --tags origin "refs/tags/$tag")"
           test -z "$refs" || { echo "Tag already exists: $tag" >&2; exit 1; }
-          digest="$(sha256sum "$apk" | cut -d' ' -f1)"
-          printf '%s  %s\n' "$digest" "$asset" > "$checksum"
-          gh release create "$tag" "$apk#$asset" "$checksum" \
+          cp "$apk" "$asset"
+          sha256sum "$asset" > "$checksum"
+          sha256sum -c "$checksum"
+          digest="$(cut -d' ' -f1 "$checksum")"
+          gh release create "$tag" "$asset" "$checksum" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "MagicCircleCharging 1.12 debug ($GITHUB_SHA)" \
-            --notes "Source: $GITHUB_SHA. CI uses an ephemeral debug signer; this APK may not update the locally signed installation. SHA-256: $digest" \
+            --title "MagicCircleCharging 1.12 디버그 (${GITHUB_SHA:0:12})" \
+            --notes "소스: $GITHUB_SHA. CI 임시 디버그 서명 APK로, 기존 로컬 서명 앱 위에 업데이트되지 않을 수 있습니다. SHA-256: $digest" \
             --prerelease --latest=false
           printf 'Download: https://github.com/%s/releases/tag/%s\n\nAPK SHA-256: `%s`\n' \
             "$GITHUB_REPOSITORY" "$tag" "$digest" >> "$GITHUB_STEP_SUMMARY"
