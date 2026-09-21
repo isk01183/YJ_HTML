@@ -5,7 +5,7 @@ const {pathToFileURL} = require('node:url');
 const {chromium} = require('playwright');
 const sharp = require('sharp');
 const designs = require('../app/src/main/assets/circle-designs.js');
-const builtins = designs.list.concat(require('../app/src/main/assets/collection-catalog.js').list);
+const builtins = [{id:'native-N01'}].concat(designs.list,require('../app/src/main/assets/collection-catalog.js').list);
 const assets = path.resolve(__dirname, '../app/src/main/assets');
 const file = name => pathToFileURL(path.join(assets, name)).href;
 const id = '12345678-90ab-4cde-8123-456789abcdef';
@@ -67,9 +67,9 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     // Browser deletion uses the real same collection filter, without pretending to save app data.
     await page.goto(file('gallery.html')+'?lang=ko');
     page.once('dialog', dialog=>dialog.accept()); await page.locator('#delete-design').click();
-    assert.equal(await page.locator('[data-theme="classic"]').isVisible(),false);
+    assert.equal(await page.locator('[data-theme="native-N01"]').isVisible(),false);
     await page.locator('#restore-designs').click();
-    assert.equal(await page.locator('[data-theme="classic"]').isVisible(),true);
+    assert.equal(await page.locator('[data-theme="native-N01"]').isVisible(),true);
     for(const language of ['ko','ja','en']) {
       await page.goto(file('media_circle.html')+'?media='+id+'&lang='+language+'&battery=78&mime=image%2Fjpeg');
       await page.evaluate(()=>window.startChargingAnimation());

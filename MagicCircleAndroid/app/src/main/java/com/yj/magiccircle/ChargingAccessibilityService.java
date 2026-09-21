@@ -14,6 +14,7 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.webkit.WebResourceError;
@@ -27,8 +28,8 @@ public final class ChargingAccessibilityService extends AccessibilityService {
     private final Runnable finishAnimation = () -> finish("deadline");
     private WindowManager windows;
     private PowerManager power;
-    private WebView overlay;
-    private final Runnable checkStart = () -> startAnimation(overlay);
+    private View overlay;
+    private final Runnable checkStart = () -> { if (overlay instanceof WebView) startAnimation((WebView) overlay); };
     private boolean receiverRegistered;
     private long runId;
     private long connectedAt;
@@ -101,16 +102,17 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             hideOverlay("screen-off");
         } else if (state != previous && event == ChargingTransition.Event.PAGE_READY) {
             startupDeadline = ChargingTransition.startupDeadline(connectedAt, SystemClock.uptimeMillis());
-            startAnimation(overlay);
+            if (overlay instanceof WebView) startAnimation((WebView) overlay);
         } else if (state != previous && event == ChargingTransition.Event.JS_STARTED) {
             handler.removeCallbacks(checkStart);
-            WebView current = overlay;
-            if (current == null) return;
+            if (!(overlay instanceof WebView)) return;
+            WebView current = (WebView) overlay;
+            long currentRun = runId;
             // Rendering confirmation is diagnostic. It must never gate JavaScript startup.
             current.postVisualStateCallback(runId, new WebView.VisualStateCallback() {
                 @Override
                 public void onComplete(long requestId) {
-                    if (overlay != current) return;
+                    if (overlay != current || runId != currentRun) return;
                     log("Visual callback ready");
                     handle(ChargingTransition.Event.VISUAL_READY);
                 }
@@ -120,6 +122,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
 
     private void startAnimation(WebView current) {
         if (current == null || overlay != current || state != ChargingTransition.State.STARTING) return;
+        long currentRun = runId;
         long delay = ChargingTransition.retryDelay(startupDeadline, SystemClock.uptimeMillis());
         if (delay == 0) {
             handle(ChargingTransition.Event.START_FAILED);
@@ -134,7 +137,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             long remaining = connectedAt + ChargingTransition.ANIMATION_DURATION_MS
                     - SystemClock.uptimeMillis();
             WebViews.startMagicCircle(current, Math.max(1L, remaining), result -> {
-                if (overlay != current || state != ChargingTransition.State.STARTING) return;
+                if (overlay != current || runId != currentRun || state != ChargingTransition.State.STARTING) return;
                 log("Animation running=" + result + " attempt=" + attempt);
                 if ("true".equals(result)) handle(ChargingTransition.Event.JS_STARTED);
             });
@@ -146,13 +149,18 @@ public final class ChargingAccessibilityService extends AccessibilityService {
 
     private boolean showOverlay() {
         // Keep the root drawable: alpha=0 can stall the visual callback in the background.
-        WebView view = null;
+        View view = null;
+        boolean added = false;
         try {
-            view = WebViews.magicCircle(this);
-            view.setWebViewClient(new WebViews.LocalClient(this) {
+            boolean nativeTheme = "native-N01".equals(WebViews.selectedTheme(this));
+            view = nativeTheme ? new MainMagicChargeView(this) : WebViews.magicCircle(this);
+            if (view instanceof WebView) {
+                WebView web = (WebView) view;
+                long currentRun = runId;
+                web.setWebViewClient(new WebViews.LocalClient(this) {
                 @Override
                 public void onPageFinished(WebView current, String url) {
-                    if (overlay != current) return;
+                    if (overlay != current || runId != currentRun) return;
                     log("Page ready; attached=" + current.isAttachedToWindow()
                             + " visibility=" + current.getWindowVisibility());
                     handle(ChargingTransition.Event.PAGE_READY);
@@ -161,20 +169,21 @@ public final class ChargingAccessibilityService extends AccessibilityService {
                 @Override
                 public void onReceivedError(WebView current, WebResourceRequest request,
                                             WebResourceError error) {
-                    if (overlay != current) return;
+                    if (overlay != current || runId != currentRun) return;
                     log("Load error=" + error.getErrorCode() + " mainFrame=" + request.isForMainFrame());
                     if (request.isForMainFrame()) finish("load-error");
                 }
 
                 @Override
                 public boolean onRenderProcessGone(WebView current, RenderProcessGoneDetail detail) {
-                    if (overlay == current) {
+                    if (overlay == current && runId == currentRun) {
                         log("Renderer gone; crashed=" + (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail.didCrash()));
                         finish("renderer-gone");
                     } else current.destroy();
                     return true;
                 }
-            });
+                });
+            }
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
@@ -190,15 +199,24 @@ public final class ChargingAccessibilityService extends AccessibilityService {
                     PixelFormat.TRANSLUCENT);
             params.gravity = Gravity.TOP | Gravity.START;
             windows.addView(view, params);
+            added = true;
             overlay = view;
             log("Overlay attached");
-            WebViews.loadMagicCircle(view);
+            if (view instanceof MainMagicChargeView) {
+                ((MainMagicChargeView) view).start();
+                handle(ChargingTransition.Event.NATIVE_READY);
+            } else WebViews.loadMagicCircle((WebView) view);
             return true;
         } catch (RuntimeException error) {
             if (overlay == view && view != null) hideOverlay("window-error");
             else {
                 handler.removeCallbacks(finishAnimation);
-                if (view != null) view.destroy();
+                if (view != null) {
+                    if (added || view.isAttachedToWindow()) try { windows.removeView(view); }
+                    catch (RuntimeException removeError) { Log.w(TAG, "Unable to remove failed overlay", removeError); }
+                    if (view instanceof MainMagicChargeView) ((MainMagicChargeView) view).stop();
+                    else WebViews.destroy((WebView) view);
+                }
             }
             Log.e(TAG, "Unable to show charging overlay", error);
             return false;
@@ -222,15 +240,19 @@ public final class ChargingAccessibilityService extends AccessibilityService {
         handler.removeCallbacks(checkStart);
         if (overlay == null) return;
         log("Dismiss reason=" + reason);
-        WebView view = overlay;
+        View view = overlay;
         overlay = null;
         try {
             windows.removeView(view);
         } catch (RuntimeException error) {
             Log.w(TAG, "Unable to remove charging overlay", error);
         }
-        if (!"renderer-gone".equals(reason)) view.stopLoading();
-        view.destroy();
+        if (view instanceof MainMagicChargeView) ((MainMagicChargeView) view).stop();
+        else {
+            WebView web = (WebView) view;
+            if (!"renderer-gone".equals(reason)) web.stopLoading();
+            web.destroy();
+        }
     }
 
     @Override

@@ -51,8 +51,9 @@ final class MediaLibrary {
         this.context = context;
         directory = new File(context.getNoBackupFilesDir(), "imported-media");
         manifest = new AtomicFile(new File(context.getNoBackupFilesDir(), "media-library.json"));
-        selected = ThemeSelection.normalize(context.getSharedPreferences("magic_circle", Context.MODE_PRIVATE)
-                .getString("selected_style", "classic"));
+        android.content.SharedPreferences preferences = context.getSharedPreferences("magic_circle", Context.MODE_PRIVATE);
+        selected = ThemeSelection.initialSelection(preferences.contains("selected_style"),
+                preferences.getString("selected_style", null));
         if (!manifest.getBaseFile().exists() && !new File(manifest.getBaseFile() + ".bak").exists()) return;
         try {
             JSONObject saved = new JSONObject(new String(readManifest(), StandardCharsets.UTF_8));

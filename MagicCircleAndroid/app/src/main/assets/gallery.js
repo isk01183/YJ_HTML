@@ -1,11 +1,14 @@
-let selected='classic', focused='classic', native=false, initialized=false, enabled=false, activeGroup='all';
+let selected='native-N01', focused='native-N01', native=false, initialized=false, enabled=false, activeGroup='all';
 let language=MagicI18n.normalize(new URLSearchParams(location.search).get('lang') || navigator.language.split('-')[0]);
 const grid=document.getElementById('design-grid');
 let hidden=new Set(), media=[], busy=false, readable=true;
-const visibleDesigns=()=>readable?CircleDesigns.list.concat(ReferenceDesigns.list).filter(t=>!hidden.has(t.id)).concat(media):[];
+const nativeDesign={id:'native-N01',code:'N01',group:'signature',color:'#e4c889'};
+const nativeIcon='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#080d18"/><circle cx="50" cy="50" r="36" fill="none" stroke="#e4c889" stroke-width="1.5"/><circle cx="50" cy="50" r="26" fill="none" stroke="#72cbe6" stroke-width="1"/><path d="M50 16 70 66 24 38h52L30 66Z" fill="none" stroke="#e4c889" stroke-width="1.5"/><text x="50" y="53" fill="#f9e8c3" font-size="12" text-anchor="middle">N01</text></svg>');
+const visibleDesigns=()=>readable?[nativeDesign].concat(CircleDesigns.list,ReferenceDesigns.list).filter(t=>!hidden.has(t.id)).concat(media):[];
 const translatedTheme=id=>{
     const custom=media.find(t=>t.id===id);
     return custom?{...custom,desc:text(custom.mime==='image/gif'?'mediaAnimated':'mediaStill'),color:'#d5c5a2',group:'uploads'}
+        :id==='native-N01'?{...nativeDesign,name:text('nativeName'),desc:text('nativeDescription')}
         :MagicI18n.theme(ReferenceDesigns.get(id)||CircleDesigns.get(id),language);
 };
 const text=(key,values)=>MagicI18n.t(key,language,values);
@@ -16,7 +19,7 @@ function loadArt(card){
     if(!image.hasAttribute('src')){
         const custom=media.find(t=>t.id===card.dataset.theme);
         const code=directCode(card.dataset.theme);
-        image.src=custom?custom.url+'?thumb=1':code?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(DirectCircles.svg(code)):ReferenceDesigns.get(card.dataset.theme)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
+        image.src=card.dataset.theme==='native-N01'?nativeIcon:custom?custom.url+'?thumb=1':code?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(DirectCircles.svg(code)):ReferenceDesigns.get(card.dataset.theme)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
     }
 }
 // Decode only nearby thumbnails. A long collection should not create thousands of live SVG nodes.
@@ -45,16 +48,17 @@ function render(){
     const hero=document.getElementById('hero-art');
     if(hero.dataset.renderedTheme!==focused){
         hero.replaceChildren();
-        if(directCode(focused)){hero.innerHTML=DirectCircles.svg(directCode(focused));const svg=hero.querySelector('svg');svg.setAttribute('aria-hidden','true');svg.style.cssText='display:block;width:100%;height:100%';}
+        if(focused==='native-N01'){const image=document.createElement('img');image.alt='';image.src=nativeIcon;hero.appendChild(image);}
+        else if(directCode(focused)){hero.innerHTML=DirectCircles.svg(directCode(focused));const svg=hero.querySelector('svg');svg.setAttribute('aria-hidden','true');svg.style.cssText='display:block;width:100%;height:100%';}
         else if(theme?.url||theme?.thumb){const image=document.createElement('img');image.alt='';image.src=theme.thumb||theme.url+'?thumb=1';hero.appendChild(image);}
         else if(theme)hero.innerHTML=CircleDesigns.svg(focused,'hero');
         else{const empty=document.createElement('span');empty.className='empty-art';empty.textContent='◇';hero.appendChild(empty);}
         hero.dataset.renderedTheme=focused;
     }
-    const review=theme?.code?text(directCode(focused)?'directReview':'legacyReview'):text(theme?.group||'all');
+    const review=focused==='native-N01'?text('nativeLabel'):theme?.code?text(directCode(focused)?'directReview':'legacyReview'):text(theme?.group||'all');
     document.getElementById('hero-tag').textContent=theme?(theme.code||focused)+' · '+review:'';
     document.getElementById('hero-title').textContent=theme?.name||text('nothingSelected');
-    document.getElementById('hero-description').textContent=theme?.code?text('directReviewHint'):theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
+    document.getElementById('hero-description').textContent=focused==='native-N01'?theme.desc+' '+text('nativePreviewHint'):theme?.code?text('directReviewHint'):theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
     document.getElementById('hero-saved').textContent=theme?text(focused===selected?'saved':'pending'):'';
     document.getElementById('selection-status').textContent=selected?text('current',{name:translatedTheme(selected).name}):text('nothingSelected');
     document.getElementById('apply').disabled=busy||!focused||focused===selected;
@@ -82,7 +86,7 @@ function render(){
         card.setAttribute('aria-label',text('select',{name:design.name}));
         card.setAttribute('aria-pressed',String(id===focused));
         card.querySelector('.name').textContent=design.name;
-        card.querySelector('.tag').textContent=(design.code||id)+' · '+text(design.code?(directCode(id)?'directReview':'legacyReview'):design.group);
+        card.querySelector('.tag').textContent=(design.code||id)+' · '+(id==='native-N01'?text('nativePreviewHint'):text(design.code?(directCode(id)?'directReview':'legacyReview'):design.group));
         const badge=card.querySelector('.applied-badge');badge.textContent=text('appliedBadge');badge.hidden=id!==selected;
         card.hidden=(activeGroup!=='all'&&design.group!==activeGroup)||!(design.name+' '+id).toLocaleLowerCase().includes(query);
         if(!card.hidden)count++;
@@ -126,6 +130,7 @@ document.getElementById('close-preview').addEventListener('click',closePreview);
 document.getElementById('preview').addEventListener('click',()=>{
     if(!focused)return;
     if(native){location.href='magiccircle://preview?theme='+encodeURIComponent(focused);return;}
+    if(focused==='native-N01'){document.getElementById('selection-status').textContent=text('nativePreviewHint');return;}
     const file=ReferenceDesigns.get(focused)?'collection_circle.html':focused==='classic'?'magic_circle.html':'theme_circle.html';
     dialog.querySelector('iframe').src=file+'?theme='+focused+'&lang='+language+'&demo=1';
     dialog.showModal();timer=setTimeout(closePreview,7400);

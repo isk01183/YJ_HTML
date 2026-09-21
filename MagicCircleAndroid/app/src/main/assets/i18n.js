@@ -23,6 +23,10 @@
     add('directReview', '手描きパス · 確認用', '직접 그리기 · 검토용', 'Direct paths · Review');
     add('legacyReview', '既存の図案 · 再制作待ち', '기존 도안 · 직접 그리기 대기', 'Legacy art · Redraw pending');
     add('directReviewHint', 'コードを指定して、形・色・光の修正を依頼できます。参照図と同一と認定された完成版ではありません。', '수정할 부분과 도안 코드를 함께 알려 주세요. 원본 동일성이 확정된 완성본은 아닙니다.', 'Use the design code when requesting shape, color or light corrections. Reference fidelity has not been approved.');
+    add('nativeName', '星を読む聖域', '별을 읽는 성역', 'Sanctuary of Stars');
+    add('nativeDescription', '星空と魔法陣を端末で描画し、電池の状態を表示します。', '별빛 배경과 마법진을 기기에서 직접 그려 배터리 상태를 보여 줍니다.', 'A device-rendered star field and magic circle show your battery status.');
+    add('nativeLabel', 'ネイティブ描画', '네이티브 화면', 'Native rendering');
+    add('nativePreviewHint', 'ネイティブ画面はアプリのプレビューで確認', '네이티브 화면은 앱의 미리보기에서 확인', 'View the native screen in the app preview');
     add('collection', '幻想の書', '환상의 서', 'Fantasy collection');
     add('signature', '代表作', '대표작', 'Signature');
     add('variation', '変奏', '변주', 'Variations');

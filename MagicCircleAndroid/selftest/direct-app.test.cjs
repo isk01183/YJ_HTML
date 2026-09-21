@@ -18,7 +18,14 @@ const refs=require(path.join(assets,'collection-catalog.js'));
   await go('gallery.html','?lang=ko');
   assert.equal(await page.evaluate(()=>typeof globalThis.DirectCircles),'object','App must load the directly authored renderer');
   assert.deepEqual((await page.evaluate(()=>DirectCircles.ids)).sort(),refs.list.map(t=>t.code).sort(),'All 118 codes must use directly authored paths');
-  assert.equal(await page.locator('.card').count(),173,'Keep all existing choices');
+  assert.equal(await page.locator('.card').count(),174,'Keep all 173 existing choices and add N01');
+  assert.equal(await page.locator('.card').first().getAttribute('data-theme'),'native-N01');
+  assert.match(await page.locator('[data-theme="native-N01"] .art img').getAttribute('src'),/^data:image\/svg\+xml/);
+  for(const [lang,hint] of [['ko','네이티브 화면은 앱의 미리보기에서 확인'],['ja','ネイティブ画面はアプリのプレビューで確認'],['en','View the native screen in the app preview']]){
+   await page.locator(`[data-language="${lang}"]`).click();
+   assert.match(await page.locator('[data-theme="native-N01"] .tag').textContent(),new RegExp(hint));
+   assert.match(await page.locator('#hero-description').textContent(),new RegExp(hint));
+  }
   for(const lang of ['ko','ja','en']){
    await page.locator(`[data-language="${lang}"]`).click();
    for(const code of ['C17','A01','R01','W03']){
@@ -69,6 +76,6 @@ const refs=require(path.join(assets,'collection-catalog.js'));
    await card.locator('img').evaluate(async (img,id)=>{try{await img.decode();if(!img.naturalWidth)throw new Error('empty')}catch(e){throw new Error(id+' thumbnail: '+e.message)}},theme.id);
   }
   assert.deepEqual(errors,[]);
-  console.log('DIRECT_APP_OK: stable review IDs, 3 languages, preserved 173 choices, actual inline SVG, offline repeat, deadline');
+  console.log('DIRECT_APP_OK: stable review IDs, 3 languages, 174 choices including N01, actual inline SVG, offline repeat, deadline');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

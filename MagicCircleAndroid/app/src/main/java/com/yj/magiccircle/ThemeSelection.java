@@ -4,7 +4,7 @@ final class ThemeSelection {
     private ThemeSelection() {}
 
     static final java.util.List<String> IDS = java.util.Collections.unmodifiableList(java.util.Arrays.asList(
-            "classic", "moon", "raphael", "layered", "premium", "basic", "blue", "gold", "silver", "violet",
+            "native-N01", "classic", "moon", "raphael", "layered", "premium", "basic", "blue", "gold", "silver", "violet",
             "cyan", "core", "minimal", "celestial-satellites", "crimson-abyss", "ivory-alchemy", "triune-seal",
             "vital-staff", "solar-crown", "healing-wings", "lunar-phases", "frost-crystal", "sage-nexus",
             "hex-lattice", "grimoire-star", "world-tree", "blood-moon", "all-seeing-eye", "spacetime-prism",
@@ -32,6 +32,10 @@ final class ThemeSelection {
 
     static String normalize(String id) {
         return isValid(id) ? id : "classic";
+    }
+
+    static String initialSelection(boolean hasLegacyChoice, String legacyChoice) {
+        return hasLegacyChoice ? normalize(legacyChoice) : "native-N01";
     }
 
     static String page(String id) {

@@ -14,7 +14,7 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
    await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><circle cx="512" cy="512" r="460" fill="none" stroke="gold" stroke-width="4"/></svg>'});
   });
   await page.goto(url('gallery.html')+'?lang=ko');
-  assert.equal(await page.locator('.card').count(),173);
+  assert.equal(await page.locator('.card').count(),174);
   await page.locator('[data-group=reference]').click();assert.equal(await page.locator('.card:visible').count(),118);
   await page.locator('#search').fill('C03');assert.equal(await page.locator('.card:visible').count(),1);
   await page.locator('[data-theme="ref-C03"]').click();
@@ -53,6 +53,6 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
    await page.setViewportSize({width,height:900});await page.goto(url('gallery.html')+'?lang=en');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   }
-  assert.deepEqual(errors,[]);console.log('COLLECTION_BROWSER_OK: 173 choices, 118 filter, removal/restore, 3 languages, bounded replay, offline SVG route');
+  assert.deepEqual(errors,[]);console.log('COLLECTION_BROWSER_OK: 174 choices, 118 filter, removal/restore, 3 languages, bounded replay, offline SVG route');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

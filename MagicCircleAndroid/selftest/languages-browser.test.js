@@ -25,7 +25,7 @@ const url = name => pathToFileURL(path.join(assets,name)).href;
             assert.equal(await frame.locator('.begin h1').textContent(),charging);
             assert.equal(new URL(await page.locator('#browser-preview iframe').getAttribute('src'),url('gallery.html')).searchParams.get('lang'),language);
             await page.locator('#close-preview').click();
-            assert.equal(await page.locator('[data-theme="classic"] .applied-badge').isVisible(),true, 'Preview must not replace the saved theme');
+            assert.equal(await page.locator('[data-theme="native-N01"] .applied-badge').isVisible(),true, 'Preview must not replace the saved theme');
         }
         // Native state restoration updates language without losing a newly focused, unapplied card.
         await page.evaluate(()=>window.setGalleryState({selected:'moon',language:'ko',enabled:true}));

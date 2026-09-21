@@ -224,9 +224,11 @@ public final class MainActivity extends Activity {
         Dialog dialog = new Dialog(this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
-        WebView preview = WebViews.magicCircle(this);
+        boolean nativeTheme = "native-N01".equals(theme);
+        MainMagicChargeView nativePreview = nativeTheme ? new MainMagicChargeView(this) : null;
+        WebView preview = nativeTheme ? null : WebViews.magicCircle(this);
         long previewDeadline = android.os.SystemClock.uptimeMillis() + 7000L;
-        preview.setWebViewClient(new WebViews.LocalClient(this) {
+        if (preview != null) preview.setWebViewClient(new WebViews.LocalClient(this) {
             @Override
             public boolean shouldOverrideUrlLoading(WebView current, String url) { return true; }
 
@@ -246,7 +248,7 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
-        root.addView(preview, new FrameLayout.LayoutParams(
+        root.addView(nativeTheme ? nativePreview : preview, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         Button close = new Button(this);
         close.setText(localizedString(R.string.close_preview));
@@ -264,7 +266,8 @@ public final class MainActivity extends Activity {
                 handler.removeCallbacks(finishPreview);
                 previewDialog = null;
             }
-            destroyWebView(preview);
+            if (nativePreview != null) nativePreview.stop();
+            if (preview != null) destroyWebView(preview);
         });
         previewDialog = dialog;
         dialog.show();
@@ -275,7 +278,8 @@ public final class MainActivity extends Activity {
             fitSystemInsets(window, root);
         }
         handler.postDelayed(finishPreview, 7_000L);
-        preview.post(() -> {
+        if (nativePreview != null) nativePreview.start();
+        else preview.post(() -> {
             if (previewDialog == dialog) WebViews.loadMagicCircle(preview, theme);
         });
     }

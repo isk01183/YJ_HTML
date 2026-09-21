@@ -40,11 +40,27 @@ public final class ThemeSelectionSelfTest {
                 collection.add(id);
             }
         }
-        check(ThemeSelection.IDS.size() == 173 && new HashSet<>(ThemeSelection.IDS).size() == 173,
-                "all 55 existing and 118 collection entries remain distinct");
-        check(ThemeSelection.IDS.subList(55, 173).equals(collection), "collection order matches approved catalog");
+        check(ThemeSelection.IDS.size() == 174 && new HashSet<>(ThemeSelection.IDS).size() == 174,
+                "new N01 plus all 55 existing and 118 collection entries remain distinct");
+        check("native-N01".equals(ThemeSelection.IDS.get(0)), "native design leads the catalog");
+        check(ThemeSelection.IDS.subList(56, 174).equals(collection), "collection order matches approved catalog");
+        java.util.Set<String> previousIds = new HashSet<>(collection);
+        previousIds.addAll(Arrays.asList("classic", "moon", "raphael", "layered", "premium",
+                "basic", "blue", "gold", "silver", "violet", "cyan", "core", "minimal",
+                "celestial-satellites", "crimson-abyss", "ivory-alchemy", "triune-seal",
+                "vital-staff", "solar-crown", "healing-wings", "lunar-phases", "frost-crystal",
+                "sage-nexus", "hex-lattice", "grimoire-star", "world-tree", "blood-moon",
+                "all-seeing-eye", "spacetime-prism", "spiral-galaxy", "heart-sanctuary",
+                "snowflake", "jade-lotus", "flame-spirit", "tidal-vortex", "moon-wheel",
+                "gravity-well", "sakura-seal", "elemental-concord", "spirit-bloom",
+                "crescent-moon", "star-guide", "chronos-gears", "seraph-wings", "infernal-pact",
+                "binding-chains", "guardian-shield", "infinite-bond", "fate-compass",
+                "earth-crystal", "water-spirit", "wind-spirit", "light-rosette",
+                "dream-constellation", "twilight-balance"));
+        check(new HashSet<>(ThemeSelection.IDS.subList(1, 174)).equals(previousIds),
+                "all previous 173 IDs remain available");
         check("".equals(ThemeSelection.nextVisible("", ThemeSelection.IDS,
-                new HashSet<>(ThemeSelection.IDS.subList(0, 55)))),
+                new HashSet<>(ThemeSelection.IDS.subList(1, 56)))),
                 "v1.9 explicit empty selection must not activate a new design after upgrade");
         for (String bad : new String[] {"C03", "ref-C00", "ref-C31", "ref-W06", "ref-F06", "ref-A31",
                 "ref-B31", "ref-G06", "ref-E09", "ref-U05", "ref-R02", "ref-D01", "ref-c03",
