@@ -10,11 +10,13 @@ const translatedTheme=id=>{
 };
 const text=(key,values)=>MagicI18n.t(key,language,values);
 const cards=new Map();
+const directCode=id=>{const code=ReferenceDesigns.get(id)?.code;return DirectCircles.ids.includes(code)?code:null;};
 function loadArt(card){
     const image=card.querySelector('img');
     if(!image.hasAttribute('src')){
         const custom=media.find(t=>t.id===card.dataset.theme);
-        image.src=custom?custom.url+'?thumb=1':ReferenceDesigns.get(card.dataset.theme)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
+        const code=directCode(card.dataset.theme);
+        image.src=custom?custom.url+'?thumb=1':code?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(DirectCircles.svg(code)):ReferenceDesigns.get(card.dataset.theme)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(card.dataset.theme,'thumb'));
     }
 }
 // Decode only nearby thumbnails. A long collection should not create thousands of live SVG nodes.
@@ -43,14 +45,16 @@ function render(){
     const hero=document.getElementById('hero-art');
     if(hero.dataset.renderedTheme!==focused){
         hero.replaceChildren();
-        if(theme?.url||theme?.thumb){const image=document.createElement('img');image.alt='';image.src=theme.thumb||theme.url+'?thumb=1';hero.appendChild(image);}
+        if(directCode(focused)){hero.innerHTML=DirectCircles.svg(directCode(focused));const svg=hero.querySelector('svg');svg.setAttribute('aria-hidden','true');svg.style.cssText='display:block;width:100%;height:100%';}
+        else if(theme?.url||theme?.thumb){const image=document.createElement('img');image.alt='';image.src=theme.thumb||theme.url+'?thumb=1';hero.appendChild(image);}
         else if(theme)hero.innerHTML=CircleDesigns.svg(focused,'hero');
         else{const empty=document.createElement('span');empty.className='empty-art';empty.textContent='◇';hero.appendChild(empty);}
         hero.dataset.renderedTheme=focused;
     }
-    document.getElementById('hero-tag').textContent=theme?text(theme.group):'';
+    const review=theme?.code?text(directCode(focused)?'directReview':'legacyReview'):text(theme?.group||'all');
+    document.getElementById('hero-tag').textContent=theme?(theme.code||focused)+' · '+review:'';
     document.getElementById('hero-title').textContent=theme?.name||text('nothingSelected');
-    document.getElementById('hero-description').textContent=theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
+    document.getElementById('hero-description').textContent=theme?.code?text('directReviewHint'):theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
     document.getElementById('hero-saved').textContent=theme?text(focused===selected?'saved':'pending'):'';
     document.getElementById('selection-status').textContent=selected?text('current',{name:translatedTheme(selected).name}):text('nothingSelected');
     document.getElementById('apply').disabled=busy||!focused||focused===selected;
@@ -78,9 +82,9 @@ function render(){
         card.setAttribute('aria-label',text('select',{name:design.name}));
         card.setAttribute('aria-pressed',String(id===focused));
         card.querySelector('.name').textContent=design.name;
-        card.querySelector('.tag').textContent=text(design.group);
+        card.querySelector('.tag').textContent=(design.code||id)+' · '+text(design.code?(directCode(id)?'directReview':'legacyReview'):design.group);
         const badge=card.querySelector('.applied-badge');badge.textContent=text('appliedBadge');badge.hidden=id!==selected;
-        card.hidden=(activeGroup!=='all'&&design.group!==activeGroup)||!design.name.toLocaleLowerCase().includes(query);
+        card.hidden=(activeGroup!=='all'&&design.group!==activeGroup)||!(design.name+' '+id).toLocaleLowerCase().includes(query);
         if(!card.hidden)count++;
     });
     document.getElementById('design-count').textContent=text('designCount',{count});

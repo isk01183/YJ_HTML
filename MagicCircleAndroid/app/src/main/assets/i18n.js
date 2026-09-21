@@ -20,6 +20,9 @@
     add('categories', 'デザインの分類', '디자인 분류', 'Design categories');
     add('all', 'すべて', '전체', 'All');
     add('reference', '参照コレクション', '첨부 도안', 'Reference collection');
+    add('directReview', '手描きパス · 確認用', '직접 그리기 · 검토용', 'Direct paths · Review');
+    add('legacyReview', '既存の図案 · 再制作待ち', '기존 도안 · 직접 그리기 대기', 'Legacy art · Redraw pending');
+    add('directReviewHint', 'コードを指定して、形・色・光の修正を依頼できます。参照図と同一と認定された完成版ではありません。', '수정할 부분과 도안 코드를 함께 알려 주세요. 원본 동일성이 확정된 완성본은 아닙니다.', 'Use the design code when requesting shape, color or light corrections. Reference fidelity has not been approved.');
     add('collection', '幻想の書', '환상의 서', 'Fantasy collection');
     add('signature', '代表作', '대표작', 'Signature');
     add('variation', '変奏', '변주', 'Variations');

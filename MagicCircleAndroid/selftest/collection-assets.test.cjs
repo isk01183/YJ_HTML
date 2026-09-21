@@ -28,7 +28,9 @@ const assets=path.resolve(__dirname,'../app/src/main/assets'),folder=path.join(a
    const start=performance.now();
    await page.goto(pathToFileURL(path.join(assets,'collection_circle.html')).href+'?theme='+theme.id+'&lang=ko&battery=78&run='+Date.now(),{timeout:20000});
    const loadMs=performance.now()-start;
-   assert.equal(await page.locator('#collection-art').evaluate(n=>n.complete&&n.naturalWidth>0),true,theme.id);
+   assert.equal(await page.locator('[data-direct-circle]').count(),1,theme.id+' must use native paths');
+   assert.equal(await page.locator('[data-direct-circle]').getAttribute('data-direct-circle'),theme.code);
+   assert.equal(await page.locator('#collection-art').count(),0,'No legacy contour image in the new charging renderer');
    assert.equal(await page.evaluate(ms=>window.startChargingAnimation(Math.max(0,7000-ms)),loadMs),true,theme.id+' must be ready inside the connection budget on this PC');
    await page.evaluate(()=>document.getAnimations().forEach(a=>{a.pause();a.currentTime=3500;}));
    const save=qa&&['C03','R01','W03','F05','G01','U04','A04','B17'].includes(theme.code);
