@@ -1,0 +1,95 @@
+name: Android debug prerelease
+
+on:
+  push:
+    branches: [codex/stellar-sanctuary-v112]
+    paths:
+      - .github/workflows/android-debug.yml
+      - MagicCircleAndroid/**
+  workflow_dispatch:
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  debug:
+    if: github.repository == 'isk01183/YJ_HTML' && github.event.repository.private == false && github.ref == 'refs/heads/codex/stellar-sanctuary-v112'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # Only this job publishes the verified APK as a prerelease.
+    defaults:
+      run:
+        working-directory: MagicCircleAndroid
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+          cache-disabled: true
+          dependency-graph: disabled
+          validate-wrappers: true
+          build-scan-publish: false
+          develocity-injection-enabled: false
+      - name: Install Android 37 SDK
+        run: sdkmanager --install 'platforms;android-37'
+      - name: Test, lint, and build
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Verify APK and summarize reports
+        id: verify
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          root = Path('app/build')
+          apk = root / 'outputs/apk/debug/app-debug.apk'
+          assert apk.is_file() and apk.stat().st_size > 0, 'Debug APK missing or empty'
+          metadata = json.loads((apk.parent / 'output-metadata.json').read_text())
+          assert metadata['applicationId'] == 'com.yj.magiccircle'
+          assert metadata['variantName'] == 'debug'
+          assert any(e['outputFile'] == apk.name and e['versionCode'] == 15 and e['versionName'] == '1.12'
+                     for e in metadata['elements']), 'Unexpected APK version'
+          suites = list((root / 'test-results/testDebugUnitTest').glob('TEST-*.xml'))
+          assert suites, 'Unit-test reports missing'
+          totals = {key: sum(int(ElementTree.parse(p).getroot().get(key, 0)) for p in suites)
+                    for key in ('tests', 'failures', 'errors', 'skipped')}
+          assert totals['tests'] > 0 and totals['failures'] == totals['errors'] == 0, totals
+          lint = (root / 'reports/lint-results-debug.txt').read_text().strip()
+          assert lint, 'Lint report missing'
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write(f"Tests: {totals['tests']} (skipped {totals['skipped']}, failures 0, errors 0)\n\nLint: {lint}\n\n")
+          PY
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish unique prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          asset=MagicCircleCharging-v1.12-debug.apk
+          checksum=MagicCircleCharging-v1.12-debug.apk.sha256
+          tag="v1.12-debug-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -s "$apk"
+          refs="$(git ls-remote --tags origin "refs/tags/$tag")"
+          test -z "$refs" || { echo "Tag already exists: $tag" >&2; exit 1; }
+          digest="$(sha256sum "$apk" | cut -d' ' -f1)"
+          printf '%s  %s\n' "$digest" "$asset" > "$checksum"
+          gh release create "$tag" "$apk#$asset" "$checksum" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "MagicCircleCharging 1.12 debug ($GITHUB_SHA)" \
+            --notes "Source: $GITHUB_SHA. CI uses an ephemeral debug signer; this APK may not update the locally signed installation. SHA-256: $digest" \
+            --prerelease --latest=false
+          printf 'Download: https://github.com/%s/releases/tag/%s\n\nAPK SHA-256: `%s`\n' \
+            "$GITHUB_REPOSITORY" "$tag" "$digest" >> "$GITHUB_STEP_SUMMARY"
