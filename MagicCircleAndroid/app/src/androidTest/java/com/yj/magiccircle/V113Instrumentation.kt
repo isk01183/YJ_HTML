@@ -10,6 +10,7 @@ class V113Instrumentation : android.app.Instrumentation() {
         val result = android.os.Bundle()
         try {
             LibraryStorageChecks.run(targetContext)
+            WallpaperChecks.run(targetContext)
             ChargeStatusPanelChecks.run()
             R01RenderingChecks.run()
             W03RenderingChecks.run()

@@ -4,6 +4,9 @@
     const strings = {};
     const add = (key, ja, ko, en) => { strings[key] = {ja, ko, en}; };
     add('galleryTitle', '魔法陣の書庫', '마법진 보관함', 'The Arcane Archive');
+    add('changeWallpaper', 'ホーム画面を変更', '배경화면 변경', 'Change wallpaper');
+    add('changeLockScreen', 'ロック画面を変更', '잠금화면 변경', 'Change lock screen');
+    add('wallpaperChoose', '壁紙の図案を選択してください。次に静止画またはライブを選び、確認して適用します。', '배경화면 도안을 선택하세요. 다음으로 정지 또는 라이브를 선택하고 확인 후 적용합니다.', 'Choose a wallpaper design, then still or live. Preview and confirm before applying.');
     add('brand', '魔法陣コレクション', '마법진 컬렉션', 'ARCANE COLLECTION');
     add('settings', '接続設定 ↗', '연결 설정 ↗', 'Setup ↗');
     add('intro', '充電のひとときに、あなたの術式を。\n好きな魔法陣を選んで、光の演出をお楽しみください。', '충전이 시작되는 순간, 나만의 마법을.\n마음에 드는 마법진을 골라 빛의 연출을 즐겨 보세요.', 'A little magic, every time you connect.\nChoose a circle and let its light unfold.');

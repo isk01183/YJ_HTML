@@ -49,10 +49,13 @@ public final class MainActivity extends Activity {
     private final Runnable finishPreview = this::dismissPreview;
     private WebView gallery;
     private Dialog previewDialog;
+    private WallpaperController wallpaperController;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        wallpaperController = new WallpaperController(this);
+        wallpaperController.restoreState(state);
         activeActivity = new WeakReference<>(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF05080B);
@@ -118,6 +121,14 @@ public final class MainActivity extends Activity {
         }
         if ("import".equals(action) && uri.getQuery() == null) {
             if (!libraryBusy) chooseMedia();
+            return;
+        }
+        if ("wallpaper".equals(action)) {
+            if (!hasExactQuery(uri, "theme", "target") || libraryBusy) return;
+            String theme = uri.getQueryParameter("theme"), target = uri.getQueryParameter("target");
+            if (!WallpaperPolicy.allowedTheme(theme) || !library.available(theme)
+                    || (!"home".equals(target) && !"lock".equals(target))) return;
+            wallpaperController.show(theme, target);
             return;
         }
         if ("restore".equals(action) && uri.getQuery() == null) {
@@ -228,6 +239,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (wallpaperController.onActivityResult(requestCode, resultCode, data)) return;
         if (requestCode != IMPORT_DOCUMENT) return;
         libraryBusy = false;
         if (resultCode == RESULT_OK && data != null && data.getData() != null) {
@@ -390,6 +402,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        wallpaperController.pause();
         dismissPreview();
         if (gallery != null) gallery.onPause();
         super.onPause();
@@ -397,6 +410,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        wallpaperController.close();
         if (activeActivity.get() == this) activeActivity.clear();
         dismissPreview();
         handler.removeCallbacks(finishPreview);
@@ -406,5 +420,11 @@ public final class MainActivity extends Activity {
             destroyWebView(view);
         }
         super.onDestroy();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle state) {
+        wallpaperController.saveState(state);
+        super.onSaveInstanceState(state);
     }
 }

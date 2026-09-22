@@ -109,6 +109,8 @@ function render(){
     document.getElementById('manage-inactive').disabled=!readable;
     document.getElementById('save-tab').disabled=busy||!readable;
     document.getElementById('import-media').disabled=!native||busy||!readable;
+    document.querySelectorAll('#wallpaper-home,#wallpaper-lock').forEach(button=>button.disabled=busy||!wallpaperThemes().length);
+    if(document.getElementById('wallpaper-dialog').open)renderWallpaperChoices();
     document.getElementById('import-media').textContent=text(busy?'mediaLoading':'importMedia');
     document.getElementById('service-label').textContent=text(native?(enabled?'serviceOn':'serviceOff'):'serviceCheck');
     document.getElementById('service-state').classList.toggle('enabled',native&&enabled);
@@ -149,6 +151,29 @@ window.setGalleryState=state=>{
     render();
 };
 const dialogTriggers=new WeakMap();
+const wallpaperThemes=()=>visibleDesigns().filter(theme=>theme.id==='ref-W03'||theme.id==='ref-R01');
+let wallpaperTarget='home';
+function renderWallpaperChoices(){
+    document.getElementById('wallpaper-title').textContent=text(wallpaperTarget==='lock'?'changeLockScreen':'changeWallpaper');
+    const choices=document.getElementById('wallpaper-choices');choices.replaceChildren();
+    ['ref-W03','ref-R01'].filter(id=>wallpaperThemes().some(theme=>theme.id===id)).forEach(id=>{
+        const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button');
+        row.className='member-row';label.textContent=translatedTheme(id).name;
+        button.type='button';button.dataset.wallpaperTheme=id;button.textContent=id.slice(4);button.disabled=busy;
+        button.setAttribute('aria-label',text('select',{name:translatedTheme(id).name}));
+        button.addEventListener('click',()=>{
+            if(busy||!wallpaperThemes().some(theme=>theme.id===id))return;
+            closeDialog(document.getElementById('wallpaper-dialog'));
+            if(native)location.href='magiccircle://wallpaper?theme='+id+'&target='+wallpaperTarget;
+            else document.getElementById('selection-status').textContent=text('browserOnly');
+        });
+        row.append(label,button);choices.appendChild(row);
+    });
+}
+['home','lock'].forEach(target=>document.getElementById('wallpaper-'+target).addEventListener('click',event=>{
+    wallpaperTarget=target;renderWallpaperChoices();openDialog(document.getElementById('wallpaper-dialog'),event.currentTarget);
+}));
+document.getElementById('close-wallpaper').addEventListener('click',()=>closeDialog(document.getElementById('wallpaper-dialog')));
 function openDialog(dialog,trigger){dialogTriggers.set(dialog,trigger);dialog.showModal();}
 function closeDialog(dialog){if(dialog.open)dialog.close();}
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>dialogTriggers.get(dialog)?.focus()));

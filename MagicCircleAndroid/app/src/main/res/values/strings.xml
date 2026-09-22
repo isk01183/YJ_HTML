@@ -20,4 +20,26 @@
     <string name="library_cancel">Cancel</string>
     <string name="library_cleanup_pending">Removed from the list. The app will retry deleting its private copies when opened again. Your original file is unchanged.</string>
     <string name="library_invalid_change">That library change is not valid. Refresh the screen and try again.</string>
+    <string name="wallpaper_w03">W03 · Garden of Stars</string>
+    <string name="wallpaper_r01">R01 · Raphael Circle</string>
+    <string name="wallpaper_description">Slowly moving outer light around a fixed, device-rendered design.</string>
+    <string name="wallpaper_home">Home screen</string>
+    <string name="wallpaper_lock">Lock screen</string>
+    <string name="wallpaper_still">Still wallpaper</string>
+    <string name="wallpaper_live">Live wallpaper</string>
+    <string name="wallpaper_apply">Confirm and apply</string>
+    <string name="wallpaper_still_confirm">Apply this image to the screen named above? Battery and charging status are not included.</string>
+    <string name="wallpaper_system_preview">Open system preview</string>
+    <string name="wallpaper_live_home_hint">In the system preview, confirm Home screen as your destination. The system controls the final choice. Cancel if your desired destination is unavailable; you can return here and choose Still wallpaper.</string>
+    <string name="wallpaper_live_lock_hint">In the system preview, choose Lock screen only. If lock-only is unavailable, cancel and return here to choose Still wallpaper. This app cannot force a lock-only live wallpaper or substitute Home screen.</string>
+    <string name="wallpaper_preparing">Preparing wallpaper preview…</string>
+    <string name="wallpaper_applied">Wallpaper applied to the requested screen.</string>
+    <string name="wallpaper_retained">Existing wallpaper retained. No new application was confirmed.</string>
+    <string name="wallpaper_unconfirmed">Confirmation needed. Check the requested screen in system settings. To use a still image, reopen Change wallpaper or Change lock screen.</string>
+    <string name="wallpaper_unavailable">This design or wallpaper target is unavailable.</string>
+    <string name="wallpaper_lock_unsupported">Still lock-screen wallpapers require Android 7.0 or later.</string>
+    <string name="wallpaper_denied">Wallpaper changes are unavailable or blocked by device policy.</string>
+    <string name="wallpaper_error">The wallpaper could not be prepared or applied. Try again.</string>
+    <string name="wallpaper_memory_error">Not enough memory for this wallpaper. Close other apps and try again.</string>
+    <string name="wallpaper_picker_error">No system live wallpaper preview is available.</string>
 </resources>

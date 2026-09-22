@@ -44,6 +44,7 @@
   <div class="statusline" id="service-state"><i class="dot"></i><span id="service-label"></span><span class="sep">/</span><span data-i18n="maxTime"></span><span class="sep">/</span><span data-i18n="offline"></span></div>
   <section class="hero" data-i18n-label="selectedCircle"><div id="hero-art"></div><div><div class="label" id="hero-tag"></div><h2 id="hero-title"></h2><p id="hero-description"></p><div class="saved" id="hero-saved"></div></div></section>
   <p id="service-hint" class="hint" hidden data-i18n="serviceHint"></p><p id="library-notice" class="notice" hidden></p>
+  <div class="manage"><button id="wallpaper-home" data-i18n="changeWallpaper"></button><button id="wallpaper-lock" data-i18n="changeLockScreen"></button></div>
   <div class="manage"><button id="delete-design" data-i18n="disableDesign"></button></div>
   <section class="library-tools"><div class="library-copy"><strong data-i18n="yourMedia"></strong><p data-i18n="mediaHint"></p></div><button id="import-media" data-i18n="importMedia" disabled></button><button id="manage-inactive" data-i18n="manageInactive"></button></section>
   <div class="section-head"><h2 data-i18n="choose"></h2><span class="count" id="design-count"></span></div>
@@ -58,6 +59,7 @@
 <dialog id="tab-editor" class="library-dialog" data-i18n-label="tabEditor"><button class="close" id="close-tab-editor" data-i18n="close"></button><h2 id="tab-editor-title"></h2><label class="field-label" for="tab-name" data-i18n="tabName"></label><input id="tab-name" class="field" autocomplete="off"><p class="form-error" id="tab-error" role="alert"></p><div class="dialog-actions"><button id="cancel-tab-editor" data-i18n="cancel"></button><button id="save-tab" class="primary" data-i18n="save"></button></div></dialog>
 <dialog id="tab-members-dialog" class="library-dialog" data-i18n-label="tabMembers"><button class="close" id="close-tab-members" data-i18n="close"></button><h2 data-i18n="tabMembers"></h2><p class="dialog-copy" data-i18n="tabMembersHint"></p><div class="member-list" id="tab-members-grid"></div></dialog>
 <script src="i18n.js"></script>
+<dialog id="wallpaper-dialog" class="library-dialog" data-i18n-label="wallpaperChoose"><button class="close" id="close-wallpaper" data-i18n="close"></button><h2 id="wallpaper-title"></h2><p class="dialog-copy" data-i18n="wallpaperChoose"></p><div id="wallpaper-choices" class="member-list"></div></dialog>
 <script src="circle-designs.js"></script>
 <script src="collection-catalog.js"></script>
 <script src="direct-extra.js"></script><script src="direct-circles.js"></script>

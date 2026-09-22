@@ -20,4 +20,26 @@
     <string name="library_cancel">キャンセル</string>
     <string name="library_cleanup_pending">一覧から削除しました。次回アプリを開いたときに内部コピーの削除を再試行します。元のファイルは変更されません。</string>
     <string name="library_invalid_change">無効な一覧変更です。画面を開き直して、もう一度お試しください。</string>
+    <string name="wallpaper_w03">W03 · 星の庭</string>
+    <string name="wallpaper_r01">R01 · ラファエルの魔法陣</string>
+    <string name="wallpaper_description">固定された図案の周りを外側の光がゆっくり動きます。</string>
+    <string name="wallpaper_home">ホーム画面</string>
+    <string name="wallpaper_lock">ロック画面</string>
+    <string name="wallpaper_still">静止画の壁紙</string>
+    <string name="wallpaper_live">ライブ壁紙</string>
+    <string name="wallpaper_apply">確認して適用</string>
+    <string name="wallpaper_still_confirm">この画像を上記の画面に適用しますか？電池や充電状態は含まれません。</string>
+    <string name="wallpaper_system_preview">システムのプレビューを開く</string>
+    <string name="wallpaper_live_home_hint">システムのプレビューでホーム画面を選択してください。最終的な対象はシステムで指定します。希望の対象がない場合はキャンセルし、ここで静止画の壁紙を選べます。</string>
+    <string name="wallpaper_live_lock_hint">システムのプレビューでロック画面のみを選択してください。選べない場合はキャンセルし、ここで静止画の壁紙を選んでください。アプリはロック専用を強制したりホーム画面に置き換えたりしません。</string>
+    <string name="wallpaper_preparing">壁紙のプレビューを準備中…</string>
+    <string name="wallpaper_applied">指定した画面に壁紙を適用しました。</string>
+    <string name="wallpaper_retained">既存の壁紙を維持しています。新しい適用は確認されていません。</string>
+    <string name="wallpaper_unconfirmed">確認が必要です。システム設定で指定した画面を確認してください。静止画は壁紙変更またはロック画面変更から選び直せます。</string>
+    <string name="wallpaper_unavailable">この図案または壁紙の対象は利用できません。</string>
+    <string name="wallpaper_lock_unsupported">ロック専用の静止画壁紙にはAndroid 7.0以降が必要です。</string>
+    <string name="wallpaper_denied">壁紙の変更に対応していないか、端末のポリシーで禁止されています。</string>
+    <string name="wallpaper_error">壁紙を準備または適用できませんでした。もう一度お試しください。</string>
+    <string name="wallpaper_memory_error">壁紙を作成するメモリが不足しています。他のアプリを閉じて再度お試しください。</string>
+    <string name="wallpaper_picker_error">システムのライブ壁紙プレビューを利用できません。</string>
 </resources>

@@ -20,4 +20,26 @@
     <string name="library_cancel">취소</string>
     <string name="library_cleanup_pending">목록에서 제거했습니다. 앱을 다시 열면 앱 내부 복사본 삭제를 재시도합니다. 원본 파일은 그대로 보존합니다.</string>
     <string name="library_invalid_change">올바르지 않은 목록 변경입니다. 화면을 새로 연 뒤 다시 시도해 주세요.</string>
+    <string name="wallpaper_w03">W03 · 별의 정원</string>
+    <string name="wallpaper_r01">R01 · 라파엘 마법진</string>
+    <string name="wallpaper_description">고정된 도안 주위로 바깥 빛이 천천히 움직입니다.</string>
+    <string name="wallpaper_home">홈 화면</string>
+    <string name="wallpaper_lock">잠금화면</string>
+    <string name="wallpaper_still">정지 배경화면</string>
+    <string name="wallpaper_live">라이브 배경화면</string>
+    <string name="wallpaper_apply">확인 후 적용</string>
+    <string name="wallpaper_still_confirm">이 이미지를 위에 표시된 화면에 적용할까요? 배터리와 충전 상태는 포함되지 않습니다.</string>
+    <string name="wallpaper_system_preview">시스템 미리보기 열기</string>
+    <string name="wallpaper_live_home_hint">시스템 미리보기에서 홈 화면을 대상으로 확인해 주세요. 최종 대상은 시스템에서 선택합니다. 원하는 대상을 선택할 수 없으면 취소하고 이곳에서 정지 배경화면을 선택할 수 있습니다.</string>
+    <string name="wallpaper_live_lock_hint">시스템 미리보기에서 잠금화면만 선택해 주세요. 잠금 단독이 없으면 취소하고 이곳에서 정지 배경화면을 선택하세요. 앱은 잠금 단독 라이브 적용을 강제하거나 홈 화면으로 대체하지 않습니다.</string>
+    <string name="wallpaper_preparing">배경화면 미리보기를 준비하고 있습니다…</string>
+    <string name="wallpaper_applied">요청한 화면에 배경화면이 적용되었습니다.</string>
+    <string name="wallpaper_retained">기존 적용 유지. 새 적용은 확인되지 않았습니다.</string>
+    <string name="wallpaper_unconfirmed">확인 필요. 시스템 설정에서 요청한 화면을 확인해 주세요. 정지 이미지는 배경화면 변경 또는 잠금화면 변경에서 다시 선택할 수 있습니다.</string>
+    <string name="wallpaper_unavailable">이 도안 또는 배경화면 대상을 사용할 수 없습니다.</string>
+    <string name="wallpaper_lock_unsupported">잠금 전용 정지 배경화면은 Android 7.0 이상에서 지원됩니다.</string>
+    <string name="wallpaper_denied">배경화면 변경을 지원하지 않거나 기기 정책으로 차단되어 있습니다.</string>
+    <string name="wallpaper_error">배경화면을 준비하거나 적용하지 못했습니다. 다시 시도해 주세요.</string>
+    <string name="wallpaper_memory_error">배경화면을 만들 메모리가 부족합니다. 다른 앱을 닫고 다시 시도해 주세요.</string>
+    <string name="wallpaper_picker_error">시스템 라이브 배경화면 미리보기를 사용할 수 없습니다.</string>
 </resources>
