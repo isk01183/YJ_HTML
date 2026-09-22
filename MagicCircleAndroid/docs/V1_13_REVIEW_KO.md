@@ -5,7 +5,7 @@
 - 앱 버전: **1.13 / versionCode 16**, minSdk 23, targetSdk 37.
 - 목록: **174개 선택 항목**, 기본 활성 **43개**, 비활성 **131개**, 첨부 도안과 썸네일 각 **118개**.
 - 언어와 연결: 한국어·일본어·영어를 오프라인으로 유지한다. 최종 APK에는 `INTERNET` 권한이 없다.
-- 로컬 업데이트 파일: [`MagicCircleCharging-v1.13-local-update.apk`](../releases/MagicCircleCharging-v1.13-local-update.apk), 20,992,754 bytes, SHA-256 `9b427eee4b99f426d1edda7a659d18804e095d0c3b6608844a453ef42700b9f5`.
+- 로컬 업데이트 파일: [`MagicCircleCharging-v1.13-local-update.apk`](../releases/MagicCircleCharging-v1.13-local-update.apk), 21,138,908 bytes, SHA-256 `c7569b2b8bf631b4a2cf5128e613ad9ffd4ae002aabc96f8d1fb1079993ef546`.
 - 로컬 APK 인증서 SHA-256은 기존 설치된 v1.12와 같은 `a821c9377aed06c149b006d35f84c9977b459648c09d91886399f83470aad7a4`이다. 이는 서명 호환성 검사이며 실제 업데이트 설치 성공을 뜻하지 않는다.
 - 공개 CI와 prerelease 게시·원격 재다운로드는 이 로컬 준비 단계에서 실행하지 않았다. CI가 만드는 `MagicCircleCharging-v1.13-debug.apk`는 임시 디버그 서명일 수 있으므로 위 로컬 업데이트 APK와 구분한다.
 
@@ -51,6 +51,10 @@ W03/R01의 보존된 SVG 페이지는 제품의 충전 renderer가 아니라 브
 필수 version metadata 검사는 먼저 1.13/code16 기대값으로 바꾼 뒤 기존 1.12/code15 APK를 거부하는 RED를 확인했다. `sanctuary-device-check`도 1.13 fixture가 기존 1.12 기본값 때문에 실패하는 RED 뒤 기본값을 갱신했다. Windows HTML 검사는 기존 authored 값인 `spacingAndGlyphs`와 실행 중 세 언어 `runeVerse` 주입을 검사하도록 바로잡았으며, seal·octagram·join·orbit 검사는 삭제하지 않았다.
 
 ## 경고와 미검증 범위
+
+최종 검토의 네 항목을 한 번의 수정 묶음으로 반영했다. 앱의 탭 삭제는 웹 확인창에 의존하지 않고 Android 확인창에서 승인하며, 취소·뒤로 가기는 저장을 호출하지 않고 최신 목록 상태를 다시 표시한다. 사용자 탭의 Enter 입력 뒤 키보드 초점을 유지하고 다른 입력란의 초점을 빼앗지 않는다. 명시적 선택·이미지 가져오기의 저장 성공 시 이전 선택 안내를 지우며, 선택이 비었을 때는 세 언어로 선택된 도안이 없다고 표시한다. 중복 탭 ID·중복 멤버·알 수 없는 내장 ID의 v2 저장 파일은 읽기 전용 전환과 원본 byte 보존을 검사하도록 Android runner에 추가했다.
+
+수정 후 전체 JVM 41개·lint·debug/androidTest/release build, Node 16개, PowerShell 및 실제 APK manifest/dex/서명/asset 검사를 다시 통과했다. native bridge가 JS 확인창 없이 호출되는지, 브라우저 승인·취소, Enter 초점, 빈 선택 안내는 실제 브라우저 동작에서 RED 후 GREEN을 확인했다. Android 확인창 승인·취소/뒤로 가기와 새 저장소 검사의 실제 기기 실행은 미검증이며, runner 컴파일을 실행 성공으로 표시하지 않는다. 공개 전 자체 생성한 v1.13 APK만 새 빌드로 교체했으며 이전 버전 APK와 사용자 자료는 보존했다.
 
 - Java deprecated API 컴파일 안내는 기존 기준 경고다. JDK 25 `apksigner`의 native-access 미래 제한 및 `META-INF` app-metadata 안내도 서명 실패가 아니며 숨기거나 APK를 변조하지 않았다.
 - 연결된 Galaxy S22(SM-S901N)는 읽기 전용으로만 확인했다. 사용자 설치 승인이 없으므로 설치/업데이트, instrumentation, 앱 실행, 접근성·배경화면 설정 변경을 하지 않았다.

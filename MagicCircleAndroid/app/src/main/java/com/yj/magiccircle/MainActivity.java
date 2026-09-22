@@ -163,9 +163,16 @@ public final class MainActivity extends Activity {
             return;
         }
         if ("tab-delete".equals(action)) {
-            if (!hasExactQuery(uri, "id")) return;
+            if (!hasExactQuery(uri, "id") || libraryBusy) return;
             String id = uri.getQueryParameter("id");
-            changeLibrary(() -> library.deleteTab(id), 0);
+            new AlertDialog.Builder(this)
+                    .setTitle(localizedString(R.string.library_tab_delete_title))
+                    .setMessage(localizedString(R.string.library_tab_delete_message))
+                    .setNegativeButton(localizedString(R.string.library_cancel), null)
+                    .setPositiveButton(localizedString(R.string.library_tab_delete),
+                            (dialog, which) -> changeLibrary(() -> library.deleteTab(id), 0))
+                    .setOnDismissListener(dialog -> updateGalleryState())
+                    .show();
             return;
         }
         if ("tab-member".equals(action)) {

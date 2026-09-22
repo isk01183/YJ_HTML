@@ -42,4 +42,7 @@
     <string name="wallpaper_error">The wallpaper could not be prepared or applied. Try again.</string>
     <string name="wallpaper_memory_error">Not enough memory for this wallpaper. Close other apps and try again.</string>
     <string name="wallpaper_picker_error">No system live wallpaper preview is available.</string>
+    <string name="library_tab_delete_title">Delete tab?</string>
+    <string name="library_tab_delete_message">Only this tab will be deleted. Its designs will be kept.</string>
+    <string name="library_tab_delete">Delete tab</string>
 </resources>

@@ -319,7 +319,7 @@ final class MediaLibrary {
 
     synchronized void select(String id) throws IOException {
         requireReadable();
-        if (available(id)) save(media, hidden, id, pendingDeletes, tabs, migrationNotice);
+        if (available(id)) save(media, hidden, id, pendingDeletes, tabs, "");
     }
 
     synchronized void setEnabled(String id, boolean enabled) throws IOException {
@@ -471,7 +471,7 @@ final class MediaLibrary {
             synchronized (this) {
                 List<Item> added = new ArrayList<>(media);
                 added.add(new Item(id, name, mime));
-                save(added, hidden, id, pendingDeletes, tabs, migrationNotice);
+                save(added, hidden, id, pendingDeletes, tabs, "");
                 saved = true;
             }
         } catch (SecurityException error) {

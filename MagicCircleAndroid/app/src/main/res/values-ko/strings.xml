@@ -42,4 +42,7 @@
     <string name="wallpaper_error">배경화면을 준비하거나 적용하지 못했습니다. 다시 시도해 주세요.</string>
     <string name="wallpaper_memory_error">배경화면을 만들 메모리가 부족합니다. 다른 앱을 닫고 다시 시도해 주세요.</string>
     <string name="wallpaper_picker_error">시스템 라이브 배경화면 미리보기를 사용할 수 없습니다.</string>
+    <string name="library_tab_delete_title">탭을 삭제할까요?</string>
+    <string name="library_tab_delete_message">이 탭만 삭제하며 도안은 삭제되지 않습니다.</string>
+    <string name="library_tab_delete">탭 삭제</string>
 </resources>

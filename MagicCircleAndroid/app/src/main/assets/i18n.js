@@ -107,8 +107,9 @@
     add('addToTab', 'タブに追加', '탭에 추가', 'Add to tab');
     add('removeFromTab', 'タブから外す', '탭에서 빼기', 'Remove from tab');
     add('deleteTabConfirm', 'このタブだけを削除します。デザインは削除されません。続けますか？', '이 탭만 삭제하며 도안은 삭제되지 않습니다. 계속할까요?', 'Delete this tab? Its designs will not be deleted.');
-    add('selectionResetNotice', '以前の選択が無効になったため、N01に変更しました。', '이전 선택이 비활성화되어 N01로 변경했습니다.', 'Your previous selection became inactive, so N01 is now active.');
-    add('selectionChangedNotice', '無効化したため、次の有効なデザインに変更しました。', '현재 도안을 비활성화하여 다음 활성 도안으로 변경했습니다.', 'The active design was disabled, so the next available design is now active.');
+    add('selectionResetNotice', '以前の選択を利用できなかったため、その時点でN01に変更しました。', '이전 선택을 사용할 수 없어 당시 N01로 변경했습니다.', 'The previous selection was unavailable, so it was reset to N01 at that time.');
+    add('selectionChangedNotice', '選択していたデザインを非表示にしたため、その時点で次の有効なデザインに変更しました。', '선택했던 도안을 비활성화하여 당시 다음 활성 도안으로 변경했습니다.', 'The selected design was disabled, so the selection moved to the next available design at that time.');
+    add('selectionEmptyNotice', '選択中のデザインはありません。デザインを表示するか画像を追加して選択してください。', '선택된 도안이 없습니다. 도안을 활성화하거나 이미지를 추가한 뒤 선택해 주세요.', 'No design is selected. Enable a design or add an image, then choose one.');
     add('restoreDesigns', '標準デザインを復元', '기본 마법진 복원', 'Restore built-in designs');
     add('removeConfirm', 'この項目を一覧から削除しますか？ 元の写真は削除されません。', '이 항목을 목록에서 삭제할까요? 원본 사진은 삭제되지 않습니다.', 'Remove this item from your library? The original photo will not be deleted.');
     add('nothingSelected', '表示する項目がありません', '선택된 항목이 없습니다', 'No design selected');

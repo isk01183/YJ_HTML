@@ -37,6 +37,12 @@ const magicRequest=async(page,click)=>{
     }
     await page.locator('[data-tab-id="'+tabId+'"]').click();
     assert.equal(await page.locator('#design-grid .card:visible').count(),1,'Inactive members stay out of active tabs');
+    await page.locator('[data-tab-id="'+tabId+'"]').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>document.activeElement?.dataset.tabId),tabId,'Enter on a tab must keep keyboard focus on that tab');
+    await page.locator('#search').focus();
+    await page.evaluate(value=>window.setGalleryState(value),state);
+    assert.equal(await page.evaluate(()=>document.activeElement?.id),'search','Refreshing tabs must not steal unrelated focus');
 
     await page.locator('#manage-inactive').click();
     assert.equal(await page.locator('#inactive-grid .card:visible').count(),131);
@@ -94,17 +100,46 @@ const magicRequest=async(page,click)=>{
     await page.evaluate(value=>window.setGalleryState(value),{...state,tabs:[multiTabs[0],{...multiTabs[1],members:[]}]});
 
     await page.locator('[data-tab-id="'+tabId+'"]').click();
-    page.once('dialog',async dialog=>{assert.match(dialog.message(),/도안은 삭제되지/);await dialog.accept();});
+    let nativeConfirmCount=0;
+    const suppressConfirm=async dialog=>{nativeConfirmCount++;await dialog.dismiss();};
+    page.on('dialog',suppressConfirm);
     assert.equal(await magicRequest(page,()=>page.locator('#delete-tab').click()),'magiccircle://tab-delete?id='+tabId);
+    page.off('dialog',suppressConfirm);
+    assert.equal(nativeConfirmCount,0,'Native deletion must reach Android even when WebView suppresses JS confirm');
     assert.equal(await page.locator('[data-tab-id="'+tabId+'"]').count(),1,'Delete waits for Android state');
+    await page.evaluate(value=>window.setGalleryState(value),{...state,tabs:multiTabs});
+    assert.equal(await page.locator('[data-tab-id="'+tabId+'"]').count(),1,'Canceled native deletion keeps the authoritative tab state');
+    assert.equal(await page.locator('#delete-tab').isDisabled(),false,'Cancellation must leave the library available');
+    await page.evaluate(value=>window.setGalleryState(value),{...state,busy:true,tabs:multiTabs});
+    assert.equal(await page.locator('#delete-tab').isDisabled(),true,'Approved native mutation stays busy until saved state arrives');
+    await page.evaluate(value=>window.setGalleryState(value),{...state,tabs:[multiTabs[1]]});
+    assert.equal(await page.locator('[data-tab-id="'+tabId+'"]').count(),0,'Confirmed native saved state removes the tab');
+
+    // A standalone browser still owns its own explicit confirmation.
+    const standalone=await browser.newPage();
+    await standalone.goto(gallery+'?lang=en');
+    await standalone.evaluate(({id})=>{tabs=[{id,name:'Browser tab',members:[]}];chooseGroup(id);},{id:tabId});
+    standalone.once('dialog',async dialog=>{assert.match(dialog.message(),/designs will not be deleted/);await dialog.dismiss();});
+    await standalone.locator('#delete-tab').click();
+    assert.equal(await standalone.locator('[data-tab-id="'+tabId+'"]').count(),1,'Browser cancellation must not delete');
+    standalone.once('dialog',async dialog=>{await dialog.accept();});
+    await standalone.locator('#delete-tab').click();
+    assert.equal(await standalone.locator('[data-tab-id="'+tabId+'"]').count(),0,'Browser approval deletes only the tab');
+    await standalone.close();
 
     const allButNative=builtins.map(x=>x.id).filter(id=>id!=='native-N01');
     await page.evaluate(value=>window.setGalleryState(value),{...state,hidden:allButNative,tabs:[]});
     assert.equal(await magicRequest(page,()=>page.locator('#delete-design').click()),'magiccircle://disable?theme=native-N01');
     assert.equal(await page.locator('#design-grid .card:visible').count(),1,'Disable waits for Android state');
-    await page.evaluate(value=>window.setGalleryState(value),{...state,selected:'',hidden:builtins.map(x=>x.id),tabs:[]});
+    await page.evaluate(value=>window.setGalleryState(value),{...state,selected:'',hidden:builtins.map(x=>x.id),tabs:[],migrationNotice:'selection_changed'});
     assert.equal(await page.locator('#design-grid .card:visible').count(),0,'The final active design may be disabled');
     assert.equal(await page.locator('#apply').isDisabled(),true);
+    for(const [language,pattern] of [['ko',/선택된 도안이 없습니다/],['ja',/選択中のデザインはありません/],['en',/No design is selected/]]){
+      await page.evaluate(value=>window.setGalleryState(value),{...state,language,selected:'',hidden:builtins.map(x=>x.id),tabs:[],migrationNotice:'selection_changed'});
+      assert.match(await page.locator('#library-notice').textContent(),pattern,'An empty selection must not claim another design is active');
+    }
+    await page.evaluate(value=>window.setGalleryState(value),{...state,migrationNotice:''});
+    assert.equal(await page.locator('#library-notice').isHidden(),true,'Cleared native notices must disappear');
 
     const mediaId='12345678-90ab-4cde-8123-456789abcdef';
     const media=[{id:mediaId,name:'내 업로드',mime:'image/png',url:'https://appassets.androidplatform.net/media/'+mediaId}];

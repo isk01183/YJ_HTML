@@ -42,4 +42,7 @@
     <string name="wallpaper_error">壁紙を準備または適用できませんでした。もう一度お試しください。</string>
     <string name="wallpaper_memory_error">壁紙を作成するメモリが不足しています。他のアプリを閉じて再度お試しください。</string>
     <string name="wallpaper_picker_error">システムのライブ壁紙プレビューを利用できません。</string>
+    <string name="library_tab_delete_title">タブを削除しますか？</string>
+    <string name="library_tab_delete_message">このタブだけを削除します。デザインは削除されません。</string>
+    <string name="library_tab_delete">タブを削除</string>
 </resources>

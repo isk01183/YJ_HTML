@@ -61,6 +61,7 @@ function chooseGroup(id){
 }
 function renderTabs(){
     const nav=document.getElementById('gallery-tabs'),create=document.getElementById('create-tab');
+    const focusedTab=nav.contains(document.activeElement)?document.activeElement.dataset.tabId:null;
     nav.querySelectorAll('[data-tab-id]').forEach(button=>button.remove());
     if(activeGroup!=='all'&&!tab(activeGroup))activeGroup='all';
     const all=nav.querySelector('[data-group="all"]');
@@ -73,6 +74,7 @@ function renderTabs(){
         button.setAttribute('aria-pressed',String(activeGroup===value.id));
         button.addEventListener('click',()=>chooseGroup(value.id));
         nav.insertBefore(button,create);
+        if(value.id===focusedTab)button.focus();
     });
     create.disabled=busy||!readable;
     document.getElementById('tab-actions').hidden=activeGroup==='all';
@@ -120,7 +122,7 @@ function render(){
     document.getElementById('service-state').classList.toggle('enabled',native&&enabled);
     document.getElementById('service-hint').hidden=!native||enabled;
     const notice=document.getElementById('library-notice');
-    notice.hidden=!migrationNotice;notice.textContent=migrationNotice?text(migrationNotice==='selection_changed'?'selectionChangedNotice':'selectionResetNotice'):'';
+    notice.hidden=!migrationNotice;notice.textContent=migrationNotice?text(!selected?'selectionEmptyNotice':migrationNotice==='selection_changed'?'selectionChangedNotice':'selectionResetNotice'):'';
     document.getElementById('search').placeholder=text('search');
     document.getElementById('inactive-search').placeholder=text('inactiveSearch');
     document.querySelectorAll('[data-language]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.language===language)));
@@ -272,8 +274,8 @@ function renderTabMembers(){
 document.getElementById('manage-tab-members').addEventListener('click',event=>{renderTabMembers();openDialog(membersDialog,event.currentTarget);});
 document.getElementById('close-tab-members').addEventListener('click',()=>closeDialog(membersDialog));
 document.getElementById('delete-tab').addEventListener('click',()=>{
-    const current=tab(activeGroup);if(!current||busy||!confirm(text('deleteTabConfirm')))return;
-    if(native)location.href='magiccircle://tab-delete?id='+encodeURIComponent(current.id);
-    else{tabs=tabs.filter(value=>value.id!==current.id);chooseGroup('all');}
+    const current=tab(activeGroup);if(!current||busy)return;
+    if(native){location.href='magiccircle://tab-delete?id='+encodeURIComponent(current.id);return;}
+    if(confirm(text('deleteTabConfirm'))){tabs=tabs.filter(value=>value.id!==current.id);chooseGroup('all');}
 });
 render();

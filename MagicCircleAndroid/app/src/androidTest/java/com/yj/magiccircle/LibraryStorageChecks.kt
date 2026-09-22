@@ -25,6 +25,9 @@ object LibraryStorageChecks {
     fun run(context: Context) {
         migratesBeforeUseAndPersistsTabs(context)
         rejectsDamagedAndFutureState(context)
+        rejectsMalformedV2WithoutChangingBytes(context)
+        clearsNoticeOnlyAfterSelectionCommits(context)
+        leavesNoSelectionWhenFinalDesignIsDisabled(context)
         rejectsBackupFailure(context)
         rejectsOversizeState(context)
         preservesStateBeforeReplacementFailure(context)
@@ -86,6 +89,60 @@ object LibraryStorageChecks {
         check(!library.isReadable())
         check(manifestFile.readText() == V1)
         check(!recoveryFile.exists())
+    }
+
+    private fun rejectsMalformedV2WithoutChangingBytes(context: Context) {
+        val tab = """{"id":"11111111-1111-4111-8111-111111111111","name":"One","members":["ref-W03"]}"""
+        val cases = listOf(
+            "duplicate tab ID" to """"hidden":[],"tabs":[$tab,${tab.replace("One", "Two")}]""",
+            "duplicate member" to """"hidden":[],"tabs":[${tab.replace("[\"ref-W03\"]", "[\"ref-W03\",\"ref-W03\"]")}]""",
+            "unknown builtin ID" to """"hidden":["ref-X99"],"tabs":[]"""
+        )
+        for ((label, fields) in cases) {
+            val root = root(context)
+            val original = """{ "version":2,"activationRevision":1,"media":[],"selected":"native-N01","pendingDeletes":[],"migrationNotice":"",$fields }""".toByteArray(Charsets.UTF_8)
+            val manifest = File(root, "media-library.json").apply { writeBytes(original) }
+            val library = MediaLibrary(context, root, "classic")
+            check(!library.isReadable()) { "$label did not enter read-only fallback" }
+            check(library.selected().isEmpty())
+            check(runCatching { library.createTab("Blocked") }.exceptionOrNull() is IOException)
+            check(manifest.readBytes().contentEquals(original)) { "$label altered original bytes" }
+            check(!File(root, "media-library.v1-recovery.json").exists())
+        }
+    }
+
+    private fun clearsNoticeOnlyAfterSelectionCommits(context: Context) {
+        val root = root(context)
+        val library = MediaLibrary(context, root, "classic")
+        check(library.galleryState(false, "en").getString("migrationNotice") == "selection_reset")
+        library.select("ref-C03") // Unavailable selections must not clear the notice.
+        check(library.galleryState(false, "en").getString("migrationNotice") == "selection_reset")
+        val manifest = File(root, "media-library.json")
+        val original = manifest.readBytes()
+        val failing = MediaLibrary(context, root, "classic", StartFailAtomicFile(manifest),
+            AtomicFile(File(root, "media-library.v1-recovery.json")))
+        check(runCatching { failing.select("ref-W03") }.exceptionOrNull() is IOException)
+        check(failing.galleryState(false, "en").getString("migrationNotice") == "selection_reset")
+        check(manifest.readBytes().contentEquals(original))
+        library.select("ref-W03")
+        check(library.galleryState(false, "en").getString("migrationNotice").isEmpty())
+        val reloaded = MediaLibrary(context, root, "classic")
+        check(reloaded.selected() == "ref-W03")
+        check(reloaded.galleryState(false, "en").getString("migrationNotice").isEmpty())
+    }
+
+    private fun leavesNoSelectionWhenFinalDesignIsDisabled(context: Context) {
+        val root = root(context)
+        val manifest = File(root, "media-library.json")
+        MediaLibrary(context, root, "classic")
+        val saved = JSONObject(manifest.readText()).put("hidden",
+            org.json.JSONArray(ThemeSelection.IDS.filter { it != "native-N01" }))
+        manifest.writeText(saved.toString())
+        val library = MediaLibrary(context, root, "classic")
+        library.setEnabled("native-N01", false)
+        check(library.selected().isEmpty())
+        check(library.galleryState(false, "en").getString("migrationNotice") == "selection_changed")
+        check(MediaLibrary(context, root, "classic").selected().isEmpty())
     }
 
     private fun rejectsOversizeState(context: Context) {
@@ -151,6 +208,11 @@ object LibraryStorageChecks {
         val wrapped = object : ContextWrapper(context) {
             override fun getContentResolver() = resolver
         }
+        val importedRoot = root(context)
+        val successful = MediaLibrary(wrapped, importedRoot, "classic")
+        successful.importDocument(Uri.parse("content://v113/source"))
+        check(successful.galleryState(false, "en").getString("migrationNotice").isEmpty())
+        check(MediaLibrary(wrapped, importedRoot, "classic").selected() == successful.selected())
         val manifestFile = File(root, "media-library.json")
         val library = MediaLibrary(wrapped, root, "classic", VerifyFailAtomicFile(manifestFile),
             AtomicFile(File(root, "media-library.v1-recovery.json")))
