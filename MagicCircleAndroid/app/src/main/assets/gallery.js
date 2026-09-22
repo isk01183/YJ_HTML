@@ -152,7 +152,7 @@ window.setGalleryState=state=>{
     media=(Array.isArray(state.media)?state.media:[]).filter(theme=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(theme.id)
         &&['image/gif','image/png','image/jpeg'].includes(theme.mime)&&theme.url==='https://appassets.androidplatform.net/media/'+theme.id)
         .map(theme=>({...theme,name:String(theme.name),group:'uploads'}));
-    if(nativeChanged){cards.forEach((card,id)=>{if(nativeArtwork(id))card.querySelector('img')?.removeAttribute('src');});document.getElementById('hero-art').dataset.renderedTheme='';}
+    if(nativeChanged){cards.forEach((card,id)=>{if(nativeArtwork(id)){card.querySelector('img')?.removeAttribute('src');loadArt(card);}});document.getElementById('hero-art').dataset.renderedTheme='';}
     if(!initialized||media.some(theme=>theme.id===selected&&!previousMedia.has(theme.id))){focused=selected;initialized=true;}
     render();
 };
