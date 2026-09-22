@@ -15,6 +15,8 @@ import android.webkit.WebViewClient;
 
 import java.util.Locale;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +27,12 @@ final class WebViews {
     private static final String PREFERENCES = "magic_circle";
     private static final String LANGUAGE = "language";
     private static final Object DESTROYED = new Object();
+    private static final Map<String, byte[]> GENERATED_ART = Collections.synchronizedMap(
+            new LinkedHashMap<String, byte[]>(2, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
+                    return size() > 2;
+                }
+            });
 
     private WebViews() {}
 
@@ -156,6 +164,8 @@ final class WebViews {
             String path = uri.getPath();
             if ("file".equals(uri.getScheme()) && (uri.getAuthority() == null || uri.getAuthority().isEmpty())
                     && path != null && path.startsWith("/android_asset/") && !path.contains("..")) return null;
+            WebResourceResponse generated = generatedArtwork(uri);
+            if (generated != null) return generated;
             String collectionAsset = CollectionCatalog.assetPath(uri.toString());
             if (collectionAsset != null) try {
                 InputStream packed = assets.open(collectionAsset);
@@ -188,6 +198,29 @@ final class WebViews {
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
             destroy(view);
             return true;
+        }
+    }
+
+    static WebResourceResponse generatedArtwork(Uri uri) {
+        String theme = ThemeSelection.generatedArtworkTheme(uri.toString());
+        if (theme == null) return null;
+        try {
+            byte[] png;
+            synchronized (GENERATED_ART) {
+                png = GENERATED_ART.get(theme);
+                if (png == null) {
+                    png = WallpaperArtwork.thumbnail(theme);
+                    GENERATED_ART.put(theme, png);
+                }
+            }
+            java.util.Map<String, String> headers = new java.util.HashMap<>();
+            headers.put("Cache-Control", "no-store");
+            headers.put("X-Content-Type-Options", "nosniff");
+            return new WebResourceResponse("image/png", null, 200, "OK", headers,
+                    new ByteArrayInputStream(png));
+        } catch (RuntimeException ignored) {
+            // Generation failure is blocked by the caller; it is never a network fallback.
+            return null;
         }
     }
 }

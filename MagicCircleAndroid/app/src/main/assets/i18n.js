@@ -24,6 +24,7 @@
     add('all', 'すべて', '전체', 'All');
     add('reference', '参照コレクション', '첨부 도안', 'Reference collection');
     add('directReview', '手描きパス · 確認用', '직접 그리기 · 검토용', 'Direct paths · Review');
+    add('browserReference', 'ブラウザ参考プレビュー', '브라우저 참고 미리보기', 'Browser reference preview');
     add('legacyReview', '既存の図案 · 再制作待ち', '기존 도안 · 직접 그리기 대기', 'Legacy art · Redraw pending');
     add('directReviewHint', 'コードを指定して、形・色・光の修正を依頼できます。参照図と同一と認定された完成版ではありません。', '수정할 부분과 도안 코드를 함께 알려 주세요. 원본 동일성이 확정된 완성본은 아닙니다.', 'Use the design code when requesting shape, color or light corrections. Reference fidelity has not been approved.');
     add('nativeName', '星を読む聖域', '별을 읽는 성역', 'Sanctuary of Stars');

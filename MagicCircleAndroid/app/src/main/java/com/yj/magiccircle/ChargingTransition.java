@@ -27,4 +27,9 @@ final class ChargingTransition {
     static long retryDelay(long deadline, long now) {
         return Math.max(0L, Math.min(250L, deadline - now));
     }
+
+    static boolean acceptsCallback(long activeRun, long callbackRun,
+            Object activeView, Object callbackView) {
+        return activeRun == callbackRun && activeView == callbackView;
+    }
 }

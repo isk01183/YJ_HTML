@@ -16,10 +16,12 @@ const translatedTheme=id=>{
         :MagicI18n.theme(ReferenceDesigns.get(id)||CircleDesigns.get(id),language);
 };
 const directCode=id=>{const code=ReferenceDesigns.get(id)?.code;return DirectCircles.ids.includes(code)?code:null;};
+const nativeArtwork=id=>id==='ref-W03'||id==='ref-R01';
+const generatedArtwork=id=>'https://appassets.androidplatform.net/generated/'+id+'.png';
 const designCode=id=>translatedTheme(id)?.code||id;
 const artUrl=id=>{
     const custom=media.find(theme=>theme.id===id),code=directCode(id);
-    return id==='native-N01'?nativeIcon:custom?custom.url+'?thumb=1':code
+    return id==='native-N01'?nativeIcon:native&&nativeArtwork(id)?generatedArtwork(id):custom?custom.url+'?thumb=1':code
         ?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(DirectCircles.svg(code))
         :ReferenceDesigns.get(id)?.thumb||'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(CircleDesigns.svg(id,'thumb'));
 };
@@ -87,17 +89,19 @@ function render(){
     const hero=document.getElementById('hero-art');
     if(hero.dataset.renderedTheme!==focused){
         hero.replaceChildren();
-        if(focused==='native-N01'){const image=document.createElement('img');image.alt='';image.src=nativeIcon;hero.appendChild(image);}
+        if(focused==='native-N01'||native&&nativeArtwork(focused)){const image=document.createElement('img');image.alt='';image.src=focused==='native-N01'?nativeIcon:generatedArtwork(focused);hero.appendChild(image);}
         else if(directCode(focused)){hero.innerHTML=DirectCircles.svg(directCode(focused));const svg=hero.querySelector('svg');svg.setAttribute('aria-hidden','true');svg.style.cssText='display:block;width:100%;height:100%';}
         else if(theme?.url||theme?.thumb){const image=document.createElement('img');image.alt='';image.src=theme.thumb||theme.url+'?thumb=1';hero.appendChild(image);}
         else if(theme)hero.innerHTML=CircleDesigns.svg(focused,'hero');
         else{const empty=document.createElement('span');empty.className='empty-art';empty.textContent='◇';hero.appendChild(empty);}
         hero.dataset.renderedTheme=focused;
     }
-    const review=focused==='native-N01'?text('nativeLabel'):theme?.code?text(directCode(focused)?'directReview':'legacyReview'):text(theme?.group||'all');
+    const review=focused==='native-N01'||native&&nativeArtwork(focused)?text('nativeLabel')
+        :nativeArtwork(focused)?text('browserReference'):theme?.code?text(directCode(focused)?'directReview':'legacyReview'):text(theme?.group||'all');
     document.getElementById('hero-tag').textContent=theme?(theme.code||focused)+' · '+review:'';
     document.getElementById('hero-title').textContent=theme?.name||text('nothingSelected');
-    document.getElementById('hero-description').textContent=focused==='native-N01'?theme.desc+' '+text('nativePreviewHint'):theme?.code?text('directReviewHint'):theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
+    document.getElementById('hero-description').textContent=focused==='native-N01'||native&&nativeArtwork(focused)?theme.desc+' '+text('nativePreviewHint')
+        :nativeArtwork(focused)?theme.desc+' '+text('browserReference'):theme?.code?text('directReviewHint'):theme?.desc||text(readable?'emptyLibrary':'libraryUnavailable');
     document.getElementById('hero-saved').textContent=theme?text(focused===selected?'saved':'pending'):'';
     document.getElementById('selection-status').textContent=selected?text('current',{name:translatedTheme(selected).name}):text('nothingSelected');
     document.getElementById('apply').disabled=busy||!focused||focused===selected;
@@ -126,7 +130,8 @@ function render(){
         card.setAttribute('aria-label',text('select',{name:design.name}));
         card.setAttribute('aria-pressed',String(id===focused));
         card.querySelector('.name').textContent=design.name;
-        card.querySelector('.tag').textContent=designCode(id)+' · '+(id==='native-N01'?text('nativePreviewHint'):text(design.code?(directCode(id)?'directReview':'legacyReview'):design.group));
+        card.querySelector('.tag').textContent=designCode(id)+' · '+(id==='native-N01'||native&&nativeArtwork(id)?text('nativePreviewHint')
+            :nativeArtwork(id)?text('browserReference'):text(design.code?(directCode(id)?'directReview':'legacyReview'):design.group));
         const badge=card.querySelector('.applied-badge');badge.textContent=text('appliedBadge');badge.hidden=id!==selected;
         card.hidden=!allowed.has(id)||!(design.name+' '+id+' '+designCode(id)).toLocaleLowerCase().includes(query);
         if(!card.hidden)count++;
@@ -140,13 +145,14 @@ function render(){
 }
 window.setGalleryState=state=>{
     const previousMedia=new Set(media.map(theme=>theme.id));
-    native=true;selected=state.selected||'';enabled=!!state.enabled;busy=!!state.busy;readable=state.readable!==false;
+    const nativeChanged=!native;native=true;selected=state.selected||'';enabled=!!state.enabled;busy=!!state.busy;readable=state.readable!==false;
     language=MagicI18n.normalize(state.language);hidden=new Set(Array.isArray(state.hidden)?state.hidden:[]);
     tabs=(Array.isArray(state.tabs)?state.tabs:[]).filter(value=>typeof value.id==='string'&&typeof value.name==='string'&&Array.isArray(value.members)).map(value=>({id:value.id,name:value.name,members:[...value.members]}));
     migrationNotice=['selection_reset','selection_changed'].includes(state.migrationNotice)?state.migrationNotice:null;
     media=(Array.isArray(state.media)?state.media:[]).filter(theme=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(theme.id)
         &&['image/gif','image/png','image/jpeg'].includes(theme.mime)&&theme.url==='https://appassets.androidplatform.net/media/'+theme.id)
         .map(theme=>({...theme,name:String(theme.name),group:'uploads'}));
+    if(nativeChanged){cards.forEach((card,id)=>{if(nativeArtwork(id))card.querySelector('img')?.removeAttribute('src');});document.getElementById('hero-art').dataset.renderedTheme='';}
     if(!initialized||media.some(theme=>theme.id===selected&&!previousMedia.has(theme.id))){focused=selected;initialized=true;}
     render();
 };

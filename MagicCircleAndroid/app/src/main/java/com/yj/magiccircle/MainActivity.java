@@ -23,6 +23,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
 import android.webkit.WebView;
 import android.webkit.RenderProcessGoneDetail;
 import android.widget.Button;
@@ -291,8 +292,8 @@ public final class MainActivity extends Activity {
         Dialog dialog = new Dialog(this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF000000);
-        boolean nativeTheme = "native-N01".equals(theme);
-        MainMagicChargeView nativePreview = nativeTheme ? new MainMagicChargeView(this) : null;
+        boolean nativeTheme = ThemeSelection.isNative(theme);
+        MainMagicChargeView nativePreview = nativeTheme ? new MainMagicChargeView(this, theme) : null;
         WebView preview = nativeTheme ? null : WebViews.magicCircle(this);
         long previewDeadline = android.os.SystemClock.uptimeMillis() + 7000L;
         if (preview != null) preview.setWebViewClient(new WebViews.LocalClient(this) {
@@ -304,8 +305,16 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView current, String url) {
-                if (previewDialog == dialog) WebViews.startMagicCircle(current,
+                if (previewDialog == dialog && current == preview) WebViews.startMagicCircle(current,
                         previewDeadline - android.os.SystemClock.uptimeMillis(), null);
+            }
+
+            @Override
+            public void onReceivedError(WebView current, WebResourceRequest request,
+                                        WebResourceError error) {
+                if (previewDialog == dialog && current == preview && request.isForMainFrame()) {
+                    dismissPreview();
+                }
             }
 
             @Override
@@ -345,10 +354,14 @@ public final class MainActivity extends Activity {
             fitSystemInsets(window, root);
         }
         handler.postDelayed(finishPreview, 7_000L);
-        if (nativePreview != null) nativePreview.start();
-        else preview.post(() -> {
-            if (previewDialog == dialog) WebViews.loadMagicCircle(preview, theme);
-        });
+        try {
+            if (nativePreview != null) nativePreview.start();
+            else preview.post(() -> {
+                if (previewDialog == dialog) WebViews.loadMagicCircle(preview, theme);
+            });
+        } catch (RuntimeException error) {
+            dismissPreview();
+        }
     }
 
     private void dismissPreview() {

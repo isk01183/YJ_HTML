@@ -87,14 +87,15 @@ public final class ChargingAccessibilityService extends AccessibilityService {
         ChargingTransition.State previous = state;
         state = ChargingTransition.next(state, event);
         if (event == ChargingTransition.Event.CONNECT) {
-            if (WebViews.selectedTheme(this).isEmpty()) {
+            String theme = WebViews.selectedTheme(this);
+            if (theme.isEmpty()) {
                 state = ChargingTransition.State.COMPLETE;
                 log("Skipped: no selected animation");
                 return;
             }
             handler.postAtTime(finishAnimation,
                     connectedAt + ChargingTransition.ANIMATION_DURATION_MS);
-            if (!showOverlay()) state = ChargingTransition.State.COMPLETE;
+            if (!showOverlay(theme)) state = ChargingTransition.State.COMPLETE;
         } else if (event == ChargingTransition.Event.DISCONNECT) {
             hideOverlay("disconnect");
         } else if (event == ChargingTransition.Event.SCREEN_OFF) {
@@ -112,7 +113,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             current.postVisualStateCallback(runId, new WebView.VisualStateCallback() {
                 @Override
                 public void onComplete(long requestId) {
-                    if (overlay != current || runId != currentRun) return;
+                    if (!ChargingTransition.acceptsCallback(runId, currentRun, overlay, current)) return;
                     log("Visual callback ready");
                     handle(ChargingTransition.Event.VISUAL_READY);
                 }
@@ -137,7 +138,8 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             long remaining = connectedAt + ChargingTransition.ANIMATION_DURATION_MS
                     - SystemClock.uptimeMillis();
             WebViews.startMagicCircle(current, Math.max(1L, remaining), result -> {
-                if (overlay != current || runId != currentRun || state != ChargingTransition.State.STARTING) return;
+                if (!ChargingTransition.acceptsCallback(runId, currentRun, overlay, current)
+                        || state != ChargingTransition.State.STARTING) return;
                 log("Animation running=" + result + " attempt=" + attempt);
                 if ("true".equals(result)) handle(ChargingTransition.Event.JS_STARTED);
             });
@@ -147,20 +149,20 @@ public final class ChargingAccessibilityService extends AccessibilityService {
         }
     }
 
-    private boolean showOverlay() {
+    private boolean showOverlay(String theme) {
         // Keep the root drawable: alpha=0 can stall the visual callback in the background.
         View view = null;
         boolean added = false;
         try {
-            boolean nativeTheme = "native-N01".equals(WebViews.selectedTheme(this));
-            view = nativeTheme ? new MainMagicChargeView(this) : WebViews.magicCircle(this);
+            boolean nativeTheme = ThemeSelection.isNative(theme);
+            view = nativeTheme ? new MainMagicChargeView(this, theme) : WebViews.magicCircle(this);
             if (view instanceof WebView) {
                 WebView web = (WebView) view;
                 long currentRun = runId;
                 web.setWebViewClient(new WebViews.LocalClient(this) {
                 @Override
                 public void onPageFinished(WebView current, String url) {
-                    if (overlay != current || runId != currentRun) return;
+                    if (!ChargingTransition.acceptsCallback(runId, currentRun, overlay, current)) return;
                     log("Page ready; attached=" + current.isAttachedToWindow()
                             + " visibility=" + current.getWindowVisibility());
                     handle(ChargingTransition.Event.PAGE_READY);
@@ -169,14 +171,14 @@ public final class ChargingAccessibilityService extends AccessibilityService {
                 @Override
                 public void onReceivedError(WebView current, WebResourceRequest request,
                                             WebResourceError error) {
-                    if (overlay != current || runId != currentRun) return;
+                    if (!ChargingTransition.acceptsCallback(runId, currentRun, overlay, current)) return;
                     log("Load error=" + error.getErrorCode() + " mainFrame=" + request.isForMainFrame());
                     if (request.isForMainFrame()) finish("load-error");
                 }
 
                 @Override
                 public boolean onRenderProcessGone(WebView current, RenderProcessGoneDetail detail) {
-                    if (overlay == current && runId == currentRun) {
+                    if (ChargingTransition.acceptsCallback(runId, currentRun, overlay, current)) {
                         log("Renderer gone; crashed=" + (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail.didCrash()));
                         finish("renderer-gone");
                     } else current.destroy();
@@ -205,7 +207,7 @@ public final class ChargingAccessibilityService extends AccessibilityService {
             if (view instanceof MainMagicChargeView) {
                 ((MainMagicChargeView) view).start();
                 handle(ChargingTransition.Event.NATIVE_READY);
-            } else WebViews.loadMagicCircle((WebView) view);
+            } else WebViews.loadMagicCircle((WebView) view, theme);
             return true;
         } catch (RuntimeException error) {
             if (overlay == view && view != null) hideOverlay("window-error");

@@ -25,4 +25,38 @@ public class SanctuaryIntegrationTest {
             assertEquals(ChargingTransition.State.DISCONNECTED, s);
         }
     }
+
+    @Test public void onlySharedCanvasThemesUseNativePreviewAndCharging() {
+        assertTrue(ThemeSelection.isNative("native-N01"));
+        assertTrue(ThemeSelection.isNative("ref-W03"));
+        assertTrue(ThemeSelection.isNative("ref-R01"));
+        assertFalse(ThemeSelection.isNative("moon"));
+        assertFalse(ThemeSelection.isNative("ref-F01"));
+    }
+
+    @Test public void generatedArtworkUrlsAreExactAndLimitedToTwoThemes() {
+        assertEquals("ref-W03", ThemeSelection.generatedArtworkTheme(
+                "https://appassets.androidplatform.net/generated/ref-W03.png"));
+        assertEquals("ref-R01", ThemeSelection.generatedArtworkTheme(
+                "https://appassets.androidplatform.net/generated/ref-R01.png"));
+        for (String url : java.util.Arrays.asList(
+                "http://appassets.androidplatform.net/generated/ref-W03.png",
+                "https://example.com/generated/ref-W03.png",
+                "https://appassets.androidplatform.net/generated/ref-F01.png",
+                "https://appassets.androidplatform.net/generated/ref-W03.png?thumb=1",
+                "https://appassets.androidplatform.net/generated/ref-R01.png#preview",
+                "https://appassets.androidplatform.net:443/generated/ref-W03.png")) {
+            assertNull(url, ThemeSelection.generatedArtworkTheme(url));
+        }
+    }
+
+    @Test public void reconnectStartsFreshAndOldRunCallbacksAreRejected() {
+        assertEquals(ChargingTransition.State.LOADING, ChargingTransition.next(
+                ChargingTransition.State.COMPLETE, ChargingTransition.Event.CONNECT));
+        Object currentView = new Object();
+        Object oldView = new Object();
+        assertTrue(ChargingTransition.acceptsCallback(8L, 8L, currentView, currentView));
+        assertFalse(ChargingTransition.acceptsCallback(8L, 7L, currentView, currentView));
+        assertFalse(ChargingTransition.acceptsCallback(8L, 8L, currentView, oldView));
+    }
 }

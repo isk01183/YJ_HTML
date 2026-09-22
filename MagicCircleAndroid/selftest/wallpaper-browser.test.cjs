@@ -10,7 +10,16 @@ const {chromium}=require('playwright');
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../app/src/main/assets/gallery.html')).href);
     const state={selected:'native-N01',language:'ko',enabled:true,media:[],hidden:[],tabs:[],readable:true};
+    await page.locator('[data-theme="ref-W03"]').click();
+    assert.match(await page.locator('#hero-tag').textContent(),/브라우저 참고 미리보기/);
+    assert.equal(await page.locator('#hero-art svg').count(),1,'Standalone browser keeps the SVG comparison');
     await page.evaluate(value=>setGalleryState(value),state);
+    await page.locator('[data-theme="ref-W03"]').click();
+    assert.equal(await page.locator('#hero-art img').getAttribute('src'),'https://appassets.androidplatform.net/generated/ref-W03.png');
+    await page.locator('[data-theme="ref-R01"]').scrollIntoViewIfNeeded();
+    await page.waitForFunction(()=>document.querySelector('[data-theme="ref-R01"] img')?.hasAttribute('src'));
+    assert.equal(await page.locator('[data-theme="ref-R01"] img').getAttribute('src'),'https://appassets.androidplatform.net/generated/ref-R01.png');
+    await page.locator('[data-theme="native-N01"]').click();
     for(const [target,label] of [['home','배경화면 변경'],['lock','잠금화면 변경']]){
       const button=page.locator('#wallpaper-'+target);
       assert.equal(await button.textContent(),label);

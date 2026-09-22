@@ -43,6 +43,23 @@ final class ThemeSelection {
         return IDS.contains(id);
     }
 
+    static boolean isNative(String id) {
+        return "native-N01".equals(id) || "ref-W03".equals(id) || "ref-R01".equals(id);
+    }
+
+    static String generatedArtworkTheme(String url) {
+        if (url == null) return null;
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            if (!"https".equals(uri.getScheme())
+                    || !"appassets.androidplatform.net".equals(uri.getRawAuthority())
+                    || uri.getRawQuery() != null || uri.getRawFragment() != null) return null;
+            if ("/generated/ref-W03.png".equals(uri.getRawPath())) return "ref-W03";
+            if ("/generated/ref-R01.png".equals(uri.getRawPath())) return "ref-R01";
+        } catch (java.net.URISyntaxException ignored) { }
+        return null;
+    }
+
     static String normalize(String id) {
         return isValid(id) ? id : "classic";
     }
