@@ -6,10 +6,12 @@
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020407;color:#e7edf2;font-family:system-ui,sans-serif}
 .scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding:max(18px,env(safe-area-inset-top)) 10px max(20px,env(safe-area-inset-bottom));opacity:0}
+.world .scene{isolation:isolate}.world-background{position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:#020a15;background-image:radial-gradient(ellipse at 18% 30%,var(--world-haze),transparent 55%),radial-gradient(ellipse at 84% 72%,var(--world-haze),transparent 58%),radial-gradient(circle at 50% 48%,#12313a80,transparent 65%),radial-gradient(circle at 17px 31px,#badce64d .6px,transparent 1px),radial-gradient(circle at 73px 19px,#cfebed33 .5px,transparent .9px);background-size:100% 100%,100% 100%,100% 100%,113px 127px,179px 157px}
 .heading{flex:none;text-align:center;padding:clamp(6px,3vh,28px) 16px 10px;position:relative;z-index:2}.eyebrow{font-size:9px;letter-spacing:.2em;color:#abbcc9;margin:0 0 9px}h1{font:400 clamp(17px,3vh,26px)/1.5 Georgia,'Yu Mincho',serif;letter-spacing:.08em;margin:0;white-space:pre-line}
 .artwork{position:relative;flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
 #collection-art{display:block;object-fit:contain;width:100%;height:100%;transform:none}
 #direct-art{width:100%;height:100%;display:flex;align-items:center;justify-content:center}#direct-art svg{display:block;width:100%;height:100%}#review-code{margin:8px 0 0;font:11px/1.4 system-ui;color:#bfcad4;letter-spacing:.03em}
+.world #direct-art svg{overflow:visible}
 .readout{flex:none;text-align:center;position:relative;z-index:2;padding:12px 14px 5px}.level{font:300 clamp(30px,5vh,48px)/1.2 Georgia,serif;letter-spacing:.02em}.percent{font-size:.42em;margin-left:4px}.caption{font-size:9px;letter-spacing:.18em;color:#b9c5cd;margin:9px 0 0}.rule{height:1px;width:70px;background:linear-gradient(90deg,transparent,#e7d9ac,transparent);margin:15px auto 0}
 .preparing{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:16px;padding:25px;color:#b9cbd8;font:400 18px/1.8 Georgia,serif;white-space:pre-line}.preparing small{font:11px/1.6 system-ui;color:#71818c}.running .preparing{display:none}
 .motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}.motes i{position:absolute;left:var(--x);top:var(--y);width:2px;height:2px;border-radius:50%;background:#eaf7ff;box-shadow:0 0 7px #a8dbff;opacity:0}
@@ -31,12 +33,17 @@ const theme=ReferenceDesigns.get(params.get('theme')),image=document.getElementB
 const direct=theme&&DirectCircles.ids.includes(theme.code);
 MagicI18n.apply(document,language);document.title=MagicI18n.t('animationTitle',language);
 if(theme){document.getElementById('art-name').textContent=theme.names[language];document.documentElement.classList.toggle('portrait',theme.portrait);}
+if(direct&&theme.code[0]==='W'){
+ document.documentElement.classList.add('world');
+ const background=document.createElement('div');background.className='world-background';background.setAttribute('aria-hidden','true');
+ background.style.setProperty('--world-haze',theme.code==='W02'?'#5366ad30':theme.code==='W05'?'#68784928':'#237c8530');document.querySelector('.scene').prepend(background);
+}
 if(theme){const code=document.createElement('p');code.id='review-code';code.textContent=theme.code+' · '+MagicI18n.t(direct?'directReview':'legacyReview',language);document.querySelector('.readout').appendChild(code);}
 if(theme?.code==='U04')document.querySelector('.artwork').appendChild(document.querySelector('.readout'));
 const level=Number(params.get('battery'));
 document.querySelector('[data-level]').textContent=params.has('battery')&&Number.isInteger(level)&&level>=0&&level<=100?String(level):'—';
 // Separate, sparse particles; no rotation or reconstruction of connected geometry during playback.
-for(let i=0;i<18;i++){
+for(let i=0;theme?.code[0]!=='F'&&i<18;i++){
  const dot=document.createElement('i');dot.style.cssText='--x:'+((i*37+7)%97)+'%;--y:'+((i*23+11)%95)+'%;--a:'+(0.25+i%4*.12);document.querySelector('.motes').appendChild(dot);
 }
 let requested=false,ready=false,deadline=0;
@@ -52,7 +59,7 @@ function reveal(){
 // Playback still waits for the native start call and its original connection-time budget.
 if(direct){
  const host=document.createElement('div');host.id='direct-art';
- host.innerHTML=DirectCircles.svg(theme.code);host.querySelector('svg').setAttribute('aria-hidden','true');image.replaceWith(host);ready=true;
+ host.innerHTML=DirectCircles.svg(theme.code,{surface:'charge'});host.querySelector('svg').setAttribute('aria-hidden','true');image.replaceWith(host);ready=true;
 }else if(theme){
  image.onload=()=>{ready=true;reveal();};
  image.onerror=()=>{window.chargingCollectionError=true;document.getElementById('loading').textContent=MagicI18n.t('mediaFailed',language);};

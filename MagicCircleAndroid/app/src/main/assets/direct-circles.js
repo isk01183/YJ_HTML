@@ -763,13 +763,13 @@
       stroke('geometry',geometry,.5,.5,true)+stroke('ornaments',ornament,.45,.6,true)+stroke('center-core',core,.45,.6,true)+
       stroke('highlights',lights,.35,.7)+stroke('particles',dust,.1,.2);
   }
-  function svg(id) {
+  function svg(id,options={}) {
     if (!ids.includes(id)) throw new RangeError('Unknown design: '+id);
-    if(extra?.ids.includes(id))return extra.svg(id);
+    if(extra?.ids.includes(id))return extra.svg(id,options);
     const tall=id==='W03',native=id!=='C03'&&id!=='R01'&&!tall,w=native?180:tall?1000:1024,h=native?180:tall?1778:1024;
     const color=id==='C03'?'#a46b24':'#126c91';
     const defs=`<defs><radialGradient id="${id}-ambient"><stop stop-color="${color}" stop-opacity=".21"/><stop offset=".72" stop-color="${color}" stop-opacity=".045"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient><radialGradient id="${id}-point"><stop stop-color="#fffef1"/><stop offset=".15" stop-color="#ffe2a3" stop-opacity=".8"/><stop offset="1" stop-color="#edaa40" stop-opacity="0"/></radialGradient><linearGradient id="${id}-wood"><stop stop-color="#77d8ef"/><stop offset=".35" stop-color="#ffeec4"/><stop offset=".52" stop-color="#fffdef"/><stop offset=".72" stop-color="#ffdfa2"/><stop offset="1" stop-color="#81d8ef"/></linearGradient><filter id="${id}-soft" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${tall?3:3.3}"/></filter></defs>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${titles[id]} — 직접 작성 기하 검토안" data-direct-circle="${id}"><title>${titles[id]}</title>${native?defs.replace('stdDeviation="3.3"','stdDeviation=".55"').replace(`id="${id}-soft"`,`id="${id}-soft" data-light="near"`):defs}<defs><filter id="${id}-mist" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="17"/></filter></defs>${p(`M0 0H${w}V${h}H0Z`,'fill="#02090e"')}${id==='C17'?c(90,90,85,'fill="#faf8ef"'):id==='C19'?c(90,90,85,'fill="#ffebac"'):''}${native?collectionC(id):id==='C03'?c03():id==='R01'?r01():w03()}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${titles[id]} — 직접 작성 기하 검토안" data-direct-circle="${id}"><title>${titles[id]}</title>${native?defs.replace('stdDeviation="3.3"','stdDeviation=".55"').replace(`id="${id}-soft"`,`id="${id}-soft" data-light="near"`):defs}<defs><filter id="${id}-mist" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="17"/></filter></defs>${tall&&options.surface==='charge'?'':p(`M0 0H${w}V${h}H0Z`,'fill="#02090e"')}${id==='C17'?c(90,90,85,'fill="#faf8ef"'):id==='C19'?c(90,90,85,'fill="#ffebac"'):''}${native?collectionC(id):id==='C03'?c03():id==='R01'?r01():w03()}</svg>`;
   }
   const mounted = new WeakMap();
   function mount(element,id) {

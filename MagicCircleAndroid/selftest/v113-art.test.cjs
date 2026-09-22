@@ -91,6 +91,24 @@ const designs=require(path.join(assets,'circle-designs.js'));
    }catch(e){failures.push(code+': '+e.message);}
   }
   await page.setViewportSize({width:412,height:915});
+  // Removing only the atmosphere leaves exterior crystals/leaves in ornaments;
+  // removing all ornaments instead destroys the six alternating internal nodes.
+  for(const code of ['F01','F02','F03','F04','F05']){
+   await page.setContent(DirectCircles.svg(code));
+   const f=await page.evaluate(()=>{
+    const outline=name=>document.querySelector(`[data-outline="${name}"]`),b=outline('ornaments').getBBox();
+    return {particles:outline('particles').innerHTML,atmosphere:outline('atmosphere').innerHTML,petals:document.querySelectorAll('[data-outline] [data-petal]').length,kinds:[...document.querySelectorAll('[data-outline] [data-core-kind]')].map(e=>e.dataset.coreKind).sort(),bounds:[b.x,b.y,b.x+b.width,b.y+b.height]};
+   });
+   for(const name of ['particles','atmosphere'])if(f[name]!=='')failures.push(code+' '+name+' must be empty');
+   try{assert.equal(f.petals,6);assert.deepEqual(f.kinds,['diamond','diamond','diamond','empty','empty','empty']);assert.ok(f.bounds.every(v=>v>=20&&v<=180),'ornaments must stay inside x/y 20..180');}catch(e){failures.push(code+': '+e.message);}
+  }
+  for(const code of ['W01','W02','W03','W04','W05']){
+   await page.setContent(DirectCircles.svg(code));
+   const preview=await page.locator('svg').evaluate(s=>{const b=s.viewBox.baseVal,e=[...s.children].find(e=>e.tagName==='path'&&e.getAttribute('d')===`M0 0H${b.width}V${b.height}H0Z`);if(!e)return null;e.remove();return s.outerHTML;});
+   assert.ok(preview,code+' default preview keeps its opaque outer field');
+   await page.setContent(DirectCircles.svg(code,{surface:'charge'}));
+   try{assert.equal(await page.locator('svg').evaluate(s=>s.outerHTML),preview,code+' charge omits only its opaque outer field');}catch(e){failures.push(code+' charge still has an opaque outer field or changed other geometry');}
+  }
   await page.clock.install();
   for(const code of ['C11','C12','C21','C26','C30','A14','crimson-abyss']){
    const crimson=code==='crimson-abyss';
@@ -116,5 +134,5 @@ const designs=require(path.join(assets,'circle-designs.js'));
   assert.notEqual(await classicScale(0),await classicScale(3500),'Other themes retain their entrance zoom');
  }finally{await browser.close();}
  assert.deepEqual(failures,[]);
- console.log('V113_ART_OK: seven actual geometry and hierarchy regressions');
+ console.log('V113_ART_OK: seven motif/playback regressions, five F debris/node bounds, five W surface contracts');
 })().catch(e=>{console.error(e);process.exitCode=1;});

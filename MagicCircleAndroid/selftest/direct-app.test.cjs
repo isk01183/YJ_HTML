@@ -64,6 +64,34 @@ const refs=require(path.join(assets,'collection-catalog.js'));
    }
    assert.equal(legacyRequests,before,'No original-image fallback for direct art');
   }
+  for(const code of ['W01','W02','W03','W04','W05','F01','F02','F03','F04','F05']){
+   await go('collection_circle.html',`?theme=ref-${code}&lang=ko&battery=78`);
+   await page.clock.install();
+   await page.evaluate(()=>startChargingAnimation(7000));
+   if(code[0]==='F'){assert.equal(await page.locator('.motes i').count(),0,code+' must not regain common floating dots');continue;}
+   for(const [width,height] of [[360,800],[412,915],[915,412],[800,1280],[1280,800]]){
+    await page.setViewportSize({width,height});
+    await page.evaluate(()=>document.getAnimations().forEach(a=>{a.pause();a.currentTime=3500;}));
+    const layout=await page.evaluate(()=>{
+     const bg=document.querySelector('.world-background'),svg=document.querySelector('#direct-art svg'),m=svg.getScreenCTM(),v=svg.viewBox.baseVal;
+     const bounds=e=>{const b=e.getBoundingClientRect();return [b.left,b.top,b.right,b.bottom];},effective=e=>{let o=1;for(;e;e=e.parentElement)o*=Number(getComputedStyle(e).opacity);return o;};
+     const ring=svg.querySelector('[data-outline="outer-ring"]'),b=ring.getBBox(),r=ring.getScreenCTM();
+     return {background:bg&&bounds(bg),paint:bg&&getComputedStyle(bg).backgroundImage,opacity:bg&&effective(bg),overflow:document.documentElement.scrollWidth>innerWidth,svgOverflow:getComputedStyle(svg).overflow,ring:[r.e+b.x*r.a,r.f+b.y*r.d,r.e+(b.x+b.width)*r.a,r.f+(b.y+b.height)*r.d],scale:[m.a,m.d],art:[m.e,m.f,m.e+v.width*m.a,m.f+v.height*m.d],labels:[...document.querySelectorAll('.heading,.readout')].map(bounds),labelText:document.querySelector('#review-code').textContent};
+    });
+    assert.deepEqual(layout.background,[0,0,width,height],code+' background must reach all viewport edges');
+    assert.notEqual(layout.paint,'none');assert.ok(layout.opacity>.9);assert.equal(layout.overflow,false);
+    assert.equal(layout.svgOverflow,'visible',code+' transparent wash/mist must not be clipped to an artwork rectangle');
+    for(const b of layout.labels)assert.ok(b[2]<=layout.ring[0]||b[0]>=layout.ring[2]||b[3]<=layout.ring[1]||b[1]>=layout.ring[3],code+' labels must not cover the core ring');
+    assert.ok(Math.abs(layout.scale[0]-layout.scale[1])<.000001,'Uniform core fit');
+    for(const b of [layout.art,...layout.labels])assert.ok(b[0]>=0&&b[1]>=0&&b[2]<=width+.01&&b[3]<=height+.01,code+' uncropped artwork and safe labels');
+    assert.match(layout.labelText,new RegExp(code));
+   }
+   await page.evaluate(()=>document.getAnimations().forEach(a=>a.currentTime=7000));
+   assert.equal(await page.locator('.world-background').evaluate(e=>{let o=1;for(;e;e=e.parentElement)o*=Number(getComputedStyle(e).opacity);return o;}),0,'Full viewport background fades with the scene');
+   await page.clock.runFor(7100);
+   assert.equal(await page.evaluate(()=>startChargingAnimation()),false,'World background cannot reopen after deadline');
+  }
+  await page.setViewportSize({width:412,height:915});
   await go('collection_circle.html','?theme=ref-A01&lang=en');
   assert.match(await page.locator('#review-code').textContent(),/A01.*review/i,'New artwork must be explicitly marked for review');
   assert.equal(await page.evaluate(()=>window.startChargingAnimation()),true);
