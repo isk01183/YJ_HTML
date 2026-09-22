@@ -153,8 +153,11 @@
             return fine(ring(185)+hexagram(170)+shape(9,152,4))+bright(seal(96,8))+around(6,i=>place(0,-182,seal(34,i%2?5:6)+localRunes(29,12,.4)))+
                 fine(around(3,'<ellipse cx="0" cy="0" rx="178" ry="74"/>'))+accent(rosette(6,78,22)+ring(14));
         case 'crimson-abyss':
-            return bright(star(8,183,54)+star(8,148,99, -67.5))+fine(rosette(16,176,23)+ring(132)+ring(123)+shape(12,190,5))+
-                around(8,line('M0-185Q-31-150-16-124Q-3-102 0-83Q4-124 16-124Q31-150 0-185Z'))+accent(star(8,55,19)+ring(12));
+            return group(rosette(16,176,23)+ring(132)+ring(123)+shape(12,174,5),'data-seal-layer="lattice" stroke-width=".65" opacity=".35"')+
+                group(star(8,183,54),'data-seal-layer="primary" stroke-width="1.6"')+
+                group(star(8,148,99,-67.5),'data-seal-layer="secondary" stroke-width=".9" opacity=".6"')+
+                group(around(8,line('M0-185Q-31-150-16-124Q-3-102 0-83Q4-124 16-124Q31-150 0-185Z')),'data-seal-layer="thorns" stroke-linejoin="round"')+
+                group(accent(star(8,55,19)+ring(12)),'data-seal-layer="core"');
         case 'ivory-alchemy':
             return group(ring(239,'fill="#e8e2cc" stroke="#f6f0de" stroke-width="4"')+ring(224)+ring(216)+localRunes(207,72,.67)+
                 shape(3,190)+shape(3,163,1,90)+ring(149)+ring(90)+ring(82)+hexagram(70)+

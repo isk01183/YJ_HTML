@@ -39,7 +39,7 @@
     s+=Array.from({length:8},(_,i)=>p(`M100 136Q${83+i*5} 148 ${73+i*8} 148`)).join('');return s;}
   function snake(wings=false){return p('M100 29L104 43H101V170H98V43H95Z','fill="currentColor"')+p('M100 60C70 59 70 92 100 94C129 96 129 113 100 120C75 126 83 143 101 147C114 153 99 161 99 166','stroke-width="6"')+p('M96 60L86 57L96 54Z','fill="currentColor"')+(wings? p('M97 53Q83 59 53 47Q63 66 89 67L96 61M103 53Q117 59 147 47Q137 66 111 67L104 61M58 52L84 58M62 58L87 62M142 52L116 58M138 58L113 62','stroke-width="2"') : p('M70 49H130M76 46H124','stroke-width="4"'));}
   function spiral(arms=6,radius=57,turns=1.2,hole=5){return Array.from({length:arms},(_,a)=>{const points=Array.from({length:48},(_,i)=>{const t=i/47;return polar(hole+(radius-hole)*t,a*360/arms+t*360*turns);});return p('M'+points.map(q=>q.join(' ')).join('L'));}).join('');}
-  function clockFace(){const numbers=['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];return rings(68,59,36,31)+tick(61,60,2)+numbers.map((s,i)=>{const[x,y]=polar(75,i*30-90);return `<text x="${x}" y="${y+3}" text-anchor="middle" font-size="8" font-family="serif" fill="currentColor" stroke="none">${s}</text>`;}).join('')+p('M100 100L99 54M100 100L125 116','stroke-width="1.3"')+r(3,'fill="currentColor"');}
+  function clockFace(){const numbers=['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];return rings(56,51,36,31)+p(close(Array.from({length:96},(_,i)=>polar(i%4===1||i%4===2?56:54.5,i*3.75))),'data-clock-gear="true" stroke-width=".35"')+tick(52,60,2)+numbers.map((s,i)=>{const[x,y]=polar(68,i*30-90);return `<text x="${x}" y="${y+3}" text-anchor="middle" font-size="8" font-family="serif" fill="currentColor" stroke="none">${s}</text>`;}).join('')+p('M100 100L100 54M100 100L125 116','stroke-width="1.3"')+r(3,'fill="currentColor"');}
   function cube(radius=38){return polygon(radius,6)+p(close([polar(radius,-90),[100,100],polar(radius,30)]))+p('M100 100L'+polar(radius,150).join(' '))+polygon(radius*.53,6)+hex(radius*.55);}
   function eye(){return p('M61 100Q100 63 139 100Q100 137 61 100Z')+rings(17,11)+spark(100,100,7,'fill="currentColor"');}
   function roseCore(){return polygon(21,6)+polygon(19,4,1,-25)+polygon(17,4,1,10)+hex(16);}
@@ -62,7 +62,7 @@
       case 11:geometry=hex(72)+orbit(75,29,0)+orbit(75,29,60)+orbit(75,29,120)+r(32);core=cube(15);ornaments=medallions(8,86,4);break;
       case 12:geometry=hex(78)+hex(59)+polygon(72,4)+polygon(62,4)+polygon(56,4,1,0)+rings(54,24);core=hex(29)+r(2,'fill="currentColor"');ornaments=medallions(8,86,4);break;
       case 13:geometry=hex(76)+mesh(66)+hex(59)+r(48);core=smallTree();ornaments=medallions(8,87,4);break;
-      case 14:outer=rings(92,87,82);geometry=clockFace()+hex(32)+tick(45,48,2);core=r(2);runes+=script(48,72,.6)+script(38,55,.4);ornaments=medallions(4,88,3);break;
+      case 14:outer=rings(92,87,82);geometry=clockFace()+g(hex(32),'stroke-width=".4" opacity=".55"')+tick(45,48,2);core=r(2);runes+=script(48,72,.6)+script(38,55,.4);ornaments=medallions(4,88,3);break;
       case 15:geometry=hex(78)+mesh(73)+mesh(61,22);core=spiral(8,53,.85,10);ornaments=medallions(8,87,3);break;
       case 16:geometry=hex(75)+mesh(68)+polygon(62,8,3)+r(43);core=drop(29);ornaments=medallions(4,87,6)+[0,90,180,270].map(a=>turn(at(drop(9),0,-64),a)).join('');break;
       case 17:geometry=hex(76)+mesh(72)+r(57)+p('M100 28C70 55 58 87 60 112C61 139 82 155 100 157C118 155 139 139 140 112C142 87 130 55 100 28Z');core=flame(32);ornaments=medallions(8,87,4);break;
