@@ -11,14 +11,17 @@ class SanctuaryGeometryTest {
         assertEquals(748f, SanctuaryLayout.centeredBaseline(-80f, 20f, 718f), 0f)
     }
 
-    @Test fun combinedBatteryGroupHasEqualHorizontalMargins() {
-        val numberWidth = 126f
-        val suffixWidth = 24f
-        val gap = 8f
-        val groupWidth = numberWidth + suffixWidth + gap
-        val left = SanctuaryLayout.centeredLeft(groupWidth, SanctuaryLayout.CENTER_X)
-        val right = left + groupWidth
-        assertEquals(SanctuaryLayout.CENTER_X - left, right - SanctuaryLayout.CENTER_X, 0f)
+    @Test fun batteryPlacementCentersMeasuredGroupAndKeepsLowerContentClear() {
+        val placement = SanctuaryLayout.batteryPlacement(126f, 24f, 8f, -80f, 20f)
+        assertEquals(353f, placement.numberX, 0f)
+        assertEquals(487f, placement.suffixX, 0f)
+        assertEquals(748f, placement.baseline, 0f)
+        assertEquals(776f, placement.dividerY, 0f)
+        assertEquals(795f, placement.statusTop, 0f)
+        assertEquals(79f, SanctuaryLayout.CENTER_X - placement.numberX, 0f)
+        assertEquals(79f, placement.suffixX + 24f - SanctuaryLayout.CENTER_X, 0f)
+        assertTrue(placement.dividerY >= placement.baseline + 20f + 8f)
+        assertTrue(placement.statusTop + 31f <= SanctuaryLayout.CENTER_Y + SanctuaryLayout.CORE_RADIUS)
     }
 
     @Test fun closedTriangleReturnsToItsActualStart() {

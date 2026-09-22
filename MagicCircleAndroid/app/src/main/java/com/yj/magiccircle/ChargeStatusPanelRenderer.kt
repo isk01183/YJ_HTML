@@ -10,12 +10,15 @@ import java.util.Locale
 
 /** Text fitting, localization and accessibility strings are rebuilt only with a new snapshot/settings. */
 class ChargeStatusPanelRenderer {
-    private data class TextRun(val text: String, val x: Float, val baseline: Float, val paint: Paint)
+    internal data class TextRun(val text: String, val x: Float, val baseline: Float, val paint: Paint)
+    internal data class BatteryTextLayout(val number: TextRun, val suffix: TextRun?)
     private val serif = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
     private val sans = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     private val runs = ArrayList<TextRun>(12)
     private val decoration = Picture()
     private val batteryDecoration = Picture()
+    internal lateinit var batteryLayout: BatteryTextLayout
+        private set
     private var spoken = ""
 
     init {
@@ -114,6 +117,8 @@ class ChargeStatusPanelRenderer {
             val run = runs[i]
             canvas.drawText(run.text, run.x, run.baseline, run.paint)
         }
+        canvas.drawText(batteryLayout.number.text, batteryLayout.number.x, batteryLayout.number.baseline, batteryLayout.number.paint)
+        batteryLayout.suffix?.let { canvas.drawText(it.text, it.x, it.baseline, it.paint) }
     }
 
     fun description(): String = spoken
@@ -135,18 +140,18 @@ class ChargeStatusPanelRenderer {
         numberPaint.textSize *= factor
         suffixPaint.textSize *= factor
         val numberWidth = numberPaint.measureText(number)
-        val width = numberWidth + suffixPaint.measureText(suffix) + gap * factor
-        val x = SanctuaryLayout.centeredLeft(width, SanctuaryLayout.CENTER_X)
+        val scaledGap = gap * factor
         val bounds = Rect().also { numberPaint.getTextBounds(number, 0, number.length, it) }
-        val baseline = SanctuaryLayout.centeredBaseline(bounds.top.toFloat(), bounds.bottom.toFloat(), SanctuaryLayout.CENTER_Y)
-        runs.add(TextRun(number, x, baseline, numberPaint))
-        runs.add(TextRun(suffix, x + numberWidth + gap * factor, baseline, suffixPaint))
+        val placement = SanctuaryLayout.batteryPlacement(
+            numberWidth, suffixPaint.measureText(suffix), scaledGap, bounds.top.toFloat(), bounds.bottom.toFloat())
+        batteryLayout = BatteryTextLayout(
+            TextRun(number, placement.numberX, placement.baseline, numberPaint),
+            suffix.takeIf { it.isNotEmpty() }?.let { TextRun(it, placement.suffixX, placement.baseline, suffixPaint) })
 
-        val dividerY = maxOf(776f, baseline + bounds.bottom + 8f)
         val canvas = batteryDecoration.beginRecording(864, 1536)
-        SanctuaryInk().glow(canvas, Path().apply { moveTo(346f, dividerY); lineTo(518f, dividerY) }, SanctuaryInk.GOLD, .7f)
+        SanctuaryInk().glow(canvas, Path().apply { moveTo(346f, placement.dividerY); lineTo(518f, placement.dividerY) }, SanctuaryInk.GOLD, .7f)
         batteryDecoration.endRecording()
-        addText(status, SanctuaryLayout.CENTER_X, dividerY + 19f, 214f, 23f * scale, 31f)
+        addText(status, SanctuaryLayout.CENTER_X, placement.statusTop, 214f, 23f * scale, 31f)
     }
 
     private fun addText(text: String, center: Float, top: Float, width: Float, size: Float, height: Float, useSerif: Boolean = true) {

@@ -58,3 +58,28 @@ Result: `BUILD SUCCESSFUL` (9 s), exit 0. Parsed JUnit XML: 22 tests, 0 failures
 
 - S22 installation and visual capture remain pending the already-requested user consent. Therefore no hardware glyph-bounds capture, Canvas-versus-AGSL comparison, or real-device portrait/landscape/tablet visual pass is claimed here.
 - No AVD exists, and no emulator/device state was changed. The debug inspection route is ready for the later approved runtime pass.
+
+## Review fix round 1
+
+- Removed the duplicated battery sizing/placement implementation from `SanctuaryReviewActivity`. The debug overlay now reads the exact number and suffix `TextRun` instances created and drawn by `ChargeStatusPanelRenderer`, so its glyph rectangles cannot drift from production sizing or placement.
+- Added the pure `SanctuaryLayout.BatteryPlacement` result and one `batteryPlacement` routine used for measured group X positions, the actual-glyph baseline, divider clearance, and status top.
+- Replaced the algebra-only group test with a focused placement-result test covering measured number/suffix/gap positions, the required 748 baseline, 8 px glyph-to-divider clearance, 19 px divider-to-status placement, equal group margins, and containment inside the core.
+
+### Fix RED
+
+`./gradlew.bat testDebugUnitTest --tests '*SanctuaryGeometryTest'`
+
+Expected failure, exit 1: `SanctuaryLayout.batteryPlacement` was unresolved before the shared result/routine existed.
+
+### Fix GREEN and verification
+
+- Focused: `./gradlew.bat testDebugUnitTest --tests '*SanctuaryGeometryTest'` — `BUILD SUCCESSFUL` (4 s), exit 0.
+- Full: `./gradlew.bat testDebugUnitTest lintDebug assembleDebug --offline` — `BUILD SUCCESSFUL` (6 s), exit 0.
+- Parsed JUnit XML: 22 tests, 0 failures, 0 errors, 0 skipped. Lint: `No issues found.` Debug APK assembled.
+- `git diff --check`: no whitespace errors; only existing LF-to-CRLF checkout warnings.
+- `graphify update .`: completed after the fix with 772 nodes, 1417 edges, and 51 communities; generated graph files remain excluded from the commit.
+
+### Fix self-review
+
+- One measured production layout now drives both drawing and debug inspection; no factory, interface, dependency, or debug overlay was moved into the release source set.
+- No device installation or other device mutation was performed. The hardware visual matrix remains the same explicit pending item above.

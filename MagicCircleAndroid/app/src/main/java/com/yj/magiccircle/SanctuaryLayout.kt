@@ -21,6 +21,21 @@ object SanctuaryLayout {
     fun centeredBaseline(ascent: Float, descent: Float, centerY: Float): Float = centerY - (ascent + descent) / 2f
     fun centeredLeft(width: Float, centerX: Float): Float = centerX - width / 2f
 
+    data class BatteryPlacement(
+        val numberX: Float,
+        val suffixX: Float,
+        val baseline: Float,
+        val dividerY: Float,
+        val statusTop: Float,
+    )
+
+    fun batteryPlacement(numberWidth: Float, suffixWidth: Float, gap: Float, glyphTop: Float, glyphBottom: Float): BatteryPlacement {
+        val numberX = centeredLeft(numberWidth + suffixWidth + gap, CENTER_X)
+        val baseline = centeredBaseline(glyphTop, glyphBottom, CENTER_Y)
+        val dividerY = maxOf(776f, baseline + glyphBottom + 8f)
+        return BatteryPlacement(numberX, numberX + numberWidth + gap, baseline, dividerY, dividerY + 19f)
+    }
+
     fun goldAngle(elapsed: Long): Float = (elapsed.coerceAtLeast(0) % 180000L) * (360f / 180000f)
     fun blueAngle(elapsed: Long): Float = -(elapsed.coerceAtLeast(0) % 240000L) * (360f / 240000f)
 

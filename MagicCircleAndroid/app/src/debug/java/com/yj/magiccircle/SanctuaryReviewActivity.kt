@@ -4,7 +4,6 @@ import android.app.Activity
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Build
 import android.os.SystemClock
@@ -105,26 +104,12 @@ class SanctuaryReviewActivity : Activity() {
         }
 
         private fun drawGlyphReview(canvas: Canvas) {
-            val percent = snapshots[state].percent
-            val number = percent?.toString() ?: "—"
-            val suffix = if (percent == null) "" else "%"
-            val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 104f * font; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL) }
-            val suffixPaint = Paint(numberPaint).apply { textSize = 42f * font }
-            val gap = if (suffix.isEmpty()) 0f else 8f
-            val groupWidth = numberPaint.measureText(number) + suffixPaint.measureText(suffix) + gap
-            val factor = minOf(1f, 214f / groupWidth, 111f / (numberPaint.fontMetrics.descent - numberPaint.fontMetrics.ascent))
-            numberPaint.textSize *= factor
-            suffixPaint.textSize *= factor
-            val numberWidth = numberPaint.measureText(number)
-            val width = numberWidth + suffixPaint.measureText(suffix) + gap * factor
-            val x = SanctuaryLayout.centeredLeft(width, SanctuaryLayout.CENTER_X)
-            numberPaint.getTextBounds(number, 0, number.length, glyphBounds)
-            val baseline = SanctuaryLayout.centeredBaseline(glyphBounds.top.toFloat(), glyphBounds.bottom.toFloat(), SanctuaryLayout.CENTER_Y)
-            canvas.drawRect(x + glyphBounds.left, baseline + glyphBounds.top, x + glyphBounds.right, baseline + glyphBounds.bottom, boundsPaint)
-            if (suffix.isNotEmpty()) {
-                suffixPaint.getTextBounds(suffix, 0, suffix.length, glyphBounds)
-                val suffixX = x + numberWidth + gap * factor
-                canvas.drawRect(suffixX + glyphBounds.left, baseline + glyphBounds.top, suffixX + glyphBounds.right, baseline + glyphBounds.bottom, boundsPaint)
+            val layout = panel.batteryLayout
+            for (run in listOfNotNull(layout.number, layout.suffix)) {
+                run.paint.getTextBounds(run.text, 0, run.text.length, glyphBounds)
+                canvas.drawRect(
+                    run.x + glyphBounds.left, run.baseline + glyphBounds.top,
+                    run.x + glyphBounds.right, run.baseline + glyphBounds.bottom, boundsPaint)
             }
             canvas.drawLine(SanctuaryLayout.CENTER_X - SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_Y, SanctuaryLayout.CENTER_X + SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_Y, centerPaint)
             canvas.drawLine(SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y - SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y + SanctuaryLayout.CORE_RADIUS, centerPaint)
