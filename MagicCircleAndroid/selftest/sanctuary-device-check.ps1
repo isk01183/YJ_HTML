@@ -1,4 +1,4 @@
-param([string]$Adb = 'adb', [string]$ExpectedVersion = '1.12')
+param([string]$Adb = 'adb', [string]$ExpectedVersion = '1.13')
 $ErrorActionPreference = 'Stop'
 $devices = @((& $Adb devices -l) | Where-Object { $_ -match '^\S+\s+device\b' })
 if ($LASTEXITCODE -ne 0 -or $devices.Count -ne 1) { throw 'Connect exactly one authorized device.' }

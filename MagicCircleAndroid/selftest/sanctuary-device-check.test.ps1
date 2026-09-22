@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $global:LASTEXITCODE = 0
 $calls = [Collections.Generic.List[string]]::new()
 $deviceCount = 1
-$version = '1.12'
+$version = '1.13'
 $crash = ''
 $gfx = 'Total frames rendered: 100'
 function FakeAdb {
@@ -10,7 +10,7 @@ function FakeAdb {
     $calls.Add($command)
     switch -Wildcard ($command) {
         'devices -l' { 'List of devices attached'; 1..$deviceCount | ForEach-Object { "device$_ device model:TEST" } }
-        '*dumpsys package*' { "versionName=$version"; 'versionCode=15' }
+        '*dumpsys package*' { "versionName=$version"; 'versionCode=16' }
         '*pidof*' { '123' }
         '*logcat*' { $crash }
         '*gfxinfo*' { $gfx }
@@ -19,7 +19,7 @@ function FakeAdb {
     }
 }
 $result = (& "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb) -join "`n"
-foreach ($expected in @('1.12', '15', '123', '100', '10000')) {
+foreach ($expected in @('1.13', '16', '123', '100', '10000')) {
     if (!$result.Contains($expected)) { throw "Missing evidence: $expected" }
 }
 if ($calls.Where({ $_ -ne 'devices -l' -and $_ -notlike '-s device1 *' }).Count) { throw 'Device was not explicitly selected' }
@@ -28,11 +28,11 @@ $rejected = $false
 try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'exactly one' }
 if (!$rejected) { throw 'Multiple devices must be rejected' }
 $deviceCount = 1
-$version = '1.11'
+$version = '1.12'
 $rejected = $false
 try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'version differs' }
 if (!$rejected) { throw 'Stale installed version must be rejected' }
-$version = '1.12'
+$version = '1.13'
 $crash = 'FATAL EXCEPTION: main'
 $rejected = $false
 try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'App crash detected' }

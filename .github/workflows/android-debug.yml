@@ -64,7 +64,7 @@ jobs:
           metadata = json.loads((apk.parent / 'output-metadata.json').read_text())
           assert metadata['applicationId'] == 'com.yj.magiccircle'
           assert metadata['variantName'] == 'debug'
-          assert any(e['outputFile'] == apk.name and e['versionCode'] == 15 and e['versionName'] == '1.12'
+          assert any(e['outputFile'] == apk.name and e['versionCode'] == 16 and e['versionName'] == '1.13'
                      for e in metadata['elements']), 'Unexpected APK version'
           suites = list((root / 'test-results/testDebugUnitTest').glob('TEST-*.xml'))
           assert suites, 'Unit-test reports missing'
@@ -83,20 +83,25 @@ jobs:
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/debug/app-debug.apk
-          asset=MagicCircleCharging-v1.12-debug.apk
-          checksum=MagicCircleCharging-v1.12-debug.apk.sha256
-          tag="v1.12-debug-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          asset=MagicCircleCharging-v1.13-debug.apk
+          checksum=MagicCircleCharging-v1.13-debug.apk.sha256
+          local_update=releases/MagicCircleCharging-v1.13-local-update.apk
+          local_checksum=releases/MagicCircleCharging-v1.13-local-update.apk.sha256
+          tag="v1.13-debug-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           test -s "$apk"
+          test -s "$local_update"
+          test -s "$local_checksum"
+          (cd releases && sha256sum -c "$(basename "$local_checksum")")
           refs="$(git ls-remote --tags origin "refs/tags/$tag")"
           test -z "$refs" || { echo "Tag already exists: $tag" >&2; exit 1; }
           cp "$apk" "$asset"
           sha256sum "$asset" > "$checksum"
           sha256sum -c "$checksum"
           digest="$(cut -d' ' -f1 "$checksum")"
-          gh release create "$tag" "$asset" "$checksum" \
+          gh release create "$tag" "$asset" "$checksum" "$local_update" "$local_checksum" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "MagicCircleCharging 1.12 디버그 (${GITHUB_SHA:0:12})" \
-            --notes "소스: $GITHUB_SHA. CI 임시 디버그 서명 APK로, 기존 로컬 서명 앱 위에 업데이트되지 않을 수 있습니다. SHA-256: $digest" \
+            --title "MagicCircleCharging 1.13 디버그 (${GITHUB_SHA:0:12})" \
+            --notes "소스: $GITHUB_SHA. CI 빌드 APK는 임시 디버그 서명이라 기존 앱 위에 업데이트되지 않을 수 있습니다. local-update APK는 기존 로컬 디버그 서명과 호환되며 키는 CI/Git에 포함하지 않습니다. CI APK SHA-256: $digest" \
             --prerelease --latest=false
           printf 'Download: https://github.com/%s/releases/tag/%s\n\nAPK SHA-256: `%s`\n' \
             "$GITHUB_REPOSITORY" "$tag" "$digest" >> "$GITHUB_STEP_SUMMARY"
