@@ -16,6 +16,7 @@ const {chromium}=require('playwright');
       assert.equal(await button.textContent(),label);
       assert.ok((await button.boundingBox()).height>=48);
       await button.click();
+      assert.ok((await page.locator('#wallpaper-dialog').boundingBox()).height<600,'Two wallpaper choices should use a compact dialog');
       assert.deepEqual(await page.locator('[data-wallpaper-theme]').evaluateAll(items=>items.map(item=>item.dataset.wallpaperTheme)),['ref-W03','ref-R01']);
       for(const theme of ['ref-W03','ref-R01']){
         const request=page.waitForEvent('request',{predicate:r=>r.url().startsWith('magiccircle://wallpaper')});
