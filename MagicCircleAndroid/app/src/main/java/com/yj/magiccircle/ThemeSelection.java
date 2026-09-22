@@ -26,6 +26,19 @@ final class ThemeSelection {
             "ref-G01", "ref-G02", "ref-G03", "ref-G04", "ref-G05", "ref-E01", "ref-E02", "ref-E03", "ref-E04",
             "ref-E05", "ref-E06", "ref-E07", "ref-E08", "ref-U01", "ref-U02", "ref-U03", "ref-U04", "ref-R01"));
 
+    static final java.util.Set<String> V113_ACTIVE = java.util.Collections.unmodifiableSet(
+            new java.util.LinkedHashSet<>(java.util.Arrays.asList(
+                    "native-N01",
+                    "ref-C11", "ref-C12", "ref-C15", "ref-C16", "ref-C21", "ref-C22", "ref-C23",
+                    "ref-C26", "ref-C28", "ref-C30",
+                    "ref-W01", "ref-W02", "ref-W03", "ref-W04", "ref-W05",
+                    "ref-F01", "ref-F02", "ref-F03", "ref-F04", "ref-F05",
+                    "ref-A14", "ref-R01",
+                    "crimson-abyss", "healing-wings", "snowflake", "sakura-seal", "spirit-bloom",
+                    "chronos-gears", "fate-compass", "twilight-balance", "moon", "raphael",
+                    "layered", "premium", "basic", "blue", "gold", "silver", "violet", "cyan",
+                    "core", "minimal")));
+
     static boolean isValid(String id) {
         return IDS.contains(id);
     }

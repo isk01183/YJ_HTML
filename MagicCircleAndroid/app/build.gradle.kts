@@ -20,6 +20,7 @@ android {
         // Increase code for every distributed APK, including restorations and hotfixes.
         versionCode = 15
         versionName = "1.12"
+        testInstrumentationRunner = "com.yj.magiccircle.V113Instrumentation"
     }
 
     buildTypes {
