@@ -8,7 +8,7 @@ import android.util.Log
 /** Device-only checks: the host JVM cannot exercise Android Path/shader rendering. */
 object R01RenderingChecks {
     fun run() {
-        check(runCatching { WallpaperArtwork("ref-W03") }.exceptionOrNull() is IllegalArgumentException)
+        check(runCatching { WallpaperArtwork("ref-C03") }.exceptionOrNull() is IllegalArgumentException)
         val art = WallpaperArtwork("ref-R01")
         fun render(width: Int = 1024, height: Int = 1024, elapsed: Long = 0, animated: Boolean = false): Bitmap {
             art.prepare(width, height)

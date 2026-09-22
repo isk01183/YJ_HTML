@@ -21,7 +21,7 @@ class SanctuaryReviewActivity : Activity() {
     private var format = 0
     private var font = 1f
     private var forceCanvas = false
-    private var reviewR01 = false
+    private var reviewArt = 0
     private var animated = true
     private val languages = arrayOf("ko", "ja", "en")
     private val snapshots = arrayOf(
@@ -55,7 +55,7 @@ class SanctuaryReviewActivity : Activity() {
                 setOnClickListener { action(); scene.refresh() }
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        artButton("N01 / R01") { reviewR01 = !reviewR01 }
+        artButton("N01 / R01 / W03") { reviewArt = (reviewArt + 1) % 3 }
         artButton("Static / Live") { animated = !animated }
         artButton("Prepare ×20") { scene.resizeReview() }
         root.addView(artControls)
@@ -70,7 +70,9 @@ class SanctuaryReviewActivity : Activity() {
     }
     private inner class Scene : View(this@SanctuaryReviewActivity) {
         private var started = SystemClock.elapsedRealtime()
-        private val artwork = WallpaperArtwork("ref-R01")
+        private val artworks = arrayOf(WallpaperArtwork("ref-R01"), WallpaperArtwork("ref-W03"))
+        private val artwork get() = artworks[if (reviewArt == 2) 1 else 0]
+        private val artworkName get() = if (reviewArt == 2) "W03" else "R01"
         private var bitmap: Bitmap? = null
         private val background = CosmicBackgroundRenderer()
         private val circle = MagicCircleRenderer()
@@ -85,31 +87,31 @@ class SanctuaryReviewActivity : Activity() {
         fun refresh() {
             mode = ""
             started = SystemClock.elapsedRealtime()
-            designWidth = if (reviewR01) (if (format == 2) 2560 else if (format == 1) 1080 else 1024)
+            designWidth = if (reviewArt != 0) (if (format == 2) 2560 else if (format == 1) 1080 else if (reviewArt == 2) 1000 else 1024)
                 else if (format == 2) 2560 else if (format == 1) 1600 else 864
-            designHeight = if (reviewR01) (if (format == 2) 1600 else if (format == 1) 2400 else 1024)
+            designHeight = if (reviewArt != 0) (if (format == 2) 1600 else if (format == 1) 2400 else if (reviewArt == 2) 1778 else 1024)
                 else if (format == 2) 1600 else if (format == 1) 2560 else 1536
             bitmap?.recycle(); bitmap = null
-            if (reviewR01) {
+            if (reviewArt != 0) {
                 artwork.prepare(designWidth, designHeight)
                 if (forceCanvas) bitmap = Bitmap.createBitmap(designWidth, designHeight, Bitmap.Config.ARGB_8888)
             } else if (width > 0 && height > 0) background.prepare(designWidth, designHeight)
             panel.update(snapshots[state], languages[language], font)
-            contentDescription = if (reviewR01) "R01; ${if (animated) "Live" else "Static"}; ${if (forceCanvas) "Bitmap Canvas" else "Hardware Canvas"}; ${designWidth}x$designHeight"
+            contentDescription = if (reviewArt != 0) "$artworkName; ${if (animated) "Live" else "Static"}; ${if (forceCanvas) "Bitmap Canvas" else "Hardware Canvas"}; ${designWidth}x$designHeight"
                 else "${if(forceCanvas) "Canvas" else "AGSL eligible"}; ${languages[language]}; state=$state; format=$format; font=$font; ${panel.description()}"
             Log.i("SanctuaryReview", contentDescription.toString())
             invalidate()
         }
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-            if (w > 0 && h > 0 && !reviewR01) background.prepare(designWidth, designHeight)
+            if (w > 0 && h > 0 && reviewArt == 0) background.prepare(designWidth, designHeight)
         }
         fun resizeReview() {
             val before = android.os.Debug.getNativeHeapAllocatedSize()
             repeat(20) { i -> artwork.prepare(if (i % 2 == 0) 1080 else 2560, if (i % 2 == 0) 2400 else 1600) }
             artwork.prepare(designWidth, designHeight)
-            Log.i("SanctuaryReview", "R01 prepare20 nativeHeapBefore=$before nativeHeapAfter=${android.os.Debug.getNativeHeapAllocatedSize()}; renderer owns no bitmap cache")
+            Log.i("SanctuaryReview", "$artworkName prepare20 nativeHeapBefore=$before nativeHeapAfter=${android.os.Debug.getNativeHeapAllocatedSize()}")
         }
-        fun close() { bitmap?.recycle(); bitmap = null; artwork.close() }
+        fun close() { bitmap?.recycle(); bitmap = null; artworks.forEach { it.close() } }
         override fun onDraw(canvas: Canvas) {
             val scale = minOf(width.toFloat() / designWidth, height.toFloat() / designHeight)
             canvas.drawColor(0xff101010.toInt())
@@ -118,7 +120,7 @@ class SanctuaryReviewActivity : Activity() {
             canvas.scale(scale, scale)
             canvas.clipRect(0, 0, designWidth, designHeight)
             val elapsed = if (animated) SystemClock.elapsedRealtime() - started else 0L
-            if (reviewR01) {
+            if (reviewArt != 0) {
                 val pixels = bitmap
                 if (pixels == null) artwork.draw(canvas, elapsed, animated)
                 else {
@@ -128,7 +130,7 @@ class SanctuaryReviewActivity : Activity() {
                 canvas.restore()
                 if (mode.isEmpty()) {
                     mode = if (pixels != null) "Bitmap Canvas" else "hardware=${canvas.isHardwareAccelerated}"
-                    Log.i("SanctuaryReview", "R01 renderer=$mode")
+                    Log.i("SanctuaryReview", "$artworkName renderer=$mode")
                 }
                 if (animated && isAttachedToWindow && windowVisibility == VISIBLE) postInvalidateDelayed(34L)
                 return
