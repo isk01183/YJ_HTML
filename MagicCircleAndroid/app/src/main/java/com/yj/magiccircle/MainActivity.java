@@ -109,8 +109,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if ("language".equals(action)) {
-            if (uri.getQueryParameterNames().size() != 1
-                    || uri.getQueryParameters("lang").size() != 1) return;
+            if (!hasExactQuery(uri, "lang")) return;
             String language = uri.getQueryParameter("lang");
             if (!LanguageSelection.isValid(language)) return;
             WebViews.selectLanguage(this, language);
@@ -125,8 +124,48 @@ public final class MainActivity extends Activity {
             changeLibrary(library::restore, 0);
             return;
         }
-        if (uri.getQueryParameterNames().size() != 1
-                || uri.getQueryParameters("theme").size() != 1) return;
+        if ("enable".equals(action) || "disable".equals(action)) {
+            if (!hasExactQuery(uri, "theme")) return;
+            String theme = uri.getQueryParameter("theme");
+            if (!ThemeSelection.isValid(theme)) return;
+            if ("enable".equals(action)) changeLibrary(() -> library.setEnabled(theme, true), 0);
+            else if (!libraryBusy) new AlertDialog.Builder(this)
+                    .setTitle(localizedString(R.string.library_hide_title))
+                    .setMessage(localizedString(R.string.library_hide_message))
+                    .setNegativeButton(localizedString(R.string.library_cancel), null)
+                    .setPositiveButton(localizedString(R.string.library_hide),
+                            (dialog, which) -> changeLibrary(() -> library.setEnabled(theme, false), 0))
+                    .show();
+            return;
+        }
+        if ("tab-create".equals(action)) {
+            if (!hasExactQuery(uri, "name")) return;
+            String name = uri.getQueryParameter("name");
+            changeLibrary(() -> library.createTab(name), 0);
+            return;
+        }
+        if ("tab-rename".equals(action)) {
+            if (!hasExactQuery(uri, "id", "name")) return;
+            String id = uri.getQueryParameter("id"), name = uri.getQueryParameter("name");
+            changeLibrary(() -> library.renameTab(id, name), 0);
+            return;
+        }
+        if ("tab-delete".equals(action)) {
+            if (!hasExactQuery(uri, "id")) return;
+            String id = uri.getQueryParameter("id");
+            changeLibrary(() -> library.deleteTab(id), 0);
+            return;
+        }
+        if ("tab-member".equals(action)) {
+            if (!hasExactQuery(uri, "id", "theme", "member")) return;
+            String id = uri.getQueryParameter("id"), theme = uri.getQueryParameter("theme");
+            String member = uri.getQueryParameter("member");
+            if (!"0".equals(member) && !"1".equals(member)) return;
+            changeLibrary(() -> library.setTabMember(id, theme, "1".equals(member)), 0);
+            return;
+        }
+        if (!"select".equals(action) && !"preview".equals(action) && !"delete".equals(action)) return;
+        if (!hasExactQuery(uri, "theme")) return;
         String theme = uri.getQueryParameter("theme");
         if (!library.available(theme)) return;
         if ("select".equals(action)) {
@@ -143,6 +182,20 @@ public final class MainActivity extends Activity {
                             (dialog, which) -> changeLibrary(() -> library.remove(theme), 0))
                     .show();
         }
+    }
+
+    private static boolean hasExactQuery(Uri uri, String... names) {
+        String query = uri.getEncodedQuery();
+        if (query == null) return names.length == 0;
+        String[] pairs = query.split("&", -1);
+        if (pairs.length != names.length) return false;
+        for (String pair : pairs) if (pair.isEmpty() || pair.indexOf('=') < 1) return false;
+        if (uri.getQueryParameterNames().size() != names.length) return false;
+        for (String name : names) {
+            if (!uri.getQueryParameterNames().contains(name)
+                    || uri.getQueryParameters(name).size() != 1) return false;
+        }
+        return true;
     }
 
     private void updateGalleryState() {
@@ -198,6 +251,7 @@ public final class MainActivity extends Activity {
                 result = "too_large".equals(error.code) ? R.string.library_too_large
                         : "dimensions".equals(error.code) ? R.string.library_dimensions : R.string.library_invalid;
             } catch (MediaLibrary.CleanupPending error) { result = R.string.library_cleanup_pending; }
+            catch (IllegalArgumentException error) { result = R.string.library_invalid_change; }
             catch (IOException | RuntimeException error) { result = R.string.library_storage_error; }
             final int messageId = result;
             LIBRARY_UI.post(() -> {

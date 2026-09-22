@@ -29,15 +29,13 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     assert.equal(await page.locator('#hero-title').textContent(),media[0].name,'Imported names must remain plain text');
     assert.equal(await page.locator('#hero-title img').count(),0);
     assert.equal(await page.locator('#import-media').isEnabled(),true);
-    assert.equal(await page.locator('#restore-designs').isVisible(),true);
+    assert.equal(await page.locator('#manage-inactive').isVisible(),true);
     assert.equal(await page.locator('#delete-design').isEnabled(),true);
     assert.equal(await page.locator('#hero-art img').getAttribute('src'),mediaUrl+'?thumb=1');
     await page.evaluate(({id,media})=>window.setGalleryState({selected:id,language:'ko',enabled:true,busy:true,hidden:['classic','moon'],media}),{id,media});
     assert.equal(await page.locator('#import-media').isDisabled(),true,'An in-flight import must disable duplicate operations');
     assert.equal(await page.locator('#delete-design').isDisabled(),true);
     await page.evaluate(({id,media})=>window.setGalleryState({selected:id,language:'ko',enabled:true,busy:false,hidden:['classic','moon'],media}),{id,media});
-    await page.locator('[data-group="uploads"]').click();
-    assert.equal(await page.locator('.card:visible').count(),1);
     await page.locator('#search').fill('여행');
     assert.equal(await page.locator('.card:visible').count(),1);
     // The native delete round trip removes the selected item. No stale preview may remain.
@@ -47,7 +45,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     assert.equal(await page.locator('#apply').isDisabled(),true);
     assert.equal(await page.locator('#delete-design').isDisabled(),true);
     assert.equal(await page.locator('#hero-art img,#hero-art svg').count(),0);
-    // Restore must immediately recover a valid selection even after an entirely empty library.
+    // A returned Android state must immediately recover a valid selection after an empty library.
     await page.evaluate(()=>window.setGalleryState({selected:'classic',language:'en',enabled:true,hidden:[],media:[]}));
     await page.locator('[data-group="all"]').click(); await page.locator('#search').fill('');
     assert.equal(await page.locator('.card:visible').count(),builtins.length);
@@ -68,7 +66,9 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     await page.goto(file('gallery.html')+'?lang=ko');
     page.once('dialog', dialog=>dialog.accept()); await page.locator('#delete-design').click();
     assert.equal(await page.locator('[data-theme="native-N01"]').isVisible(),false);
-    await page.locator('#restore-designs').click();
+    await page.locator('#manage-inactive').click();
+    await page.locator('[data-enable-theme="native-N01"]').click();
+    await page.locator('#close-inactive').click();
     assert.equal(await page.locator('[data-theme="native-N01"]').isVisible(),true);
     for(const language of ['ko','ja','en']) {
       await page.goto(file('media_circle.html')+'?media='+id+'&lang='+language+'&battery=78&mime=image%2Fjpeg');
@@ -117,6 +117,6 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
       assert.equal(await redOrBlue(),'blue','Readiness retries must not restart a running GIF');
     }
     assert.deepEqual(errors,[]);
-    console.log('MEDIA_BROWSER_OK: import UI, safe names, hide/delete/restore, empty library, 3 languages, 7s offline media');
+    console.log('MEDIA_BROWSER_OK: import UI, safe names, disable/delete/enable, empty library, 3 languages, 7s offline media');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

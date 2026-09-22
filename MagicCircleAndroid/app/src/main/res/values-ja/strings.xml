@@ -19,4 +19,5 @@
     <string name="library_hide">非表示</string>
     <string name="library_cancel">キャンセル</string>
     <string name="library_cleanup_pending">一覧から削除しました。次回アプリを開いたときに内部コピーの削除を再試行します。元のファイルは変更されません。</string>
+    <string name="library_invalid_change">無効な一覧変更です。画面を開き直して、もう一度お試しください。</string>
 </resources>

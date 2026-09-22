@@ -19,4 +19,5 @@
     <string name="library_hide">Hide</string>
     <string name="library_cancel">Cancel</string>
     <string name="library_cleanup_pending">Removed from the list. The app will retry deleting its private copies when opened again. Your original file is unchanged.</string>
+    <string name="library_invalid_change">That library change is not valid. Refresh the screen and try again.</string>
 </resources>

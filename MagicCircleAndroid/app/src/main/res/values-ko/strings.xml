@@ -19,4 +19,5 @@
     <string name="library_hide">숨기기</string>
     <string name="library_cancel">취소</string>
     <string name="library_cleanup_pending">목록에서 제거했습니다. 앱을 다시 열면 앱 내부 복사본 삭제를 재시도합니다. 원본 파일은 그대로 보존합니다.</string>
+    <string name="library_invalid_change">올바르지 않은 목록 변경입니다. 화면을 새로 연 뒤 다시 시도해 주세요.</string>
 </resources>

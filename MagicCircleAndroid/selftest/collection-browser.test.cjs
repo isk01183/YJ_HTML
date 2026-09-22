@@ -15,13 +15,13 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
   });
   await page.goto(url('gallery.html')+'?lang=ko');
   assert.equal(await page.locator('.card').count(),174);
-  await page.locator('[data-group=reference]').click();assert.equal(await page.locator('.card:visible').count(),118);
   await page.locator('#search').fill('C03');assert.equal(await page.locator('.card:visible').count(),1);
   await page.locator('[data-theme="ref-C03"]').click();
   assert.equal(await page.locator('#hero-art [data-direct-circle="C03"]').count(),1);
   page.once('dialog',d=>d.accept());await page.locator('#delete-design').click();
   assert.equal(await page.locator('[data-theme="ref-C03"]').count(),0);
-  await page.locator('#restore-designs').click();assert.equal(await page.locator('[data-theme="ref-C03"]').count(),1);
+  await page.locator('#manage-inactive').click();await page.locator('[data-enable-theme="ref-C03"]').click();await page.locator('#close-inactive').click();
+  assert.equal(await page.locator('[data-theme="ref-C03"]').count(),1);
   await page.evaluate(()=>window.setGalleryState({selected:'',language:'ko',hidden:CircleDesigns.list.map(t=>t.id),media:[]}));
   assert.equal(await page.locator('#selection-status').textContent(),'선택된 항목이 없습니다','Upgrade must preserve explicitly disabled playback');
   assert.equal(await page.locator('.applied-badge:visible').count(),0);
@@ -53,6 +53,6 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
    await page.setViewportSize({width,height:900});await page.goto(url('gallery.html')+'?lang=en');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   }
-  assert.deepEqual(errors,[]);console.log('COLLECTION_BROWSER_OK: 174 choices, 118 filter, removal/restore, 3 languages, bounded replay, offline SVG route');
+  assert.deepEqual(errors,[]);console.log('COLLECTION_BROWSER_OK: 174 unified choices, search, disable/enable, 3 languages, bounded replay, offline SVG route');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
