@@ -2,6 +2,9 @@ package com.yj.magiccircle
 
 import android.app.Activity
 import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Build
 import android.os.SystemClock
@@ -20,8 +23,9 @@ class SanctuaryReviewActivity : Activity() {
     private var forceCanvas = false
     private val languages = arrayOf("ko", "ja", "en")
     private val snapshots = arrayOf(
+        ChargeSnapshot(0, 0f, 7, 3, 0), ChargeSnapshot(9, 32.5f, 2, 4, 0),
         ChargeSnapshot(69, 32.5f, 2, 4, 0), ChargeSnapshot(100, 0f, 2, 5, 2),
-        ChargeSnapshot(0, 0f, 7, 3, 0), ChargeSnapshot(null, null, null, null, null))
+        ChargeSnapshot(null, null, null, null, null))
     private lateinit var scene: Scene
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,10 +41,10 @@ class SanctuaryReviewActivity : Activity() {
             controls.addView(Button(this).apply { text = label; textSize = 10f; setPadding(0, 0, 0, 0); setOnClickListener { action(); scene.refresh() } }, LinearLayout.LayoutParams(0, 48 * resources.displayMetrics.density.toInt(), 1f))
         }
         button("KO/JA/EN") { language = (language + 1) % 3 }
-        button("69/100/0/?") { state = (state + 1) % 4 }
+        button("0/9/69/100/?") { state = (state + 1) % snapshots.size }
         button("Canvas") { forceCanvas = !forceCanvas }
         button("크기") { format = (format + 1) % 3 }
-        button("글자") { font = if (font == 1f) 2f else 1f }
+        button("글자") { font = when (font) { 1f -> 1.3f; 1.3f -> 2f; else -> 1f } }
         root.addView(controls)
         scene = Scene()
         root.addView(scene, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -52,6 +56,9 @@ class SanctuaryReviewActivity : Activity() {
         private val background = CosmicBackgroundRenderer()
         private val circle = MagicCircleRenderer()
         private val panel = ChargeStatusPanelRenderer()
+        private val glyphBounds = Rect()
+        private val boundsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xffff4050.toInt(); style = Paint.Style.STROKE; strokeWidth = 1f }
+        private val centerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xff40ffdf.toInt(); style = Paint.Style.STROKE; strokeWidth = 1f }
         private var first = true
         private var mode = ""
         private var designWidth = 864
@@ -91,9 +98,36 @@ class SanctuaryReviewActivity : Activity() {
             canvas.scale(frame.scale, frame.scale)
             circle.draw(canvas, SanctuaryLayout.goldAngle(elapsed), SanctuaryLayout.blueAngle(elapsed))
             panel.draw(canvas)
+            drawGlyphReview(canvas)
             canvas.restore()
             if (first) { Log.i("SanctuaryReview", "firstDrawMs=${SystemClock.elapsedRealtime()-started} hardware=${canvas.isHardwareAccelerated}"); first = false }
             if (isAttachedToWindow && windowVisibility == VISIBLE) postInvalidateOnAnimation()
+        }
+
+        private fun drawGlyphReview(canvas: Canvas) {
+            val percent = snapshots[state].percent
+            val number = percent?.toString() ?: "—"
+            val suffix = if (percent == null) "" else "%"
+            val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 104f * font; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL) }
+            val suffixPaint = Paint(numberPaint).apply { textSize = 42f * font }
+            val gap = if (suffix.isEmpty()) 0f else 8f
+            val groupWidth = numberPaint.measureText(number) + suffixPaint.measureText(suffix) + gap
+            val factor = minOf(1f, 214f / groupWidth, 111f / (numberPaint.fontMetrics.descent - numberPaint.fontMetrics.ascent))
+            numberPaint.textSize *= factor
+            suffixPaint.textSize *= factor
+            val numberWidth = numberPaint.measureText(number)
+            val width = numberWidth + suffixPaint.measureText(suffix) + gap * factor
+            val x = SanctuaryLayout.centeredLeft(width, SanctuaryLayout.CENTER_X)
+            numberPaint.getTextBounds(number, 0, number.length, glyphBounds)
+            val baseline = SanctuaryLayout.centeredBaseline(glyphBounds.top.toFloat(), glyphBounds.bottom.toFloat(), SanctuaryLayout.CENTER_Y)
+            canvas.drawRect(x + glyphBounds.left, baseline + glyphBounds.top, x + glyphBounds.right, baseline + glyphBounds.bottom, boundsPaint)
+            if (suffix.isNotEmpty()) {
+                suffixPaint.getTextBounds(suffix, 0, suffix.length, glyphBounds)
+                val suffixX = x + numberWidth + gap * factor
+                canvas.drawRect(suffixX + glyphBounds.left, baseline + glyphBounds.top, suffixX + glyphBounds.right, baseline + glyphBounds.bottom, boundsPaint)
+            }
+            canvas.drawLine(SanctuaryLayout.CENTER_X - SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_Y, SanctuaryLayout.CENTER_X + SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_Y, centerPaint)
+            canvas.drawLine(SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y - SanctuaryLayout.CORE_RADIUS, SanctuaryLayout.CENTER_X, SanctuaryLayout.CENTER_Y + SanctuaryLayout.CORE_RADIUS, centerPaint)
         }
     }
 }

@@ -18,6 +18,9 @@ object SanctuaryLayout {
         return Frame(scale, (width - DESIGN_WIDTH * scale) / 2f, (height - DESIGN_HEIGHT * scale) / 2f)
     }
 
+    fun centeredBaseline(ascent: Float, descent: Float, centerY: Float): Float = centerY - (ascent + descent) / 2f
+    fun centeredLeft(width: Float, centerX: Float): Float = centerX - width / 2f
+
     fun goldAngle(elapsed: Long): Float = (elapsed.coerceAtLeast(0) % 180000L) * (360f / 180000f)
     fun blueAngle(elapsed: Long): Float = -(elapsed.coerceAtLeast(0) % 240000L) * (360f / 240000f)
 

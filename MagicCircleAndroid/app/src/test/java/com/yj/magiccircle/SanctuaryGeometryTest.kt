@@ -7,6 +7,20 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 class SanctuaryGeometryTest {
+    @Test fun batteryGlyphBoundsAreCenteredOnTheCore() {
+        assertEquals(748f, SanctuaryLayout.centeredBaseline(-80f, 20f, 718f), 0f)
+    }
+
+    @Test fun combinedBatteryGroupHasEqualHorizontalMargins() {
+        val numberWidth = 126f
+        val suffixWidth = 24f
+        val gap = 8f
+        val groupWidth = numberWidth + suffixWidth + gap
+        val left = SanctuaryLayout.centeredLeft(groupWidth, SanctuaryLayout.CENTER_X)
+        val right = left + groupWidth
+        assertEquals(SanctuaryLayout.CENTER_X - left, right - SanctuaryLayout.CENTER_X, 0f)
+    }
+
     @Test fun closedTriangleReturnsToItsActualStart() {
         val points = SanctuaryLayout.polygon(300f, 3, 1, -90f)
         assertEquals(8, points.size)

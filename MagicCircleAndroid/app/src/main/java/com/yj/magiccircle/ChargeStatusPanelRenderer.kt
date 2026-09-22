@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Picture
+import android.graphics.Rect
 import android.graphics.Typeface
 import java.util.Locale
 
@@ -14,6 +15,7 @@ class ChargeStatusPanelRenderer {
     private val sans = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     private val runs = ArrayList<TextRun>(12)
     private val decoration = Picture()
+    private val batteryDecoration = Picture()
     private var spoken = ""
 
     init {
@@ -22,7 +24,6 @@ class ChargeStatusPanelRenderer {
         val lines = Path().apply {
             moveTo(194f, 229f); lineTo(670f, 229f)
             moveTo(171f, 1215f); lineTo(693f, 1215f)
-            moveTo(346f, 776f); lineTo(518f, 776f)
             moveTo(306f, 1307f); lineTo(306f, 1430f)
             moveTo(558f, 1307f); lineTo(558f, 1430f)
         }
@@ -96,22 +97,7 @@ class ChargeStatusPanelRenderer {
         addText(subtitle, 432f, 252f, 530f, 25f * scale, 33f)
         addText(footer, 432f, 1244f, 590f, 27f * scale, 36f)
 
-        // Fit number and percent as a single measured group; 100% must remain centered.
-        val number = snapshot.percent?.toString() ?: "—"
-        val suffix = if (snapshot.percent == null) "" else "%"
-        val numberPaint = textPaint(104f * scale, true)
-        val suffixPaint = textPaint(42f * scale, true)
-        val gap = if (suffix.isEmpty()) 0f else 8f
-        val groupWidth = numberPaint.measureText(number) + suffixPaint.measureText(suffix) + gap
-        val factor = minOf(1f, 214f / groupWidth, 111f / (numberPaint.fontMetrics.descent - numberPaint.fontMetrics.ascent))
-        numberPaint.textSize *= factor
-        suffixPaint.textSize *= factor
-        val numberWidth = numberPaint.measureText(number)
-        val width = numberWidth + suffixPaint.measureText(suffix) + gap * factor
-        val x = 432f - width / 2f
-        runs.add(TextRun(number, x, 754f, numberPaint))
-        runs.add(TextRun(suffix, x + numberWidth + gap * factor, 754f, suffixPaint))
-        addText(if (snapshot.plugged == 0) connection else status, 432f, 795f, 214f, 23f * scale, 31f)
+        addBattery(snapshot.percent, if (snapshot.plugged == 0) connection else status, scale)
         addText(temperature, 174f, 1327f, 224f, 40f * scale, 49f)
         addText(health, 432f, 1327f, 220f, 38f * scale, 49f)
         addText(connection, 690f, 1327f, 224f, 34f * scale, 49f)
@@ -123,6 +109,7 @@ class ChargeStatusPanelRenderer {
 
     fun draw(canvas: Canvas) {
         canvas.drawPicture(decoration)
+        canvas.drawPicture(batteryDecoration)
         for (i in runs.indices) {
             val run = runs[i]
             canvas.drawText(run.text, run.x, run.baseline, run.paint)
@@ -135,6 +122,31 @@ class ChargeStatusPanelRenderer {
         color = if (useSerif) 0xfffff4d8.toInt() else 0xffded8c5.toInt()
         textSize = size
         typeface = if (useSerif) serif else sans
+    }
+
+    private fun addBattery(percent: Int?, status: String, scale: Float) {
+        val number = percent?.toString() ?: "—"
+        val suffix = if (percent == null) "" else "%"
+        val numberPaint = textPaint(104f * scale, true)
+        val suffixPaint = textPaint(42f * scale, true)
+        val gap = if (suffix.isEmpty()) 0f else 8f
+        val groupWidth = numberPaint.measureText(number) + suffixPaint.measureText(suffix) + gap
+        val factor = minOf(1f, 214f / groupWidth, 111f / (numberPaint.fontMetrics.descent - numberPaint.fontMetrics.ascent))
+        numberPaint.textSize *= factor
+        suffixPaint.textSize *= factor
+        val numberWidth = numberPaint.measureText(number)
+        val width = numberWidth + suffixPaint.measureText(suffix) + gap * factor
+        val x = SanctuaryLayout.centeredLeft(width, SanctuaryLayout.CENTER_X)
+        val bounds = Rect().also { numberPaint.getTextBounds(number, 0, number.length, it) }
+        val baseline = SanctuaryLayout.centeredBaseline(bounds.top.toFloat(), bounds.bottom.toFloat(), SanctuaryLayout.CENTER_Y)
+        runs.add(TextRun(number, x, baseline, numberPaint))
+        runs.add(TextRun(suffix, x + numberWidth + gap * factor, baseline, suffixPaint))
+
+        val dividerY = maxOf(776f, baseline + bounds.bottom + 8f)
+        val canvas = batteryDecoration.beginRecording(864, 1536)
+        SanctuaryInk().glow(canvas, Path().apply { moveTo(346f, dividerY); lineTo(518f, dividerY) }, SanctuaryInk.GOLD, .7f)
+        batteryDecoration.endRecording()
+        addText(status, SanctuaryLayout.CENTER_X, dividerY + 19f, 214f, 23f * scale, 31f)
     }
 
     private fun addText(text: String, center: Float, top: Float, width: Float, size: Float, height: Float, useSerif: Boolean = true) {
