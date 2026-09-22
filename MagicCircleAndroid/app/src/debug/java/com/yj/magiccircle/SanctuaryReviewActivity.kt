@@ -104,7 +104,7 @@ class SanctuaryReviewActivity : Activity() {
         }
 
         private fun drawGlyphReview(canvas: Canvas) {
-            val layout = panel.batteryLayout
+            val layout = panel.batteryLayout ?: return
             for (run in listOfNotNull(layout.number, layout.suffix)) {
                 run.paint.getTextBounds(run.text, 0, run.text.length, glyphBounds)
                 canvas.drawRect(

@@ -17,7 +17,7 @@ class ChargeStatusPanelRenderer {
     private val runs = ArrayList<TextRun>(12)
     private val decoration = Picture()
     private val batteryDecoration = Picture()
-    internal lateinit var batteryLayout: BatteryTextLayout
+    internal var batteryLayout: BatteryTextLayout? = null
         private set
     private var spoken = ""
 
@@ -117,8 +117,10 @@ class ChargeStatusPanelRenderer {
             val run = runs[i]
             canvas.drawText(run.text, run.x, run.baseline, run.paint)
         }
-        canvas.drawText(batteryLayout.number.text, batteryLayout.number.x, batteryLayout.number.baseline, batteryLayout.number.paint)
-        batteryLayout.suffix?.let { canvas.drawText(it.text, it.x, it.baseline, it.paint) }
+        batteryLayout?.let { layout ->
+            canvas.drawText(layout.number.text, layout.number.x, layout.number.baseline, layout.number.paint)
+            layout.suffix?.let { canvas.drawText(it.text, it.x, it.baseline, it.paint) }
+        }
     }
 
     fun description(): String = spoken

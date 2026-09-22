@@ -10,6 +10,7 @@ class V113Instrumentation : android.app.Instrumentation() {
         val result = android.os.Bundle()
         try {
             LibraryStorageChecks.run(targetContext)
+            ChargeStatusPanelChecks.run()
             result.putString("stream", "V113_CHECKS_OK")
             finish(android.app.Activity.RESULT_OK, result)
         } catch (error: Throwable) {

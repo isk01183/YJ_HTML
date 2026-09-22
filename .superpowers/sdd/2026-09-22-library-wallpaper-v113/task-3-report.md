@@ -83,3 +83,20 @@ Expected failure, exit 1: `SanctuaryLayout.batteryPlacement` was unresolved befo
 
 - One measured production layout now drives both drawing and debug inspection; no factory, interface, dependency, or debug overlay was moved into the release source set.
 - No device installation or other device mutation was performed. The hardware visual matrix remains the same explicit pending item above.
+
+## Review fix round 2
+
+- Replaced the `lateinit` battery layout with a nullable value and guarded both the production draw path and debug overlay. A temporarily absent layout now preserves the renderer's former safe empty-draw behavior instead of throwing `UninitializedPropertyAccessException`.
+- Added `ChargeStatusPanelChecks`, an instrumentation regression that clears the layout, draws the renderer onto a real bitmap-backed Android `Canvas`, and requires the draw to return normally. The existing instrumentation runner invokes it after the storage checks.
+
+### Verification
+
+Command:
+
+`./gradlew.bat testDebugUnitTest --tests '*SanctuaryGeometryTest' assembleDebug assembleDebugAndroidTest --offline`
+
+Result: `BUILD SUCCESSFUL` (3 s), exit 0. The focused JVM geometry tests passed, and both the debug app APK and instrumentation APK compiled and assembled. `javap` confirmed the Kotlin backing field remains named `batteryLayout`, matching the regression's reflection target. `git diff --check` reported no whitespace errors beyond existing LF-to-CRLF checkout warnings.
+
+The Android Canvas regression could not be executed without installing updated APKs; device mutation remains prohibited pending the existing user consent. Against the previous code, setting the backing field to null reaches the unguarded `lateinit` getter and throws; the new nullable draw guard is the minimal production change. No device result is claimed.
+
+`graphify update .` completed after the source change with 775 nodes, 1420 edges, and 51 communities; generated graph files remain excluded from the commit.
