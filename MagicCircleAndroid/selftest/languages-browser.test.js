@@ -14,10 +14,17 @@ const url = name => pathToFileURL(path.join(assets,name)).href;
         const errors=[]; page.on('pageerror', error=>errors.push(error.message));
         await page.goto(url('gallery.html'));
         assert.equal(await page.locator('[data-language]').count(),3, 'Three in-app language choices must be available');
-        for (const [language,title,charging] of [['ko','마법진 보관함','충전 시작'],['en','The Arcane Archive','Charging begins'],['ja','魔法陣の書庫','充電開始']]) {
+        for (const [language,title,charging,manageInactive,createTab] of [
+            ['ko','마법진 보관함','충전 시작','비활성 도안 관리','＋ 탭 만들기'],
+            ['en','The Arcane Archive','Charging begins','Manage inactive designs','＋ Create tab'],
+            ['ja','魔法陣の書庫','充電開始','非表示デザインを管理','＋ タブを作成']
+        ]) {
             await page.locator('[data-language="'+language+'"]').click();
             assert.equal(await page.locator('h1').textContent(),title);
             assert.equal(await page.locator('html').getAttribute('lang'),language);
+            assert.equal(await page.locator('#manage-inactive').textContent(),manageInactive);
+            assert.equal(await page.locator('#create-tab').textContent(),createTab);
+            assert.equal(await page.locator('#gallery-tabs [data-group]').count(),1,'Unified gallery must not restore fixed category tabs');
             await page.locator('[data-theme="raphael"]').click();
             await page.locator('#preview').click();
             const frame = page.frameLocator('#browser-preview iframe');
