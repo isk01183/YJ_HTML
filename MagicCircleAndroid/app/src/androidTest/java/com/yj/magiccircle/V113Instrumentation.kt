@@ -11,6 +11,7 @@ class V113Instrumentation : android.app.Instrumentation() {
         try {
             LibraryStorageChecks.run(targetContext)
             ChargeStatusPanelChecks.run()
+            R01RenderingChecks.run()
             result.putString("stream", "V113_CHECKS_OK")
             finish(android.app.Activity.RESULT_OK, result)
         } catch (error: Throwable) {
