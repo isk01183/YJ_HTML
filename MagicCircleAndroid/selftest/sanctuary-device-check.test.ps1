@@ -3,6 +3,7 @@ $global:LASTEXITCODE = 0
 $calls = [Collections.Generic.List[string]]::new()
 $deviceCount = 1
 $version = '1.13'
+$versionCode = '16'
 $crash = ''
 $gfx = 'Total frames rendered: 100'
 function FakeAdb {
@@ -10,7 +11,7 @@ function FakeAdb {
     $calls.Add($command)
     switch -Wildcard ($command) {
         'devices -l' { 'List of devices attached'; 1..$deviceCount | ForEach-Object { "device$_ device model:TEST" } }
-        '*dumpsys package*' { "versionName=$version"; 'versionCode=16' }
+        '*dumpsys package*' { "versionName=$version"; "versionCode=$versionCode minSdk=23 targetSdk=37" }
         '*pidof*' { '123' }
         '*logcat*' { $crash }
         '*gfxinfo*' { $gfx }
@@ -33,6 +34,11 @@ $rejected = $false
 try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'version differs' }
 if (!$rejected) { throw 'Stale installed version must be rejected' }
 $version = '1.13'
+$versionCode = '15'
+$rejected = $false
+try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'version code differs' }
+if (!$rejected) { throw 'Stale installed version code must be rejected' }
+$versionCode = '16'
 $crash = 'FATAL EXCEPTION: main'
 $rejected = $false
 try { & "$PSScriptRoot/sanctuary-device-check.ps1" -Adb FakeAdb } catch { $rejected = $_ -match 'App crash detected' }

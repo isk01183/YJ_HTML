@@ -42,7 +42,7 @@ W03/R01의 보존된 SVG 페이지는 제품의 충전 renderer가 아니라 브
 | JVM unit | 41 tests, failures 0, errors 0, skipped 0 |
 | Android build | `testDebugUnitTest`, `lintDebug`, `assembleDebug`, `assembleDebugAndroidTest`, `assembleRelease` 성공 |
 | JavaScript/browser | 16개 selftest 모두 성공. 118개 실제 SVG 렌더, 174개 catalog, 43/131 활성 정책, 세 언어, offline, 7초, wallpaper UI 포함 |
-| PowerShell | device diagnostics와 가짜 ADB device checker 성공; `magic-circle-design.ps1`은 SVG 브라우저/참고 비교기로 성공 |
+| PowerShell | device diagnostics와 가짜 ADB device checker 성공. checker는 설치본의 1.13 이름과 code16을 각각 거부 조건으로 검사한다. `magic-circle-design.ps1`은 SVG 브라우저/참고 비교기로 성공 |
 | APK assets | contour archive 없음, 공유 asset이 source와 동일, 썸네일 118개 |
 | 실제 APK manifest | debug/release 모두 1.13/code16, min23/target37, `INTERNET` 없음. W03/R01 service 모두 `android.permission.BIND_WALLPAPER`로 보호 |
 | release 분리 | release APK manifest/dex에 `SanctuaryReviewActivity`와 `V113Instrumentation` 없음; release `DebugReview`는 동작 없는 stub |

@@ -1,4 +1,4 @@
-param([string]$Adb = 'adb', [string]$ExpectedVersion = '1.13')
+param([string]$Adb = 'adb', [string]$ExpectedVersion = '1.13', [long]$ExpectedVersionCode = 16)
 $ErrorActionPreference = 'Stop'
 $devices = @((& $Adb devices -l) | Where-Object { $_ -match '^\S+\s+device\b' })
 if ($LASTEXITCODE -ne 0 -or $devices.Count -ne 1) { throw 'Connect exactly one authorized device.' }
@@ -11,6 +11,10 @@ function Read-Device {
 $package = (Read-Device shell dumpsys package com.yj.magiccircle) -join "`n"
 $package -split "`n" | Select-String 'versionName=|versionCode=' | ForEach-Object { $_.Line.Trim() }
 if ($package -notmatch ('versionName=' + [regex]::Escape($ExpectedVersion) + '(\s|$)')) { throw 'Installed version differs from expected version.' }
+$actualVersionCode = [regex]::Match($package, '(?m)^\s*versionCode=(\d+)\b')
+if (!$actualVersionCode.Success -or [long]$actualVersionCode.Groups[1].Value -ne $ExpectedVersionCode) {
+    throw 'Installed version code differs from expected version code.'
+}
 $appPid = ((Read-Device shell pidof com.yj.magiccircle) -join '').Trim()
 if (!$appPid) { throw 'App process is not running; open the app manually.' }
 "PID=$appPid"
