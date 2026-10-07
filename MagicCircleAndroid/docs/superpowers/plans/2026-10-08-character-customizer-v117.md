@@ -31,7 +31,7 @@
 4. v1.16 저장자료·적용 스냅샷 업그레이드와 쓰기 실패: 기존 정상 데이터 및 원본 파일을 보존해야 한다. 작업 1·4에서 검사.
 5. 화면 회전·가림·닫기·최소 SDK 경로: 렌더링 재개/정지와 자원 해제가 정확해야 하며 이전 콜백이 새 화면을 덮지 않아야 한다. 작업 2·3·5에서 검사.
 
-## 작업 1 — 캐릭터 설정·검증·보관함
+## Task 1 — 캐릭터 설정·검증·보관함
 
 **Files:** 새 `app/src/main/java/com/yj/magiccircle/CharacterDefinition.kt`, `CharacterStore.kt`; 새 `app/src/test/java/com/yj/magiccircle/CharacterRulesTest.kt`; 새 `app/src/androidTest/java/com/yj/magiccircle/CharacterStorageChecks.kt`; 수정 `V113Instrumentation.kt`(같은 androidTest 폴더).
 
@@ -61,7 +61,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 - [ ] 단위 테스트 통과 후 `CharacterStorageChecks`에서 JSON 왕복, 새 인스턴스 복원, 복제 독립성, 초안/저장본 분리, 손상 파일 보존, AtomicFile 실패 주입 시 이전 파일 유지 확인. 기기 전용 임시 테스트 폴더만 사용한다.
 - [ ] 변경 파일만 명시적으로 커밋: `feat: add validated offline character presets`.
 
-## 작업 2 — 실제 벡터 부품·체형·동작 렌더러
+## Task 2 — 실제 벡터 부품·체형·동작 렌더러
 
 **Files:** 새 `app/src/main/java/com/yj/magiccircle/CharacterGeometry.kt`, `CharacterParts.kt`, `CharacterRenderer.kt`; 새 `app/src/test/java/com/yj/magiccircle/CharacterGeometryTest.kt`; 새 `app/src/androidTest/java/com/yj/magiccircle/CharacterRenderingChecks.kt`; 러너에 `character-render` 등록.
 
@@ -74,7 +74,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 - [ ] 계측에서 `static(t=0)==static(t=5000)`, `live(t=0)==static(t=0)`, 동작별 후속 프레임 차이, update 뒤 다른 렌더러 불변, close 반복 안전을 검사한다. 전신·얼굴·장비·최소/최대 체형 캡처를 실제로 열어 기준 시안과 비교하고 관절 틈/직선 인형/부품 누락을 수정한다. 픽셀 차이만으로 품질 합격을 선언하지 않는다.
 - [ ] 관련 테스트 통과 및 비교 캡처 후 해당 파일만 커밋: `feat: render layered customizable fantasy characters`.
 
-## 작업 3 — 관리·커스터마이징 실사용 화면
+## Task 3 — 관리·커스터마이징 실사용 화면
 
 **Files:** 새 `app/src/main/java/com/yj/magiccircle/CharacterActivity.kt`, `CharacterPreviewView.kt`; 수정 `MainActivity.java`, `app/src/main/AndroidManifest.xml`, `app/src/main/assets/gallery.html`, `gallery.js`, `i18n.js`; 새 `app/src/androidTest/java/com/yj/magiccircle/CharacterEditorChecks.kt`; 러너에 `character-editor` 등록.
 
@@ -86,7 +86,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 - [ ] 이름·체형 등 마지막 유효 초안을 저장하고 저장/버리기/계속 편집을 구분한다. lifecycle stop에서 프레임 중지, 재개 때 단일 루프 재시작, close에서 콜백 제거. 늦은 저장/썸네일 응답에는 현재 캐릭터/화면 세대 검사를 한다. UI 저장 실패는 기존 데이터 유지와 오류 표시로 처리한다.
 - [ ] 휴대전화와 태블릿에서 폰트 확대·키보드·3개 언어·전체 부품과 슬롯을 실제 조작한다. 취소/초기화가 다른 슬롯의 선택·색을 바꾸지 않는지 확인한다. 단위/계측 통과 후 해당 파일만 커밋: `feat: add character wardrobe and body editor`.
 
-## 작업 4 — 전용 레이어·배경화면·구버전 데이터 호환
+## Task 4 — 전용 레이어·배경화면·구버전 데이터 호환
 
 **Files:** 수정 `app/src/main/java/com/yj/magiccircle/ScreenScene.kt`, `MediaLibrary.java`, `LayeredSceneRenderer.kt`, `ScreenEditorView.kt`, `ScreenEditorActivity.kt`, `ChargingSceneView.kt`, `WallpaperArtwork.kt`, `UploadedWallpaperStore.kt`, `app/src/main/assets/gallery.js`; 수정 `app/src/test/java/com/yj/magiccircle/ScreenSceneTest.kt`; 새 `app/src/androidTest/java/com/yj/magiccircle/CharacterSceneChecks.kt`; 기존 `SceneStorageChecks.kt`, `SceneWallpaperChecks.kt`, `EditorGestureChecks.kt`와 `selftest/wallpaper-browser.test.cjs` 확장; 러너에 `character-scene` 등록.
 
@@ -105,7 +105,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 - [ ] 배경화면 작품의 편집 미리보기는 충전 duration 제한 없이 닫기 버튼까지 유지되게 구분한다. 기존 ChargingSceneView의 deadline을 길게 늘리는 우회 대신 WallpaperArtwork를 사용하는 배경화면 전용 미리보기 생명주기로 처리한다. 실제 적용은 기존 WallpaperController를 재사용하고 사용자 확인 없이 호출하지 않는다.
 - [ ] 관련 단위/전체 계측을 통과시키고 기존 이미지·GIF·마법진·충전 단계 기능 회귀 검사. 변경 파일만 커밋: `feat: place independent character layers in wallpapers`.
 
-## 작업 5 — 품질 확인·버전 증가·모바일 배포
+## Task 5 — 품질 확인·버전 증가·모바일 배포
 
 **Files:** 수정 `app/build.gradle.kts`, 저장소 루트 `.github/workflows/android-debug.yml`; 새 `docs/V1_17_KO.md` 및 검증 캡처. 필요 시 앞 단계의 실제 실패 원인이 있는 파일만 수정한다.
 
