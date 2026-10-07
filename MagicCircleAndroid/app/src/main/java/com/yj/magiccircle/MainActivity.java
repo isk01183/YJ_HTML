@@ -170,6 +170,20 @@ public final class MainActivity extends Activity {
             changeLibrary(library::restore, 0);
             return;
         }
+        if ("editor-material".equals(action)) {
+            if (!hasExactQuery(uri, "theme") || libraryBusy) return;
+            String theme = uri.getQueryParameter("theme");
+            if (!MediaValidation.isId(theme) || library.find(theme) == null
+                    || !library.available(theme) || library.editorOnly(theme)) return;
+            new AlertDialog.Builder(this)
+                    .setTitle(localizedString(R.string.library_editor_material_title))
+                    .setMessage(localizedString(R.string.library_editor_material_message))
+                    .setNegativeButton(localizedString(R.string.library_cancel), null)
+                    .setPositiveButton(localizedString(R.string.library_hide),
+                            (dialog, which) -> changeLibrary(() -> library.setEditorOnly(theme, true), 0))
+                    .show();
+            return;
+        }
         if ("enable".equals(action) || "disable".equals(action)) {
             if (!hasExactQuery(uri, "theme")) return;
             String theme = uri.getQueryParameter("theme");
@@ -332,10 +346,11 @@ public final class MainActivity extends Activity {
     }
 
     private void showPreview(String theme) {
+        MediaLibrary library = MediaLibrary.get(this);
+        if (!library.available(theme) || library.editorOnly(theme)) return;
         dismissPreview();
         Dialog dialog = new Dialog(this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
         FrameLayout root = new FrameLayout(this);
-        MediaLibrary library = MediaLibrary.get(this);
         ChargingSceneView scene = new ChargingSceneView(this, theme, library.chargeInfo(theme));
         root.addView(scene, new FrameLayout.LayoutParams(-1, -1));
         Button close = new Button(this);

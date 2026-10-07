@@ -19,6 +19,8 @@
     <string name="library_hide_message">This design will be hidden from the list. Restore built-ins brings it back.</string>
     <string name="library_delete">Delete app copy</string>
     <string name="library_hide">Hide</string>
+    <string name="library_editor_material_title">Hide as editor material?</string>
+    <string name="library_editor_material_message">Hide this image from the charging and wallpaper lists and custom tabs. No files will be deleted. It remains available as an editor material, and existing saved scenes stay unchanged. If it is your active charging design, the selection switches to another available design or is cleared.</string>
     <string name="library_cancel">Cancel</string>
     <string name="library_cleanup_pending">Removed from the list. The app will retry deleting its private copies when opened again. Your original file is unchanged.</string>
     <string name="library_invalid_change">That library change is not valid. Refresh the screen and try again.</string>

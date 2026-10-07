@@ -130,13 +130,18 @@ final class MediaLibrary {
 
     static final class Item {
         final String id, name, mime;
+        final boolean editorOnly;
         Item(String id, String name, String mime) {
+            this(id, name, mime, false);
+        }
+        Item(String id, String name, String mime, boolean editorOnly) {
             this.id = id;
             this.name = name;
             this.mime = mime;
+            this.editorOnly = editorOnly;
         }
         JSONObject json() throws JSONException {
-            return new JSONObject().put("id", id).put("name", name).put("mime", mime);
+            return new JSONObject().put("id", id).put("name", name).put("mime", mime).put("editorOnly", editorOnly);
         }
     }
 
@@ -215,7 +220,9 @@ final class MediaLibrary {
             String id = entry.getString("id"), name = entry.getString("name"), mime = entry.getString("mime");
             if (!MediaValidation.isId(id) || !supportedMime(mime) || !seen.add(id)
                     || !name.equals(safeName(name))) throw new JSONException("Invalid media entry");
-            result.add(new Item(id, name, mime));
+            if (entry.has("editorOnly") && !(entry.get("editorOnly") instanceof Boolean))
+                throw new JSONException("Invalid editor-only flag");
+            result.add(new Item(id, name, mime, entry.optBoolean("editorOnly", false)));
         }
         return result;
     }
@@ -325,9 +332,35 @@ final class MediaLibrary {
         return null;
     }
 
+    synchronized boolean editorOnly(String id) {
+        Item item = find(id);
+        return item != null && item.editorOnly;
+    }
+
+    synchronized void setEditorOnly(String id, boolean editorOnly) throws IOException {
+        requireReadable();
+        Item item = find(id);
+        if (item == null) throw new IllegalArgumentException("Unknown media ID");
+        if (item.editorOnly == editorOnly) return;
+        List<Item> nextMedia = new ArrayList<>(media);
+        nextMedia.set(nextMedia.indexOf(item), new Item(item.id, item.name, item.mime, editorOnly));
+        List<Tab> nextTabs = copyTabs(tabs);
+        String nextSelected = selected();
+        if (editorOnly) {
+            for (Tab tab : nextTabs) tab.members.remove(id);
+            if (id.equals(nextSelected)) {
+                Set<String> unavailable = new HashSet<>(hidden);
+                unavailable.add(id);
+                for (Item value : media) if (!file(value.id).isFile()) unavailable.add(value.id);
+                nextSelected = ThemeSelection.nextVisible(nextSelected, order(), unavailable);
+            }
+        }
+        save(nextMedia, hidden, nextSelected, pendingDeletes, nextTabs, migrationNotice);
+    }
+
     synchronized JSONObject galleryState(boolean enabled, String language) throws JSONException {
         JSONArray entries = new JSONArray();
-        for (Item item : media) if (file(item.id).isFile()) {
+        for (Item item : media) if (!item.editorOnly && file(item.id).isFile()) {
             entries.put(item.json().put("url", MEDIA_ORIGIN + item.id));
         }
         JSONArray tabEntries = new JSONArray();
@@ -343,7 +376,7 @@ final class MediaLibrary {
 
     synchronized void select(String id) throws IOException {
         requireReadable();
-        if (available(id) && (scene(id) == null || scene(id).getPurpose() == ScenePurpose.CHARGING))
+        if (!editorOnly(id) && available(id) && (scene(id) == null || scene(id).getPurpose() == ScenePurpose.CHARGING))
             save(media, hidden, id, pendingDeletes, tabs, "");
     }
 
@@ -397,6 +430,7 @@ final class MediaLibrary {
 
     synchronized void setTabMember(String tabId, String theme, boolean member) throws IOException {
         requireReadable();
+        if (member && editorOnly(theme)) throw new IllegalArgumentException("Editor material is not a design");
         if (!ThemeSelection.isValid(theme) && find(theme) == null && scene(theme) == null) {
             throw new IllegalArgumentException("Unknown design");
         }
@@ -477,6 +511,14 @@ final class MediaLibrary {
     }
 
     String importDocument(Uri uri, boolean selectForCharging) throws IOException {
+        return importDocument(uri, selectForCharging, false);
+    }
+
+    String importEditorDocument(Uri uri) throws IOException {
+        return importDocument(uri, false, true);
+    }
+
+    private String importDocument(Uri uri, boolean selectForCharging, boolean editorOnly) throws IOException {
         if (uri == null || !"content".equals(uri.getScheme())) throw new MediaValidation.InvalidMedia("invalid");
         synchronized (this) {
             if (!readable) throw new IOException("Library manifest is unreadable");
@@ -502,7 +544,7 @@ final class MediaLibrary {
             if (!pendingThumbnail.renameTo(thumbnail(id))) throw new IOException("Cannot finish thumbnail");
             synchronized (this) {
                 List<Item> added = new ArrayList<>(media);
-                added.add(new Item(id, name, mime));
+                added.add(new Item(id, name, mime, editorOnly));
                 save(added, hidden, selectForCharging ? id : selected(), pendingDeletes, tabs, "");
                 saved = true;
             }
@@ -536,7 +578,7 @@ final class MediaLibrary {
 
     private List<String> order() {
         List<String> order = new ArrayList<>(ThemeSelection.IDS);
-        for (Item item : media) order.add(item.id);
+        for (Item item : media) if (!item.editorOnly) order.add(item.id);
         for (ScreenScene scene : editor.getScenes().values())
             if (scene.getPurpose() == ScenePurpose.CHARGING && available(scene.getId())) order.add(scene.getId());
         return order;

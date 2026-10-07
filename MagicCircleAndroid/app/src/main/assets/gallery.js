@@ -119,6 +119,9 @@ function render(){
     document.getElementById('preview').disabled=busy||!focused;
     document.getElementById('preview').textContent=text('preview',{seconds:durationMs/1000});
     document.getElementById('edit-information').disabled=busy||!focused||!native;
+    const materialButton=document.getElementById('hide-editor-material');
+    materialButton.hidden=!media.some(item=>item.id===focused);
+    materialButton.disabled=busy||!native||!readable;
     document.getElementById('open-create').disabled=busy||!readable||!native;
     document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.duration)===durationMs));b.disabled=busy||!native||!readable;});
     const deleteButton=document.getElementById('delete-design');
@@ -170,7 +173,7 @@ window.setGalleryState=state=>{
     tabs=(Array.isArray(state.tabs)?state.tabs:[]).filter(value=>typeof value.id==='string'&&typeof value.name==='string'&&Array.isArray(value.members)).map(value=>({id:value.id,name:value.name,members:[...value.members]}));
     migrationNotice=['selection_reset','selection_changed'].includes(state.migrationNotice)?state.migrationNotice:null;
     media=(Array.isArray(state.media)?state.media:[]).filter(theme=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(theme.id)
-        &&['image/gif','image/png','image/jpeg'].includes(theme.mime)&&theme.url==='https://appassets.androidplatform.net/media/'+theme.id)
+        &&theme.editorOnly!==true&&['image/gif','image/png','image/jpeg'].includes(theme.mime)&&theme.url==='https://appassets.androidplatform.net/media/'+theme.id)
         .map(theme=>({...theme,name:String(theme.name),group:'uploads'}));
     if(nativeChanged){cards.forEach((card,id)=>{if(nativeArtwork(id)){card.querySelector('img')?.removeAttribute('src');loadArt(card);}});document.getElementById('hero-art').dataset.renderedTheme='';}
     if(!initialized||media.some(theme=>theme.id===selected&&!previousMedia.has(theme.id))){focused=selected;initialized=true;}
@@ -196,6 +199,10 @@ function renderScreens(){
         const apply=document.createElement('button');apply.type='button';apply.className='apply-wallpaper';apply.dataset.wallpaperTheme=theme.id;apply.textContent=text('wallpaperUse');apply.disabled=!native||busy;
         apply.addEventListener('click',()=>{if(native&&!busy)location.href='magiccircle://wallpaper?theme='+encodeURIComponent(theme.id)+'&target='+wallpaperTarget;});
         card.append(art,label,apply);container.appendChild(card);
+        if(media.some(item=>item.id===theme.id)) {
+            const material=document.createElement('button');material.type='button';material.className='apply-wallpaper';material.dataset.editorMaterial=theme.id;
+            material.textContent=text('hideEditorMaterial');material.disabled=!native||busy||!readable;material.onclick=()=>hideEditorMaterial(theme.id);card.appendChild(material);
+        }
         if(scenes.some(s=>s.id===theme.id)) {
             const edit=document.createElement('button');edit.textContent=text('editScene');edit.className='apply-wallpaper';edit.onclick=()=>editTheme(theme.id);edit.disabled=!native||busy;card.appendChild(edit);
             const remove=document.createElement('button');remove.textContent=text('deleteDesign');remove.className='apply-wallpaper';remove.disabled=!native||busy;remove.onclick=()=>{if(native&&!busy)location.href='magiccircle://delete?theme='+encodeURIComponent(theme.id);};card.appendChild(remove);
@@ -223,6 +230,8 @@ createButton.addEventListener('click',()=>{
 document.getElementById('close-create').onclick=()=>closeDialog(document.getElementById('create-screen-dialog'));
 document.querySelectorAll('[data-create-purpose]').forEach(b=>b.onclick=()=>{if(native&&!busy){closeDialog(document.getElementById('create-screen-dialog'));location.href='magiccircle://create?purpose='+b.dataset.createPurpose;}});
 document.getElementById('edit-information').onclick=()=>editTheme(focused);
+function hideEditorMaterial(id){if(native&&!busy&&readable&&media.some(item=>item.id===id))location.href='magiccircle://editor-material?theme='+encodeURIComponent(id);}
+document.getElementById('hide-editor-material').onclick=()=>hideEditorMaterial(focused);
 document.querySelectorAll('[data-duration]').forEach(b=>b.onclick=()=>{if(native&&!busy)location.href='magiccircle://duration?ms='+b.dataset.duration;});
 function closeDialog(dialog){if(dialog.open)dialog.close();}
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>dialogTriggers.get(dialog)?.focus()));

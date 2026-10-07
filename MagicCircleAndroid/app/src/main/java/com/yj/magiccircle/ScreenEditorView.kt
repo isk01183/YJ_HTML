@@ -4,26 +4,35 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.FrameLayout
 import java.io.Closeable
+import kotlin.math.atan2
+import kotlin.math.hypot
 
 class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
     private lateinit var draft: EditorDraft
     private var host: ChargingSceneView?=null
     private var listener: ((EditorDraft)->Unit)?=null
     var selectedLayer: String?=null
+        set(value) {if(field!=value)stopGesture();field=value;handles.invalidate()}
     var selectedField: InfoField?=null
+        set(value) {if(field!=value)stopGesture();field=value;handles.invalidate()}
     var onSelectionChanged: (() -> Unit)?=null
     var onError: (() -> Unit)?=null
     private var downX=0f;private var downY=0f;private var originX=0f;private var originY=0f
+    private var gestureLayer: String?=null
+    private var gestureField: InfoField?=null
+    private var firstPointer=-1;private var secondPointer=-1
+    private var originWidth=1f;private var originAngle=0f
+    private var pointerDistance=0f;private var pointerAngle=0f
     private var closed=false
     private var previewScale=1f
     private var previewLeft=0f
     private var previewTop=0f
     private var surfaceWidth=1
     private var surfaceHeight=1
+    private var previewProgress=.5f
     private val ink=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xffeac985.toInt();style=Paint.Style.STROKE;strokeWidth=2f*resources.displayMetrics.density }
     private val handles: View=object:View(context) {
         override fun onDraw(c: Canvas) {
@@ -34,11 +43,6 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
             c.drawCircle(x*width,y*height,12f*resources.displayMetrics.density,ink)
         }
     }
-    private val pinch=ScaleGestureDetector(context,object:ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScale(d: ScaleGestureDetector): Boolean {
-            modifyLayer { it.copy(width=(it.width*d.scaleFactor).coerceIn(.05f,4f)) };return true
-        }
-    })
     fun setOnDraftChanged(listener: (EditorDraft)->Unit) {this.listener=listener}
     override fun onMeasure(w: Int,h: Int) {
         setMeasuredDimension(MeasureSpec.getSize(w),MeasureSpec.getSize(h))
@@ -60,17 +64,19 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
     fun setDraft(value: EditorDraft) {
         if(closed)return
         val old=if(::draft.isInitialized)draft else null
-        draft=value
         val structure= { d: EditorDraft? -> d?.scene?.layers?.map { Triple(it.id,it.mediaId,it.visible) } }
+        if(old?.key!=value.key || structure(old)!=structure(value))stopGesture()
+        draft=value
         if(host==null || old?.key!=value.key || structure(old)!=structure(value) || (old?.information==null)!=(value.information==null)) {
             host?.close();removeAllViews()
             host=ChargingSceneView(context,value.key,value.information,value.scene)
             addView(host,LayoutParams(-1,-1));addView(handles,LayoutParams(-1,-1))
             val current=host!!
-            current.prepare(Runnable { if(host===current)current.showEditorFrame() },Runnable { if(host===current)onError?.invoke() })
+            current.prepare(Runnable { if(host===current)current.showEditorFrame(previewProgress) },Runnable { if(host===current)onError?.invoke() })
         } else { value.scene?.let { host?.updateLayers(it.layers) };host?.setInformation(value.information) }
         handles.invalidate()
     }
+    fun showEditorStage(progress: Float) {if(closed)return;previewProgress=progress.coerceIn(0f,1f);host?.showEditorFrame(previewProgress)}
     fun change(value: EditorDraft) {setDraft(value);listener?.invoke(value)}
     fun modifyLayer(block: (ImageLayer)->ImageLayer) { val s=draft.scene ?: return;change(draft.copy(scene=s.copy(layers=s.layers.map {if(it.id==selectedLayer)block(it)else it}))) }
     fun modifyField(block: (InfoPlacement)->InfoPlacement) {
@@ -81,25 +87,69 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
     override fun onInterceptTouchEvent(e: MotionEvent)=true
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if(closed || !::draft.isInitialized)return false
-        pinch.onTouchEvent(e)
         when(e.actionMasked) {
             MotionEvent.ACTION_DOWN->{
-                val px=(e.x-previewLeft)/previewScale;val py=(e.y-previewTop)/previewScale
-                selectedField=host?.informationView?.placementAt(px,py)
-                selectedLayer=if(selectedField==null)host?.imageAt(px,py)else null
-                val l=draft.scene?.layers?.find {it.id==selectedLayer};val p=information().find {it.field==selectedField}
-                originX=l?.x ?: p?.x ?: .5f;originY=l?.y ?: p?.y ?: .5f;downX=e.x;downY=e.y
-                parent.requestDisallowInterceptTouchEvent(true);onSelectionChanged?.invoke();handles.invalidate()
+                stopGesture()
+                if(selectedLayer!=null)gestureLayer=draft.scene?.layers?.find {it.id==selectedLayer && it.visible}?.id
+                else gestureField=information().find {it.field==selectedField && it.visible}?.field
+                if(gestureLayer!=null || gestureField!=null) {
+                    rebasePointers(e);parent?.requestDisallowInterceptTouchEvent(true)
+                }
             }
-            MotionEvent.ACTION_MOVE->if(!pinch.isInProgress && e.pointerCount==1) {
-                val x=(originX+(e.x-downX)/(surfaceWidth*previewScale)).coerceIn(0f,1f);val y=(originY+(e.y-downY)/(surfaceHeight*previewScale)).coerceIn(0f,1f)
-                if(selectedLayer!=null)modifyLayer {it.copy(x=x,y=y)}else if(selectedField!=null)modifyField {it.copy(x=x,y=y)}
-            }
-            MotionEvent.ACTION_UP->{performClick();parent.requestDisallowInterceptTouchEvent(false);onSelectionChanged?.invoke()}
-            MotionEvent.ACTION_CANCEL->parent.requestDisallowInterceptTouchEvent(false)
+            MotionEvent.ACTION_POINTER_DOWN->rebasePointers(e)
+            MotionEvent.ACTION_POINTER_UP->rebasePointers(e,e.actionIndex)
+            MotionEvent.ACTION_MOVE->movePointers(e)
+            MotionEvent.ACTION_UP->{stopGesture();performClick();onSelectionChanged?.invoke()}
+            MotionEvent.ACTION_CANCEL->stopGesture()
         }
         return true
     }
+    private fun stopGesture() {
+        gestureLayer=null;gestureField=null;firstPointer=-1;secondPointer=-1
+        parent?.requestDisallowInterceptTouchEvent(false)
+    }
+    private fun rebasePointers(e: MotionEvent, excluded: Int=-1) {
+        if(gestureLayer==null && gestureField==null)return
+        val l=draft.scene?.layers?.find {it.id==gestureLayer && it.visible}
+        val p=if(gestureField!=null)information().find {it.field==gestureField && it.visible}else null
+        if(l==null && p==null) {stopGesture();return}
+        val ids=(0 until e.pointerCount).filter {it!=excluded}.map {e.getPointerId(it)}
+        firstPointer=if(firstPointer in ids)firstPointer else if(secondPointer in ids)secondPointer else ids.firstOrNull() ?: -1
+        secondPointer=if(l==null)-1 else if(secondPointer in ids && secondPointer!=firstPointer)secondPointer else ids.firstOrNull {it!=firstPointer} ?: -1
+        val first=e.findPointerIndex(firstPointer);val second=e.findPointerIndex(secondPointer)
+        if(first<0) {stopGesture();return}
+        originX=l?.x ?: p!!.x;originY=l?.y ?: p!!.y
+        originWidth=l?.width ?: 1f;originAngle=l?.angle ?: 0f
+        downX=e.getX(first);downY=e.getY(first);pointerDistance=0f
+        if(second>=0) {
+            val dx=e.getX(second)-downX;val dy=e.getY(second)-downY
+            pointerDistance=hypot(dx,dy);pointerAngle=atan2(dy,dx)*180f/Math.PI.toFloat()
+            downX=(downX+e.getX(second))/2;downY=(downY+e.getY(second))/2
+        }
+    }
+    private fun movePointers(e: MotionEvent) {
+        if(firstPointer<0 || previewScale<=0f)return
+        val l=draft.scene?.layers?.find {it.id==gestureLayer && it.visible}
+        val p=if(gestureField!=null)information().find {it.field==gestureField && it.visible}else null
+        if(l==null && p==null) {stopGesture();return}
+        val first=e.findPointerIndex(firstPointer);val second=e.findPointerIndex(secondPointer)
+        if(first<0 || (secondPointer>=0 && second<0)) {rebasePointers(e);return}
+        var px=e.getX(first);var py=e.getY(first)
+        var size=originWidth;var angle=originAngle
+        if(second>=0) {
+            val dx=e.getX(second)-px;val dy=e.getY(second)-py
+            val distance=hypot(dx,dy)
+            if(pointerDistance<=0f) {rebasePointers(e);return}
+            size=(originWidth*(distance/pointerDistance)).coerceIn(.05f,4f)
+            if(distance>0f)angle=originAngle+atan2(dy,dx)*180f/Math.PI.toFloat()-pointerAngle
+            angle=((angle+180f)%360f+360f)%360f-180f
+            px=(px+e.getX(second))/2;py=(py+e.getY(second))/2
+        }
+        val x=(originX+(px-downX)/(surfaceWidth*previewScale)).coerceIn(0f,1f)
+        val y=(originY+(py-downY)/(surfaceHeight*previewScale)).coerceIn(0f,1f)
+        if(l!=null)modifyLayer {it.copy(x=x,y=y,width=size,angle=angle)}
+        else modifyField {it.copy(x=x,y=y)}
+    }
     override fun performClick(): Boolean {super.performClick();return true}
-    override fun close() {if(closed)return;closed=true;host?.close();host=null}
+    override fun close() {if(closed)return;stopGesture();closed=true;host?.close();host=null}
 }

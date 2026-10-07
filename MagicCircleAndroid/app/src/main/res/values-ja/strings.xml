@@ -19,6 +19,8 @@
     <string name="library_hide_message">一覧からデザインを隠します。内蔵デザインの復元で再表示できます。</string>
     <string name="library_delete">アプリのコピーを削除</string>
     <string name="library_hide">非表示</string>
+    <string name="library_editor_material_title">編集素材として非表示にしますか？</string>
+    <string name="library_editor_material_message">充電・壁紙の一覧とカスタムタブからこの画像を隠します。ファイルは削除されず、編集素材として引き続き使えます。保存済みの作品は変わりません。使用中の充電デザインの場合は、別の利用可能なデザインに切り替わるか、選択が解除されます。</string>
     <string name="library_cancel">キャンセル</string>
     <string name="library_cleanup_pending">一覧から削除しました。次回アプリを開いたときに内部コピーの削除を再試行します。元のファイルは変更されません。</string>
     <string name="library_invalid_change">無効な一覧変更です。画面を開き直して、もう一度お試しください。</string>

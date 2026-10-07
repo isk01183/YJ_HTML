@@ -10,6 +10,10 @@ const assert=require('node:assert/strict');
   assert.equal(await page.evaluate(()=>window.prepareChargingAnimation()),true);
   assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('running')),false);
   await page.evaluate(()=>window.showChargeEditorFrame());
+  for(const progress of [.1,.5,.95]) {
+   await page.evaluate(p=>window.showChargeEditorFrame(p),progress);
+   assert.equal(await page.evaluate(p=>document.getAnimations().every(a=>Math.abs(a.currentTime-p*7000)<1),progress),true,'Editor preview ignored selected stage');
+  }
   for(const item of await page.locator('[data-level]').all()) assert.equal(await item.isVisible(),false);
   await page.evaluate(()=>document.getAnimations().forEach(a=>{a.pause();a.currentTime=6300}));
   for(const item of await page.locator('.finish h2,.finish p').all()) assert.equal(await item.isVisible(),false,'Custom information must hide the original completion message');

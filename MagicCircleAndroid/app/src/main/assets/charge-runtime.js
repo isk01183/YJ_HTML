@@ -15,9 +15,10 @@
   document.getAnimations().forEach(a=>{if(a.effect.getTiming().iterations===Infinity)a.playbackRate=1});
   return result;
  };
- window.showChargeEditorFrame=()=>{
+ window.showChargeEditorFrame=(progress=4/7)=>{
   if(!window.startChargingAnimation(7000))return false;
-  document.getAnimations().forEach(a=>{a.pause();a.currentTime=4000});
+  const time=(Number.isFinite(progress)?Math.max(0,Math.min(1,progress)):4/7)*7000;
+  document.getAnimations().forEach(a=>{a.pause();a.currentTime=time});
   return true;
  };
 })();

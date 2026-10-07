@@ -1,6 +1,11 @@
 package com.yj.magiccircle
 
 class V113Instrumentation : android.app.Instrumentation() {
+    private fun checkOnMain(block: () -> Unit) {
+        var failure: Throwable?=null
+        runOnMainSync {try {block()}catch(error: Throwable){failure=error}}
+        failure?.let {throw it}
+    }
     private var options: android.os.Bundle?=null
     override fun onCreate(arguments: android.os.Bundle?) {
         super.onCreate(arguments)
@@ -24,12 +29,26 @@ class V113Instrumentation : android.app.Instrumentation() {
                 finish(android.app.Activity.RESULT_OK,result)
                 return
             }
+            options?.getString("checks")?.let { name ->
+                when(name) {
+                    "media116" -> EditorMediaChecks.run(targetContext)
+                    "gesture116" -> checkOnMain { EditorGestureChecks.run(targetContext) }
+                    "message116" -> checkOnMain { StageMessageChecks.run(targetContext) }
+                    else -> error("Unknown check: $name")
+                }
+                result.putString("stream", "$name OK")
+                finish(android.app.Activity.RESULT_OK,result)
+                return
+            }
             LibraryStorageChecks.run(targetContext)
             SceneStorageChecks.run(targetContext)
             SceneWallpaperChecks.run(targetContext)
             LayeredSceneChecks.run()
-            runOnMainSync { ChargeInfoChecks.run(targetContext) }
-            runOnMainSync { ScreenEditorChecks.run(targetContext) }
+            checkOnMain { ChargeInfoChecks.run(targetContext) }
+            checkOnMain { ScreenEditorChecks.run(targetContext) }
+            EditorMediaChecks.run(targetContext)
+            checkOnMain { EditorGestureChecks.run(targetContext) }
+            checkOnMain { StageMessageChecks.run(targetContext) }
             WallpaperChecks.run(targetContext)
             MediaWallpaperChecks.run()
             ChargeStatusPanelChecks.run()

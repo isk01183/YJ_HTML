@@ -8,7 +8,10 @@ enum class InfoField { BATTERY, STATUS, TEMPERATURE, HEALTH, CONNECTION, METER, 
 data class ImageLayer(val id: String, val mediaId: String, val x: Float, val y: Float,
     val width: Float, val angle: Float, val flipX: Boolean, val visible: Boolean)
 data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>)
-data class InfoPlacement(val field: InfoField, val x: Float, val y: Float, val visible: Boolean)
+data class StageMessages(val connected: String, val charging: String, val complete: String) {
+    fun at(progress: Float) = when { progress<.28f -> connected; progress<.83f -> charging; else -> complete }
+}
+data class InfoPlacement(val field: InfoField, val x: Float, val y: Float, val visible: Boolean, val messages: StageMessages?=null)
 data class EditorDraft(val key: String, val scene: ScreenScene?, val information: List<InfoPlacement>?)
 
 object SceneRules {
@@ -27,7 +30,13 @@ object SceneRules {
     }
     @JvmStatic fun validateInformation(items: List<InfoPlacement>) {
         require(items.map { it.field }.toSet().size == items.size)
-        items.forEach { require(it.x.isFinite() && it.x in 0f..1f && it.y.isFinite() && it.y in 0f..1f) }
+        items.forEach {
+            require(it.x.isFinite() && it.x in 0f..1f && it.y.isFinite() && it.y in 0f..1f)
+            it.messages?.let { m ->
+                require(it.field==InfoField.MESSAGE)
+                require(listOf(m.connected,m.charging,m.complete).all { text -> text.length<=120 && text.none { c -> c.isISOControl() && c!='\n' } })
+            }
+        }
     }
 }
 
@@ -61,8 +70,13 @@ internal data class SceneData(
         fun readScene(o: JSONObject) = ScreenScene(o.getString("id"),o.getString("name"),ScenePurpose.valueOf(o.getString("purpose")),
             o.getJSONArray("layers").objects().map { l -> ImageLayer(l.getString("id"),l.getString("mediaId"),l.getDouble("x").toFloat(),l.getDouble("y").toFloat(),
                 l.getDouble("width").toFloat(),l.getDouble("angle").toFloat(),l.getBoolean("flipX"),l.getBoolean("visible")) })
-        private fun infoJson(info: List<InfoPlacement>) = JSONArray(info.map { JSONObject().put("field",it.field.name).put("x",it.x.toDouble()).put("y",it.y.toDouble()).put("visible",it.visible) })
-        private fun readInfo(a: JSONArray) = a.objects().map { InfoPlacement(InfoField.valueOf(it.getString("field")),it.getDouble("x").toFloat(),it.getDouble("y").toFloat(),it.getBoolean("visible")) }.also { SceneRules.validateInformation(it) }
+        private fun infoJson(info: List<InfoPlacement>) = JSONArray(info.map { p -> JSONObject().put("field",p.field.name).put("x",p.x.toDouble()).put("y",p.y.toDouble()).put("visible",p.visible).also { o ->
+            p.messages?.let { o.put("messages",JSONObject().put("connected",it.connected).put("charging",it.charging).put("complete",it.complete)) }
+        } })
+        private fun readInfo(a: JSONArray) = a.objects().map { o ->
+            val m=if(o.has("messages")) o.getJSONObject("messages").let { StageMessages(it.getString("connected"),it.getString("charging"),it.getString("complete")) } else null
+            InfoPlacement(InfoField.valueOf(o.getString("field")),o.getDouble("x").toFloat(),o.getDouble("y").toFloat(),o.getBoolean("visible"),m)
+        }.also { SceneRules.validateInformation(it) }
         private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
         @JvmStatic fun read(o: JSONObject, mime: Map<String,String>): SceneData {
             val scenes = linkedMapOf<String,ScreenScene>()

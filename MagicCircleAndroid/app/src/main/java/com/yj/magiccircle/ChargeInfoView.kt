@@ -20,7 +20,7 @@ class ChargeInfoView(context: Context): FrameLayout(context) {
         typeface=Typeface.create(if(field==InfoField.BATTERY) "serif" else "sans-serif-medium",Typeface.NORMAL)
         textSize=if(field==InfoField.BATTERY) 40f else 13f
         setShadowLayer(3f,0f,1f,0xff070d18.toInt())
-        maxLines=2; visibility=View.GONE
+        maxLines=if(field==InfoField.MESSAGE)Int.MAX_VALUE else 2; visibility=View.GONE
         addView(this, LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT))
     } }
     fun setInformation(items: List<InfoPlacement>) { SceneRules.validateInformation(items); information=items.toList(); refresh(); requestLayout() }
@@ -42,8 +42,9 @@ class ChargeInfoView(context: Context): FrameLayout(context) {
                 InfoField.HEALTH->health+"\n"+w("배터리 상태","バッテリー状態","Battery health")
                 InfoField.CONNECTION->connection+"\n"+w("연결 방식","接続方式","Connection")
                 InfoField.METER->"⚡ "+(snapshot.percent?.let { "▰".repeat(it/10)+"▱".repeat(10-it/10) } ?: "—")
-                InfoField.MESSAGE->when {progress<.28f->w("충전 단자가 연결되었습니다","充電端子が接続されました","Charger connected");progress<.83f->w("충전 시작","充電開始","Charging begins");else->w("연결 완료","接続完了","Connection complete")}
+                InfoField.MESSAGE->(information.find { it.field==InfoField.MESSAGE }?.messages ?: defaultMessages(language)).at(progress)
             }
+            if(label.text.isEmpty()) label.visibility=GONE
         }
         contentDescription=labels.values.filter { it.visibility==VISIBLE }.joinToString(". ") { it.text }
         importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -64,6 +65,10 @@ class ChargeInfoView(context: Context): FrameLayout(context) {
     }
     fun placementAt(x: Float,y: Float): InfoField? = information.asReversed().firstOrNull { p -> val v=labels.getValue(p.field);p.visible && x>=v.left && x<=v.right && y>=v.top && y<=v.bottom }?.field
     companion object {
+        fun defaultMessages(language: String)=StageMessages(
+            words(language,"충전 단자가 연결되었습니다","充電端子が接続されました","Charger connected"),
+            words(language,"충전 시작","充電開始","Charging begins"),
+            words(language,"연결 완료","接続完了","Connection complete"))
         @JvmStatic fun defaultInformation(id: String): List<InfoPlacement> {
             val center=id in listOf("native-N01","premium","ref-U04")
             return InfoField.entries.map { field ->

@@ -51,7 +51,7 @@ class ScreenEditorActivity: Activity() {
         }
         name=EditText(this).apply {setText(draft.scene?.name ?: key);setTextColor(0xfff2dfb9.toInt());textSize=22f;typeface=Typeface.create("serif",Typeface.NORMAL);isSingleLine=true;isEnabled=draft.scene!=null;contentDescription=w("작품 이름","作品名","Scene name")}
         root.addView(name,LinearLayout.LayoutParams(-1,dp(52)))
-        status=TextView(this).apply {text=w("드래그로 이동 · 두 손가락으로 크기 조절","ドラッグで移動・ピンチで拡大","Drag to move · Pinch to resize");setTextColor(0xffadbbcb.toInt());textSize=12f;setPadding(0,dp(4),0,dp(8))}
+        status=TextView(this).apply {text=w("목록에서 선택 · 드래그로 이동 · 두 손가락으로 확대·회전","一覧で選択・ドラッグで移動・2本指で拡大と回転","Select in list · Drag to move · Two fingers to resize & rotate");setTextColor(0xffadbbcb.toInt());textSize=12f;setPadding(0,dp(4),0,dp(8))}
         root.addView(status)
         val workspace=LinearLayout(this).apply {orientation=if(resources.configuration.screenWidthDp>=700)LinearLayout.HORIZONTAL else LinearLayout.VERTICAL}
         root.addView(workspace,LinearLayout.LayoutParams(-1,0,1f))
@@ -133,10 +133,40 @@ class ScreenEditorActivity: Activity() {
                 }
             }
             editor.information().find {it.field==editor.selectedField}?.let {p->position(p.x,p.y){x,y->editor.modifyField {it.copy(x=x,y=y)}}}
+            button(tools,w("단계별 문구 편집","段階別テキストを編集","Edit stage text")){editMessages()}
+            val stages=row(tools)
+            for((label,progress) in listOf(w("연결","接続","Connected") to .1f,w("충전","充電","Charging") to .5f,w("완료","完了","Complete") to .95f))
+                button(stages,label){editor.showEditorStage(progress)}
             button(tools,w("정보 기본 배치","情報の初期配置","Reset information")){editor.resetInformation();renderTools()}
             heading(w("애니메이션 표시 시간","アニメーション表示時間","Animation duration"))
             val r=row(tools);for(ms in listOf(1000,3000,5000,7000)) button(r,(if(library.durationMs()==ms)"● " else "")+"${ms/1000}s") {try {library.setDurationMs(ms);renderTools()}catch(_:Exception){persistDraft()}}
         }
+    }
+    private fun editMessages() {
+        val saved=editor.information().single {it.field==InfoField.MESSAGE}.messages
+        val values=saved ?: ChargeInfoView.defaultMessages(language)
+        val form=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),dp(8))}
+        form.addView(TextView(this).apply {text=w("각 단계 최대 120자 · 빈 문구는 표시하지 않습니다","各段階120文字まで・空欄は非表示","Up to 120 characters per stage · Leave empty to hide")})
+        val inputs=listOf(w("연결 감지","接続検知","Connected") to values.connected,w("충전 시작","充電開始","Charging") to values.charging,w("완료","完了","Complete") to values.complete).map { (label,value) ->
+            form.addView(TextView(this).apply {text=label;setPadding(0,dp(12),0,0)})
+            EditText(this).apply {setText(value);contentDescription=label;maxLines=3;filters=arrayOf(android.text.InputFilter.LengthFilter(120));form.addView(this,LinearLayout.LayoutParams(-1,-2))}
+        }
+        val scroll=ScrollView(this).apply {addView(form)}
+        fun apply(messages: StageMessages?) {
+            val d=editor.currentDraft()
+            editor.change(d.copy(information=editor.information().map {if(it.field==InfoField.MESSAGE)it.copy(messages=messages,visible=true)else it}))
+            editor.selectedField=InfoField.MESSAGE;editor.selectedLayer=null;editor.showEditorStage(.1f);renderTools()
+        }
+        val dialog=AlertDialog.Builder(this).setTitle(w("단계별 문구","段階別テキスト","Stage text")).setView(scroll)
+            .setPositiveButton(w("적용","適用","Apply"),null)
+            .setNeutralButton(w("기본 문구","初期テキスト","Default text")){_,_->apply(null)}
+            .setNegativeButton(w("취소","取消","Cancel"),null).create()
+        dialog.setOnShowListener {dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val text=StageMessages(inputs[0].text.toString(),inputs[1].text.toString(),inputs[2].text.toString())
+            if(runCatching {SceneRules.validateInformation(listOf(InfoPlacement(InfoField.MESSAGE,.5f,.5f,true,text)))}.isSuccess) {apply(text);dialog.dismiss()}
+            else inputs.first().error=w("지원하지 않는 제어 문자가 있습니다","使用できない制御文字があります","Unsupported control character")
+        }}
+        dialog.show()
     }
     private fun position(x: Float,y: Float,change:(Float,Float)->Unit) {
         slider("X %",(x*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val p=editor.information().find {it.field==editor.selectedField};change(value/100f,l?.y ?: p?.y ?: y)}
@@ -157,7 +187,7 @@ class ScreenEditorActivity: Activity() {
     private fun addLayer(id: String) {
         val d=current();val s=d.scene ?: return
         val next=s.copy(layers=s.layers+ImageLayer(UUID.randomUUID().toString(),id,.5f,.5f,1f,0f,false,true))
-        try {SceneRules.validate(next,library.items().associate {it.id to it.mime});editor.change(d.copy(scene=next));editor.selectedLayer=next.layers.last().id;renderTools();persistDraft()}
+        try {SceneRules.validate(next,library.items().associate {it.id to it.mime});editor.change(d.copy(scene=next));editor.selectedLayer=next.layers.last().id;editor.selectedField=null;renderTools();persistDraft()}
         catch(_:Exception){status.text=w("이미지 8개 / GIF 2개까지만 추가할 수 있습니다","画像8枚 / GIF2枚までです","Up to 8 images / 2 GIF layers")}
     }
     private fun chooseExisting() {val items=library.items();AlertDialog.Builder(this).setTitle(w("보관함에서 추가","ライブラリから追加","Add from library")).setItems(items.map {it.name}.toTypedArray()){_,i->addLayer(items[i].id)}.show()}
@@ -168,7 +198,7 @@ class ScreenEditorActivity: Activity() {
         val uri=data?.data ?: return
         busy=true;status.text=w("이미지를 안전하게 가져오는 중…","画像を読み込み中…","Importing image…")
         val key=current().key
-        IO.execute {val result=runCatching {library.importDocument(uri,false)};ui.post {
+        IO.execute {val result=runCatching {library.importEditorDocument(uri)};ui.post {
             if(isDestroyed || isFinishing)return@post
             busy=false
             if(current().key==key) result.onSuccess {addLayer(it);status.text=w("이미지를 추가했습니다","画像を追加しました","Image added")}.onFailure {status.text=w("파일 형식·크기를 확인하세요","形式とサイズを確認","Check file type and size")}

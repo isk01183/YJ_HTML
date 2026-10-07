@@ -18,8 +18,8 @@ android {
         minSdk = 23
         targetSdk = 37
         // Increase code for every distributed APK, including restorations and hotfixes.
-        versionCode = 18
-        versionName = "1.15"
+        versionCode = 19
+        versionName = "1.16"
         testInstrumentationRunner = "com.yj.magiccircle.V113Instrumentation"
     }
 

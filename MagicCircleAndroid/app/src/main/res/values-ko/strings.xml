@@ -19,6 +19,8 @@
     <string name="library_hide_message">목록에서 디자인을 숨깁니다. 기본 디자인 복원으로 다시 표시할 수 있습니다.</string>
     <string name="library_delete">앱 복사본 삭제</string>
     <string name="library_hide">숨기기</string>
+    <string name="library_editor_material_title">편집 재료로 숨길까요?</string>
+    <string name="library_editor_material_message">충전·배경화면 목록과 사용자 탭에서 이 이미지를 숨깁니다. 파일은 삭제하지 않으며, 편집 재료로 계속 사용할 수 있습니다. 기존 저장 작품은 그대로 유지됩니다. 현재 충전 도안이면 다른 사용 가능한 도안으로 바뀌거나 선택이 해제됩니다.</string>
     <string name="library_cancel">취소</string>
     <string name="library_cleanup_pending">목록에서 제거했습니다. 앱을 다시 열면 앱 내부 복사본 삭제를 재시도합니다. 원본 파일은 그대로 보존합니다.</string>
     <string name="library_invalid_change">올바르지 않은 목록 변경입니다. 화면을 새로 연 뒤 다시 시도해 주세요.</string>

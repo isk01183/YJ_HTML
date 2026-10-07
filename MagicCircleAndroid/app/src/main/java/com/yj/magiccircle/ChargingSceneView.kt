@@ -37,6 +37,7 @@ class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId:
     private var startedAt=0L
     private var deadline=0L
     private var editor=false
+    private var editorProgress=.5f
     private var snapshot=ChargeSnapshot(null,null,null,null,null)
     private val ui=Handler(Looper.getMainLooper())
     private val frame: Runnable=Runnable { if(!closed) { updateInfo(); imageView.invalidate() } }
@@ -129,10 +130,11 @@ class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId:
         web?.let { WebViews.startMagicCircle(it,remaining) { result -> if(!closed && result!="true") fail() } }
         alpha=1f; imageView.invalidate();updateInfo()
     }
-    fun showEditorFrame() {
+    fun showEditorFrame(progress: Float=.5f) {
+        editorProgress=progress.coerceIn(0f,1f)
         if(closed || !prepared)return
         editor=true;native?.editorFrame=true
-        web?.evaluateJavascript("showChargeEditorFrame()",null)
+        web?.evaluateJavascript("showChargeEditorFrame($editorProgress)",null)
         alpha=1f;imageView.invalidate();updateInfo()
     }
     fun setInformation(items: List<InfoPlacement>?) {
@@ -150,7 +152,7 @@ class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId:
         snapshot=ChargeSnapshot.fromRaw(v(BatteryManager.EXTRA_LEVEL),v(BatteryManager.EXTRA_SCALE),v(BatteryManager.EXTRA_TEMPERATURE),v(BatteryManager.EXTRA_HEALTH),v(BatteryManager.EXTRA_STATUS),v(BatteryManager.EXTRA_PLUGGED))
     }
     private fun updateInfo() {
-        val p=if(editor || startedAt==0L).5f else ((SystemClock.uptimeMillis()-startedAt).toFloat()/maxOf(1,deadline-startedAt)).coerceIn(0f,1f)
+        val p=if(editor || startedAt==0L)editorProgress else ((SystemClock.uptimeMillis()-startedAt).toFloat()/maxOf(1,deadline-startedAt)).coerceIn(0f,1f)
         informationView.update(snapshot,WebViews.selectedLanguage(context),p)
         if(!editor && startedAt>0 && SystemClock.uptimeMillis()<deadline) { ui.removeCallbacks(frame);ui.postDelayed(frame,100) }
     }

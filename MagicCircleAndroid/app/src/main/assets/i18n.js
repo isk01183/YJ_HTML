@@ -7,6 +7,7 @@
     add('createHint','画像を重ね、位置・角度・情報を自由に。','이미지를 겹치고 위치·각도·충전 정보를 자유롭게 꾸며요.','Layer images and arrange every detail.');
     add('editInformation','充電情報を編集','충전 정보 편집','Edit charge information');
     add('editScene','作品を編集','작품 편집','Edit scene');
+    add('hideEditorMaterial','編集素材として非表示','편집 재료로 숨기기','Hide as editor material');
     add('duration','表示時間','표시 시간','Display duration');
     add('galleryTitle', '魔法陣の書庫', '마법진 보관함', 'The Arcane Archive');
     add('homeTitle', 'あなたの画面に、魔法を。', '내 화면에 담는 마법', 'A little magic for your screen');

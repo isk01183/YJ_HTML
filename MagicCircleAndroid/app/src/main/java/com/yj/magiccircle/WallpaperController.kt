@@ -48,6 +48,7 @@ class WallpaperController(private val activity: Activity) {
 
     private fun valid(theme: String, target: String) = WallpaperPolicy.allowedTheme(theme) &&
         target in setOf("home", "lock") && MediaLibrary.get(activity).available(theme) &&
+        !MediaLibrary.get(activity).editorOnly(theme) &&
         (!SceneRules.isSceneId(theme) || MediaLibrary.get(activity).scene(theme)?.purpose==ScenePurpose.WALLPAPER)
 
     private fun canSet(): Boolean = manager.isWallpaperSupported &&
@@ -100,6 +101,7 @@ class WallpaperController(private val activity: Activity) {
     }
 
     private fun showStillPreview(theme: String, target: String, bitmap: Bitmap) {
+        if (!valid(theme, target)) { bitmap.recycle(); message(R.string.wallpaper_unavailable); return }
         var transferred = false
         val image = ImageView(activity).apply {
             setImageBitmap(bitmap)
@@ -173,6 +175,7 @@ class WallpaperController(private val activity: Activity) {
     }
 
     private fun launchLive(theme: String, target: String, key: String) {
+        if (!valid(theme, target)) { message(R.string.wallpaper_unavailable); return }
         try {
             if (!canSet()) { message(R.string.wallpaper_denied); return }
             previousComponent = actualTheme(target)
