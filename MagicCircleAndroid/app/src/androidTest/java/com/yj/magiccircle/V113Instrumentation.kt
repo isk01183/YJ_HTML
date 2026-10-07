@@ -32,6 +32,7 @@ class V113Instrumentation : android.app.Instrumentation() {
             options?.getString("checks")?.let { name ->
                 when(name) {
                     "character-storage" -> CharacterStorageChecks.run(targetContext)
+                    "character-render" -> CharacterRenderingChecks.run(targetContext)
                     "media116" -> EditorMediaChecks.run(targetContext)
                     "gesture116" -> checkOnMain { EditorGestureChecks.run(targetContext) }
                     "message116" -> checkOnMain { StageMessageChecks.run(targetContext) }
@@ -42,6 +43,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                 return
             }
             CharacterStorageChecks.run(targetContext)
+            CharacterRenderingChecks.run(targetContext)
             LibraryStorageChecks.run(targetContext)
             SceneStorageChecks.run(targetContext)
             SceneWallpaperChecks.run(targetContext)
