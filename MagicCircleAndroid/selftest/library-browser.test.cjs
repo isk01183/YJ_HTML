@@ -26,7 +26,7 @@ const magicRequest=async(page,click)=>{
     const builtins=await page.evaluate(()=>[nativeDesign,...CircleDesigns.list,...ReferenceDesigns.list]);
     const hidden=builtins.map(x=>x.id).filter(id=>!activeIds.includes(id));
     const tabs=[{id:tabId,name:'<b>내 도안</b>',members:['ref-C03','ref-W03']}];
-    const state={selected:'native-N01',language:'ko',enabled:true,media:[],readable:true,hidden,tabs,activationRevision:1};
+    const state={selected:'native-N01',screen:'charging',language:'ko',enabled:true,media:[],readable:true,hidden,tabs,activationRevision:1};
     await page.evaluate(value=>window.setGalleryState(value),state);
 
     assert.equal(await page.locator('#design-grid .card:visible').count(),43);
@@ -118,6 +118,7 @@ const magicRequest=async(page,click)=>{
     // A standalone browser still owns its own explicit confirmation.
     const standalone=await browser.newPage();
     await standalone.goto(gallery+'?lang=en');
+    await standalone.locator('#open-charging').click();
     await standalone.evaluate(({id})=>{tabs=[{id,name:'Browser tab',members:[]}];chooseGroup(id);},{id:tabId});
     standalone.once('dialog',async dialog=>{assert.match(dialog.message(),/designs will not be deleted/);await dialog.dismiss();});
     await standalone.locator('#delete-tab').click();

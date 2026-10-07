@@ -110,14 +110,14 @@ class ChargeStatusPanelRenderer {
         spoken = "$title. $percentageLabel: ${snapshot.percent?.let { "$it%" } ?: unknown}. $status. $tempLabel: ${if (snapshot.temperatureC == null) unknown else temperature}. $healthLabel: $health. $connectionLabel: $connection."
     }
 
-    fun draw(canvas: Canvas) {
+    @JvmOverloads fun draw(canvas: Canvas, information: Boolean = true) {
         canvas.drawPicture(decoration)
         canvas.drawPicture(batteryDecoration)
-        for (i in runs.indices) {
+        for (i in 0 until if(information) runs.size else minOf(3,runs.size)) {
             val run = runs[i]
             canvas.drawText(run.text, run.x, run.baseline, run.paint)
         }
-        batteryLayout?.let { layout ->
+        if(information) batteryLayout?.let { layout ->
             canvas.drawText(layout.number.text, layout.number.x, layout.number.baseline, layout.number.paint)
             layout.suffix?.let { canvas.drawText(it.text, it.x, it.baseline, it.paint) }
         }

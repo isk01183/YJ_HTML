@@ -35,6 +35,8 @@ class MainMagicChargeView @JvmOverloads constructor(
     private var receiverRegistered = false
     private var startedAt = 0L
     private var animate = true
+    var customInformation = false
+    var editorFrame = false
     private var leftInset = 0
     private var topInset = 0
     private var rightInset = 0
@@ -58,6 +60,11 @@ class MainMagicChargeView @JvmOverloads constructor(
                 if (width > 0 && height > 0) artwork?.prepare(width, height)
             }
             val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            if (customInformation) {
+                panel?.update(ChargeSnapshot(null,null,null,null,null), WebViews.selectedLanguage(context), resources.configuration.fontScale)
+                contentDescription = null
+                invalidate(); return
+            }
             val battery = if (Build.VERSION.SDK_INT >= 33) {
                 context.registerReceiver(batteryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             } else context.registerReceiver(batteryReceiver, filter)
@@ -132,14 +139,14 @@ class MainMagicChargeView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val elapsed = if (started && animate) SystemClock.elapsedRealtime() - startedAt else 0L
+        val elapsed = if (started && animate && !editorFrame) SystemClock.elapsedRealtime() - startedAt else 0L
         if (n01) {
             background?.draw(canvas, elapsed, false)
             val save = canvas.save()
             canvas.translate(leftInset + frame.left, topInset + frame.top)
             canvas.scale(frame.scale, frame.scale)
             circle?.draw(canvas, SanctuaryLayout.goldAngle(elapsed), SanctuaryLayout.blueAngle(elapsed))
-            panel?.draw(canvas)
+            panel?.draw(canvas, !customInformation)
             canvas.restoreToCount(save)
         } else {
             artwork?.draw(canvas, elapsed, animate)
@@ -147,11 +154,11 @@ class MainMagicChargeView @JvmOverloads constructor(
             val center = (leftInset + width - rightInset) / 2f
             val bottom = height - bottomInset - 20f * density
             val top = bottom - 48f * density
-            canvas.drawRoundRect(center - 104f * density, top, center + 104f * density,
+            if (!customInformation) canvas.drawRoundRect(center - 104f * density, top, center + 104f * density,
                 bottom + 8f * density, 18f * density, 18f * density, badgePaint)
-            canvas.drawText(chargeText, center, bottom - 10f * density, chargePaint)
+            canvas.drawText(if(customInformation) themeId.removePrefix("ref-") else chargeText, center, bottom - 10f * density, chargePaint)
         }
-        if (started && animate && isAttachedToWindow && visibility == VISIBLE && windowVisibility == VISIBLE) {
+        if (started && animate && !editorFrame && isAttachedToWindow && visibility == VISIBLE && windowVisibility == VISIBLE) {
             removeCallbacks(nextFrame)
             postOnAnimation(nextFrame)
         }

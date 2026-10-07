@@ -35,32 +35,48 @@
   .library-dialog{height:min(760px,94vh);width:min(760px,96vw);padding:20px;overflow:auto}.library-dialog h2{font:400 21px/1.4 'Yu Mincho',serif;margin:3px 58px 8px 0}.library-dialog .dialog-copy{color:#aeb2b8;font-size:11px;line-height:1.7;margin:0 58px 18px 0}.library-dialog .search{margin-bottom:14px}.library-dialog .grid{padding-bottom:10px}.inactive-card{display:block}.inactive-card .enable,.member-row button,.dialog-actions button{width:100%;min-height:48px;margin-top:10px;border:1px solid #514b3f;background:#26221b;color:#f2dfba;border-radius:9px;padding:10px;font-size:11px}.inactive-card .check{display:none}
   .field-label{display:block;font-size:11px;color:#c8c1b5;margin:20px 0 8px}.field{width:100%;min-height:48px;border:1px solid #414650;border-radius:9px;background:#0c1016;color:#f0ebe0;padding:10px 12px;font:inherit}.field:focus{outline:2px solid #bdac8d;outline-offset:2px}.form-error{min-height:20px;color:#e5aaa2;font-size:11px;margin:8px 0}.dialog-actions{display:flex;gap:10px}.dialog-actions button{width:auto;flex:1}.dialog-actions .primary{background:#eddbb6;color:#181613}.member-list{display:grid;gap:8px}.member-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;border:1px solid #292e36;border-radius:10px;padding:9px 11px}.member-row span{min-width:0;font-size:11px;overflow-wrap:anywhere}.member-row button{width:auto;min-width:86px;margin:0}.member-row button[aria-pressed=true]{background:#3d3525;border-color:#8c744d}.notice{font-size:11px;line-height:1.7;color:#ead3a5;border:1px solid #594b33;border-radius:9px;padding:10px 12px;margin:14px 0}.notice[hidden]{display:none}
   #wallpaper-dialog{height:fit-content;max-height:80vh}#wallpaper-dialog .dialog-copy{word-break:keep-all;overflow-wrap:anywhere}
+  [hidden]{display:none!important}.home-menu{display:grid;gap:18px;margin:32px 0}.destination{display:block;width:100%;min-height:168px;padding:28px;text-align:left;border:1px solid #534935;border-radius:20px;background:radial-gradient(ellipse at 100% 0,#435d7433,transparent 70%),#11161e}.destination strong{display:block;font:400 23px/1.5 serif;color:#f3dfb9}.destination span{display:block;margin-top:12px;font-size:13px;line-height:1.8;color:#afb8c4}.destination .symbol{font-size:26px;color:#c9e6f3;margin:0 0 14px}.back{margin-top:22px;min-height:48px;padding:8px 16px;border:1px solid #393f49;border-radius:10px;background:#11161e}.wallpaper-card .art{aspect-ratio:3/4}.wallpaper-card img{object-fit:contain;background:#05080d}.wallpaper-card .apply-wallpaper{margin-top:12px;width:100%;min-height:48px;border:1px solid #6d5e43;border-radius:8px;background:#29251c}.target-options{display:flex;gap:10px;margin:24px 0 14px}.target-options button{flex:1}.wallpaper-help{font-size:12px;line-height:1.9;color:#b4bdc8}.wallpaper-card{cursor:default}
+  .home-menu{gap:14px;margin:26px 0}.destination{min-height:140px;padding:20px}.destination .symbol{margin-bottom:8px}.destination span{margin-top:8px}
 </style>
 </head>
 <body>
 <main class="page">
   <div class="masthead"><span class="brand" data-i18n="brand"></span><button id="settings" class="settings" data-i18n="settings"></button></div>
   <div class="languages" role="group" data-i18n-label="language"><span data-i18n="language"></span><button data-language="ko" lang="ko" aria-pressed="false">한국어</button><button data-language="ja" lang="ja" aria-pressed="false">日本語</button><button data-language="en" lang="en" aria-pressed="false">English</button></div>
+  <section id="home-screen">
+    <h1 data-i18n="homeTitle"></h1><p class="intro" data-i18n="homeIntro"></p>
+    <div class="home-menu"><button class="destination" id="open-wallpapers"><span class="symbol" aria-hidden="true">☾</span><strong data-i18n="wallpaperMenu"></strong><span data-i18n="wallpaperMenuHint"></span></button><button class="destination" id="open-charging"><span class="symbol" aria-hidden="true">✧</span><strong data-i18n="chargingMenu"></strong><span data-i18n="chargingMenuHint"></span></button></div>
+  </section>
+  <button class="back" id="back-home" hidden data-i18n="backHome"></button>
+  <section id="wallpaper-screen" hidden>
+    <h1 data-i18n="wallpaperMenu"></h1><p class="intro" data-i18n="wallpaperMenuHint"></p>
+    <div class="target-options" role="group" data-i18n-label="wallpaperTarget"><button class="tab" data-wallpaper-target="home" aria-pressed="true" data-i18n="changeWallpaper"></button><button class="tab" data-wallpaper-target="lock" aria-pressed="false" data-i18n="changeLockScreen"></button></div>
+    <p class="wallpaper-help" data-i18n="wallpaperFileHint"></p>
+    <section class="library-tools"><div class="library-copy"><strong data-i18n="yourMedia"></strong><p data-i18n="mediaHint"></p></div><button id="import-wallpaper" data-i18n="importMedia" disabled></button></section>
+    <div class="grid" id="wallpaper-grid"></div><p class="empty" id="wallpaper-empty" hidden data-i18n="emptyLibrary"></p>
+  </section>
+  <section id="charging-screen" hidden>
   <h1 data-i18n="galleryTitle"></h1><p class="intro" data-i18n="intro"></p>
   <div class="statusline" id="service-state"><i class="dot"></i><span id="service-label"></span><span class="sep">/</span><span data-i18n="maxTime"></span><span class="sep">/</span><span data-i18n="offline"></span></div>
   <section class="hero" data-i18n-label="selectedCircle"><div id="hero-art"></div><div><div class="label" id="hero-tag"></div><h2 id="hero-title"></h2><p id="hero-description"></p><div class="saved" id="hero-saved"></div></div></section>
   <p id="service-hint" class="hint" hidden data-i18n="serviceHint"></p><p id="library-notice" class="notice" hidden></p>
-  <div class="manage"><button id="wallpaper-home" data-i18n="changeWallpaper"></button><button id="wallpaper-lock" data-i18n="changeLockScreen"></button></div>
-  <div class="manage"><button id="delete-design" data-i18n="disableDesign"></button></div>
+  <div class="target-options" id="duration-options" role="group" data-i18n-label="duration"><button class="tab" data-duration="1000">1s</button><button class="tab" data-duration="3000">3s</button><button class="tab" data-duration="5000">5s</button><button class="tab" data-duration="7000">7s</button></div>
+  <div class="manage"><button id="edit-information" data-i18n="editInformation"></button><button id="delete-design" data-i18n="disableDesign"></button></div>
   <section class="library-tools"><div class="library-copy"><strong data-i18n="yourMedia"></strong><p data-i18n="mediaHint"></p></div><button id="import-media" data-i18n="importMedia" disabled></button><button id="manage-inactive" data-i18n="manageInactive"></button></section>
   <div class="section-head"><h2 data-i18n="choose"></h2><span class="count" id="design-count"></span></div>
   <nav class="tabs" id="gallery-tabs" data-i18n-label="categories"><button class="tab" data-group="all" aria-pressed="true"></button><button class="tab add" id="create-tab" data-i18n="createTab"></button></nav>
   <div class="tab-actions" id="tab-actions" hidden><button id="manage-tab-members" data-i18n="manageTabMembers"></button><button id="rename-tab" data-i18n="renameTab"></button><button id="delete-tab" class="danger" data-i18n="deleteTab"></button></div>
   <input id="search" class="search" type="search" autocomplete="off" data-i18n-label="search">
   <div class="grid" id="design-grid"></div><p class="empty" id="empty" hidden data-i18n="noResults"></p><p class="note" data-i18n="note"></p>
+  </section>
 </main>
-<footer class="actions"><div class="action-inner"><div class="action-label" id="selection-status" aria-live="polite"></div><div class="buttons"><button id="preview" data-i18n="preview"></button><button class="apply" id="apply"></button></div></div></footer>
+<footer class="actions" id="charging-actions" hidden><div class="action-inner"><div class="action-label" id="selection-status" aria-live="polite"></div><div class="buttons"><button id="preview" data-i18n="preview"></button><button class="apply" id="apply"></button></div></div></footer>
 <dialog id="browser-preview"><button class="close" id="close-preview" data-i18n="close"></button><iframe title="Magic circle preview"></iframe></dialog>
 <dialog id="inactive-dialog" class="library-dialog" data-i18n-label="manageInactive"><button class="close" id="close-inactive" data-i18n="close"></button><h2 data-i18n="manageInactive"></h2><p class="dialog-copy" data-i18n="inactiveHint"></p><input id="inactive-search" class="search" type="search" autocomplete="off" data-i18n-label="inactiveSearch"><div class="grid" id="inactive-grid"></div><p class="empty" id="inactive-empty" hidden data-i18n="noResults"></p></dialog>
 <dialog id="tab-editor" class="library-dialog" data-i18n-label="tabEditor"><button class="close" id="close-tab-editor" data-i18n="close"></button><h2 id="tab-editor-title"></h2><label class="field-label" for="tab-name" data-i18n="tabName"></label><input id="tab-name" class="field" autocomplete="off"><p class="form-error" id="tab-error" role="alert"></p><div class="dialog-actions"><button id="cancel-tab-editor" data-i18n="cancel"></button><button id="save-tab" class="primary" data-i18n="save"></button></div></dialog>
 <dialog id="tab-members-dialog" class="library-dialog" data-i18n-label="tabMembers"><button class="close" id="close-tab-members" data-i18n="close"></button><h2 data-i18n="tabMembers"></h2><p class="dialog-copy" data-i18n="tabMembersHint"></p><div class="member-list" id="tab-members-grid"></div></dialog>
 <script src="i18n.js"></script>
-<dialog id="wallpaper-dialog" class="library-dialog" data-i18n-label="wallpaperChoose"><button class="close" id="close-wallpaper" data-i18n="close"></button><h2 id="wallpaper-title"></h2><p class="dialog-copy" data-i18n="wallpaperChoose"></p><div id="wallpaper-choices" class="member-list"></div></dialog>
+<dialog id="create-screen-dialog" class="library-dialog" style="height:fit-content"><button id="close-create" class="close" data-i18n="close"></button><h2 data-i18n="createScreen"></h2><p class="dialog-copy" data-i18n="createHint"></p><div class="dialog-actions"><button data-create-purpose="wallpaper" data-i18n="wallpaperMenu"></button><button data-create-purpose="charging" data-i18n="chargingMenu"></button></div><div id="draft-list" class="member-list"></div></dialog>
 <script src="circle-designs.js"></script>
 <script src="collection-catalog.js"></script>
 <script src="direct-extra.js"></script><script src="direct-circles.js"></script>

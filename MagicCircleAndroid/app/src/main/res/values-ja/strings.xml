@@ -4,7 +4,9 @@
     <string name="accessibility_service_description">充電端子を接続すると、オフラインの魔法陣アニメーションを最大7秒間表示します。</string>
     <string name="close_preview">閉じる</string>
     <string name="library_importing">画像をアプリにコピーしています…</string>
-    <string name="library_imported">画像を追加して選択しました。</string>
+    <string name="library_imported">画像を追加しました。</string>
+    <string name="wallpaper_uploaded">マイファイルの壁紙</string>
+    <string name="wallpaper_uploaded_description">取り込んだ画像またはGIFを壁紙に表示します。</string>
     <string name="library_invalid">読み取れる GIF、PNG、JPEG 画像を選択してください。</string>
     <string name="library_too_large">ファイルが大きすぎます。20 MiB 以下の画像を選択してください。</string>
     <string name="library_dimensions">画像または GIF アニメーションが大きすぎます。小さい画像か短い GIF を使用してください。</string>

@@ -22,6 +22,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     const errors=[]; page.on('pageerror', error=>errors.push(error.message));
     await page.route('https://appassets.androidplatform.net/media/**', route => route.fulfill({contentType:'image/png',body:png}));
     await page.goto(file('gallery.html')+'?lang=ko');
+    await page.locator('#open-charging').click();
     assert.equal(await page.locator('#import-media').count(),1,'Users need an import action in the existing gallery');
     const media=[{id,name:'<img src=x onerror=alert(1)> 여행 사진.jpg',url:mediaUrl,mime:'image/jpeg'}];
     await page.evaluate(({id,media})=>window.setGalleryState({selected:id,language:'ko',enabled:true,hidden:['classic','moon'],media}),{id,media});
@@ -64,6 +65,7 @@ const gif = Buffer.from('47494638396101000100800000ff00000000ff21ff0b4e455453434
     }
     // Browser deletion uses the real same collection filter, without pretending to save app data.
     await page.goto(file('gallery.html')+'?lang=ko');
+    await page.locator('#open-charging').click();
     page.once('dialog', dialog=>dialog.accept()); await page.locator('#delete-design').click();
     assert.equal(await page.locator('[data-theme="native-N01"]').isVisible(),false);
     await page.locator('#manage-inactive').click();

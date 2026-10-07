@@ -16,7 +16,7 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
-import android.util.Base64
+import android.graphics.Bitmap
 import org.json.JSONObject
 
 object LibraryStorageChecks {
@@ -60,7 +60,7 @@ object LibraryStorageChecks {
         check(savedTab.getString("name") == "Étoile")
         check(savedTab.getJSONArray("members").getString(0) == "ref-C03")
         check(File(root, "media-library.v1-recovery.json").readText() == V1)
-        check(JSONObject(manifest.readText()).getInt("version") == 2)
+        check(JSONObject(manifest.readText()).getInt("version") == 3)
 
         reloaded.renameTab(tab, "Night")
         check(runCatching { reloaded.createTab("Night") }.exceptionOrNull() is IllegalArgumentException)
@@ -186,10 +186,12 @@ object LibraryStorageChecks {
         if (Build.VERSION.SDK_INT < 29) return
         val root = root(context)
         MediaLibrary(context, root, "classic")
-        val source = File(root, "source.png").apply {
-            writeBytes(Base64.decode(
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2ZQAAAABJRU5ErkJggg==",
-                Base64.DEFAULT))
+        val source = File(root, "source.png")
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        try {
+            FileOutputStream(source).use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally {
+            bitmap.recycle()
         }
         val provider = object : ContentProvider() {
             override fun onCreate() = true
@@ -210,7 +212,12 @@ object LibraryStorageChecks {
         }
         val importedRoot = root(context)
         val successful = MediaLibrary(wrapped, importedRoot, "classic")
+        val beforeWallpaperImport = successful.selected()
+        successful.importDocument(Uri.parse("content://v113/source"), false)
+        check(successful.selected() == beforeWallpaperImport) { "Wallpaper import changed charging selection" }
+        check(successful.galleryState(false, "en").getJSONArray("media").length() == 1)
         successful.importDocument(Uri.parse("content://v113/source"))
+        check(successful.selected() != beforeWallpaperImport) { "Charging import did not select its file" }
         check(successful.galleryState(false, "en").getString("migrationNotice").isEmpty())
         check(MediaLibrary(wrapped, importedRoot, "classic").selected() == successful.selected())
         val manifestFile = File(root, "media-library.json")

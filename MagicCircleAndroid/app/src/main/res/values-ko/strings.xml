@@ -4,7 +4,9 @@
     <string name="accessibility_service_description">충전기를 연결하면 인터넷 없이 마법진 애니메이션을 최대 7초 동안 표시합니다.</string>
     <string name="close_preview">닫기</string>
     <string name="library_importing">이미지를 앱에 복사하는 중…</string>
-    <string name="library_imported">이미지를 추가하고 선택했습니다.</string>
+    <string name="library_imported">이미지를 추가했습니다.</string>
+    <string name="wallpaper_uploaded">내 파일 배경화면</string>
+    <string name="wallpaper_uploaded_description">가져온 이미지 또는 GIF를 배경화면으로 표시합니다.</string>
     <string name="library_invalid">읽을 수 있는 GIF, PNG 또는 JPEG 이미지를 선택해 주세요.</string>
     <string name="library_too_large">파일이 너무 큽니다. 20 MiB 이하의 이미지를 선택해 주세요.</string>
     <string name="library_dimensions">이미지나 GIF 애니메이션이 너무 큽니다. 더 작은 이미지나 짧은 GIF를 사용해 주세요.</string>

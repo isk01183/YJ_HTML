@@ -1,15 +1,22 @@
 let selected='native-N01',focused='native-N01',native=false,initialized=false,enabled=false,activeGroup='all';
 let language=MagicI18n.normalize(new URLSearchParams(location.search).get('lang')||navigator.language.split('-')[0]);
 let hidden=new Set(),media=[],tabs=[],busy=false,readable=true,migrationNotice=null;
+let screen='home',wallpaperTarget='home';
+let scenes=[],drafts=[],durationMs=7000;
+const createButton=document.createElement('button');createButton.id='open-create';createButton.className='destination';
+createButton.innerHTML='<span class="symbol" aria-hidden="true">⊞</span><strong data-i18n="createScreen"></strong><span data-i18n="createHint"></span>';
+document.querySelector('.home-menu').appendChild(createButton);
 const grid=document.getElementById('design-grid');
 const nativeDesign={id:'native-N01',code:'N01',group:'signature',color:'#e4c889'};
 const builtins=[nativeDesign,...CircleDesigns.list,...ReferenceDesigns.list];
 const builtinIds=new Set(builtins.map(design=>design.id));
 const nativeIcon='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#080d18"/><circle cx="50" cy="50" r="36" fill="none" stroke="#e4c889" stroke-width="1.5"/><circle cx="50" cy="50" r="26" fill="none" stroke="#72cbe6" stroke-width="1"/><path d="M50 16 70 66 24 38h52L30 66Z" fill="none" stroke="#e4c889" stroke-width="1.5"/><text x="50" y="53" fill="#f9e8c3" font-size="12" text-anchor="middle">N01</text></svg>');
 const text=(key,values)=>MagicI18n.t(key,language,values);
-const visibleDesigns=()=>readable?builtins.filter(theme=>!hidden.has(theme.id)).concat(media):[];
+const visibleDesigns=()=>readable?builtins.filter(theme=>!hidden.has(theme.id)).concat(media,scenes.filter(s=>s.purpose==='CHARGING')):[];
 const tab=id=>tabs.find(value=>value.id===id);
 const translatedTheme=id=>{
+    const scene=scenes.find(s=>s.id===id);
+    if(scene)return {...scene,desc:text('createHint'),color:'#d5c5a2',group:'uploads',thumb:scene.url};
     const custom=media.find(theme=>theme.id===id);
     return custom?{...custom,desc:text(custom.mime==='image/gif'?'mediaAnimated':'mediaStill'),color:'#d5c5a2',group:'uploads'}
         :id==='native-N01'?{...nativeDesign,name:text('nativeName'),desc:text('nativeDescription')}
@@ -20,6 +27,7 @@ const nativeArtwork=id=>id==='ref-W03'||id==='ref-R01';
 const generatedArtwork=id=>'https://appassets.androidplatform.net/generated/'+id+'.png';
 const designCode=id=>translatedTheme(id)?.code||id;
 const artUrl=id=>{
+    const scene=scenes.find(s=>s.id===id);if(scene)return scene.url;
     const custom=media.find(theme=>theme.id===id),code=directCode(id);
     return id==='native-N01'?nativeIcon:native&&nativeArtwork(id)?generatedArtwork(id):custom?custom.url+'?thumb=1':code
         ?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(DirectCircles.svg(code))
@@ -109,14 +117,17 @@ function render(){
     document.getElementById('apply').disabled=busy||!focused||focused===selected;
     document.getElementById('apply').textContent=text(focused&&focused===selected?'applied':'apply');
     document.getElementById('preview').disabled=busy||!focused;
+    document.getElementById('preview').textContent=text('preview',{seconds:durationMs/1000});
+    document.getElementById('edit-information').disabled=busy||!focused||!native;
+    document.getElementById('open-create').disabled=busy||!readable||!native;
+    document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.duration)===durationMs));b.disabled=busy||!native||!readable;});
     const deleteButton=document.getElementById('delete-design');
     deleteButton.disabled=busy||!focused;
     deleteButton.textContent=text(focused&&builtinIds.has(focused)?'disableDesign':'deleteDesign');
     document.getElementById('manage-inactive').disabled=!readable;
     document.getElementById('save-tab').disabled=busy||!readable;
     document.getElementById('import-media').disabled=!native||busy||!readable;
-    document.querySelectorAll('#wallpaper-home,#wallpaper-lock').forEach(button=>button.disabled=busy||!wallpaperThemes().length);
-    if(document.getElementById('wallpaper-dialog').open)renderWallpaperChoices();
+    renderScreens();
     document.getElementById('import-media').textContent=text(busy?'mediaLoading':'importMedia');
     document.getElementById('service-label').textContent=text(native?(enabled?'serviceOn':'serviceOff'):'serviceCheck');
     document.getElementById('service-state').classList.toggle('enabled',native&&enabled);
@@ -146,9 +157,16 @@ function render(){
     if(document.getElementById('tab-members-dialog').open)renderTabMembers();
 }
 window.setGalleryState=state=>{
+    scenes=(Array.isArray(state.scenes)?state.scenes:[]).filter(s=>/^scene-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s.id)&&['WALLPAPER','CHARGING'].includes(s.purpose))
+        .map(s=>({...s,name:String(s.name),url:'https://appassets.androidplatform.net/scene-thumbnails/'+s.id+'?v='+encodeURIComponent(JSON.stringify(s.layers))}));
+    drafts=Array.isArray(state.drafts)?state.drafts:[];
+    durationMs=[1000,3000,5000,7000].includes(state.durationMs)?state.durationMs:7000;
+    delete document.getElementById('hero-art').dataset.renderedTheme;
+    cards.forEach(c=>{c.querySelector('img')?.removeAttribute('src');if(observer)observer.observe(c);else loadArt(c);});
     const previousMedia=new Set(media.map(theme=>theme.id));
     const nativeChanged=!native;native=true;selected=state.selected||'';enabled=!!state.enabled;busy=!!state.busy;readable=state.readable!==false;
     language=MagicI18n.normalize(state.language);hidden=new Set(Array.isArray(state.hidden)?state.hidden:[]);
+    if(['home','wallpaper','charging'].includes(state.screen))screen=state.screen;
     tabs=(Array.isArray(state.tabs)?state.tabs:[]).filter(value=>typeof value.id==='string'&&typeof value.name==='string'&&Array.isArray(value.members)).map(value=>({id:value.id,name:value.name,members:[...value.members]}));
     migrationNotice=['selection_reset','selection_changed'].includes(state.migrationNotice)?state.migrationNotice:null;
     media=(Array.isArray(state.media)?state.media:[]).filter(theme=>/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(theme.id)
@@ -159,30 +177,53 @@ window.setGalleryState=state=>{
     render();
 };
 const dialogTriggers=new WeakMap();
-const wallpaperThemes=()=>visibleDesigns().filter(theme=>theme.id==='ref-W03'||theme.id==='ref-R01');
-let wallpaperTarget='home';
-function renderWallpaperChoices(){
-    document.getElementById('wallpaper-title').textContent=text(wallpaperTarget==='lock'?'changeLockScreen':'changeWallpaper');
-    const choices=document.getElementById('wallpaper-choices');choices.replaceChildren();
-    ['ref-W03','ref-R01'].filter(id=>wallpaperThemes().some(theme=>theme.id===id)).forEach(id=>{
-        const row=document.createElement('div'),label=document.createElement('span'),button=document.createElement('button');
-        row.className='member-row';label.textContent=translatedTheme(id).name;
-        button.type='button';button.dataset.wallpaperTheme=id;button.textContent=id.slice(4);button.disabled=busy;
-        button.setAttribute('aria-label',text('select',{name:translatedTheme(id).name}));
-        button.addEventListener('click',()=>{
-            if(busy||!wallpaperThemes().some(theme=>theme.id===id))return;
-            closeDialog(document.getElementById('wallpaper-dialog'));
-            if(native)location.href='magiccircle://wallpaper?theme='+id+'&target='+wallpaperTarget;
-            else document.getElementById('selection-status').textContent=text('browserOnly');
-        });
-        row.append(label,button);choices.appendChild(row);
+const wallpaperThemes=()=>visibleDesigns().filter(theme=>nativeArtwork(theme.id)||media.some(item=>item.id===theme.id)).concat(scenes.filter(s=>s.purpose==='WALLPAPER'));
+function renderScreens(){
+    ['home','wallpaper','charging'].forEach(name=>document.getElementById(name+'-screen').hidden=screen!==name);
+    document.getElementById('back-home').hidden=screen==='home';
+    document.getElementById('charging-actions').hidden=screen!=='charging';
+    document.getElementById('settings').hidden=screen!=='charging';
+    document.title=text(screen==='home'?'homeTitle':screen==='wallpaper'?'wallpaperMenu':'chargingMenu');
+    const upload=document.getElementById('import-wallpaper');upload.disabled=!native||busy||!readable;upload.textContent=text(busy?'mediaLoading':'importMedia');
+    if(screen!=='wallpaper')return;
+    document.querySelectorAll('[data-wallpaper-target]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.wallpaperTarget===wallpaperTarget)));
+    const container=document.getElementById('wallpaper-grid');container.replaceChildren();
+    wallpaperThemes().forEach(theme=>{
+        const card=document.createElement('div');card.className='card wallpaper-card';
+        const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=artUrl(theme.id);
+        const art=document.createElement('div');art.className='art';art.appendChild(image);
+        const label=document.createElement('span');label.className='name';label.textContent=translatedTheme(theme.id).name;
+        const apply=document.createElement('button');apply.type='button';apply.className='apply-wallpaper';apply.dataset.wallpaperTheme=theme.id;apply.textContent=text('wallpaperUse');apply.disabled=!native||busy;
+        apply.addEventListener('click',()=>{if(native&&!busy)location.href='magiccircle://wallpaper?theme='+encodeURIComponent(theme.id)+'&target='+wallpaperTarget;});
+        card.append(art,label,apply);container.appendChild(card);
+        if(scenes.some(s=>s.id===theme.id)) {
+            const edit=document.createElement('button');edit.textContent=text('editScene');edit.className='apply-wallpaper';edit.onclick=()=>editTheme(theme.id);edit.disabled=!native||busy;card.appendChild(edit);
+            const remove=document.createElement('button');remove.textContent=text('deleteDesign');remove.className='apply-wallpaper';remove.disabled=!native||busy;remove.onclick=()=>{if(native&&!busy)location.href='magiccircle://delete?theme='+encodeURIComponent(theme.id);};card.appendChild(remove);
+        }
     });
+    document.getElementById('wallpaper-empty').hidden=wallpaperThemes().length!==0;
 }
-['home','lock'].forEach(target=>document.getElementById('wallpaper-'+target).addEventListener('click',event=>{
-    wallpaperTarget=target;renderWallpaperChoices();openDialog(document.getElementById('wallpaper-dialog'),event.currentTarget);
-}));
-document.getElementById('close-wallpaper').addEventListener('click',()=>closeDialog(document.getElementById('wallpaper-dialog')));
+function showScreen(value){screen=value;render();window.scrollTo(0,0);if(native)location.href='magiccircle://screen?name='+value;}
+document.getElementById('open-wallpapers').addEventListener('click',()=>showScreen('wallpaper'));
+document.getElementById('open-charging').addEventListener('click',()=>showScreen('charging'));
+document.getElementById('back-home').addEventListener('click',()=>showScreen('home'));
+document.querySelectorAll('[data-wallpaper-target]').forEach(button=>button.addEventListener('click',()=>{wallpaperTarget=button.dataset.wallpaperTarget;renderScreens();}));
+document.getElementById('import-wallpaper').addEventListener('click',()=>{if(native&&!busy)location.href='magiccircle://import-wallpaper';});
+window.navigateBack=()=>{
+    const dialog=document.querySelector('dialog[open]');if(dialog){if(dialog===previewDialog)closePreview();else closeDialog(dialog);return true;}
+    if(screen==='home')return false;showScreen('home');return true;
+};
 function openDialog(dialog,trigger){dialogTriggers.set(dialog,trigger);dialog.showModal();}
+function editTheme(id){if(native&&!busy){document.querySelectorAll('dialog[open]').forEach(closeDialog);location.href='magiccircle://edit?theme='+encodeURIComponent(id);}}
+createButton.addEventListener('click',()=>{
+    const list=document.getElementById('draft-list');list.replaceChildren();
+    drafts.forEach(d=>{const button=document.createElement('button');button.className='back';button.textContent=text('editScene')+' · '+(d.scene?.name||d.key);button.onclick=()=>editTheme(d.key);list.appendChild(button);});
+    openDialog(document.getElementById('create-screen-dialog'),createButton);
+});
+document.getElementById('close-create').onclick=()=>closeDialog(document.getElementById('create-screen-dialog'));
+document.querySelectorAll('[data-create-purpose]').forEach(b=>b.onclick=()=>{if(native&&!busy){closeDialog(document.getElementById('create-screen-dialog'));location.href='magiccircle://create?purpose='+b.dataset.createPurpose;}});
+document.getElementById('edit-information').onclick=()=>editTheme(focused);
+document.querySelectorAll('[data-duration]').forEach(b=>b.onclick=()=>{if(native&&!busy)location.href='magiccircle://duration?ms='+b.dataset.duration;});
 function closeDialog(dialog){if(dialog.open)dialog.close();}
 document.querySelectorAll('dialog').forEach(dialog=>dialog.addEventListener('close',()=>dialogTriggers.get(dialog)?.focus()));
 grid.addEventListener('click',event=>{const card=event.target.closest('[data-theme]');if(card){focused=card.dataset.theme;render();}});
@@ -229,6 +270,7 @@ function renderInactive(){
         card.querySelector('.name').textContent=design.name;card.querySelector('.tag').textContent=designCode(theme.id);
         const button=card.querySelector('button');button.dataset.enableTheme=theme.id;button.textContent=text('enableDesign');button.disabled=busy||!readable;
         button.addEventListener('click',()=>{if(native)location.href='magiccircle://enable?theme='+encodeURIComponent(theme.id);else{hidden.delete(theme.id);render();}});
+        const edit=document.createElement('button');edit.className='enable';edit.textContent=text('editInformation');edit.disabled=!native||busy;edit.onclick=()=>editTheme(theme.id);card.appendChild(edit);
         card.hidden=!(design.name+' '+theme.id+' '+designCode(theme.id)).toLocaleLowerCase().includes(query);
         container.appendChild(card);loadArt(card);if(!card.hidden)count++;
     });

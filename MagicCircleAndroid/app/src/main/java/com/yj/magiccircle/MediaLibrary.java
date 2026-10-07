@@ -32,7 +32,7 @@ import java.util.UUID;
 /** Private copies and one atomic manifest; source document URIs are never saved or deleted. */
 final class MediaLibrary {
     static final String MEDIA_ORIGIN = "https://appassets.androidplatform.net/media/";
-    private static final int SCHEMA_VERSION = 2;
+    private static final int SCHEMA_VERSION = 3;
     private static final int ACTIVATION_REVISION = 1;
     private static final int MAX_MANIFEST_BYTES = 1024 * 1024;
     @SuppressLint("StaticFieldLeak") // The singleton retains only the application context.
@@ -49,6 +49,8 @@ final class MediaLibrary {
     private String migrationNotice = "";
     private boolean readable = true;
     private long initializationMillis;
+    private SceneData editor = new SceneData();
+    private final java.util.Map<String, Integer> leases = new java.util.HashMap<>();
 
     static synchronized MediaLibrary get(Context context) {
         if (instance == null) instance = new MediaLibrary(context.getApplicationContext());
@@ -93,14 +95,21 @@ final class MediaLibrary {
                             migrated.equals(state.selected) ? "" : "selection_reset");
                     save(state.media, state.hidden, state.selected, state.pendingDeletes,
                             state.tabs, state.migrationNotice);
-                } else if (version == SCHEMA_VERSION) {
+                } else if (version == 2 || version == SCHEMA_VERSION) {
                     state = readV2(saved);
+                    if (version == 2) {
+                        AtomicFile v2 = new AtomicFile(new File(storageRoot, "media-library.v2-recovery.json"));
+                        if (exists(v2)) {
+                            if (!Arrays.equals(original, read(v2))) throw new IOException("Existing v2 recovery differs");
+                        } else writeAtomic(v2, original, false);
+                    }
                     apply(state);
+                    if (version == 2) save(media, hidden, selected, pendingDeletes, tabs, migrationNotice);
                 } else {
                     throw new JSONException("Unknown library version");
                 }
             }
-        } catch (IOException | JSONException error) {
+        } catch (IOException | JSONException | IllegalArgumentException error) {
             // Keep every private file if a damaged manifest needs recovery; do not overwrite it.
             readable = false;
         } finally {
@@ -152,6 +161,7 @@ final class MediaLibrary {
         final Set<String> pendingDeletes;
         final List<Tab> tabs;
         final String migrationNotice;
+        SceneData editor = new SceneData();
         State(List<Item> media, Set<String> hidden, String selected, Set<String> pendingDeletes,
                 List<Tab> tabs, String migrationNotice) {
             this.media = media;
@@ -182,13 +192,19 @@ final class MediaLibrary {
         Set<String> ids = mediaIds(entries);
         Set<String> hiddenIds = readBuiltIns(saved.getJSONArray("hidden"), "hidden");
         Set<String> deletes = readDeletes(saved.getJSONArray("pendingDeletes"), true, ids);
+        SceneData scenes;
+        try { scenes = saved.getInt("version") == 3 ? SceneData.read(saved.getJSONObject("editor"), mimeById(entries)) : new SceneData(); }
+        catch (IllegalArgumentException error) { throw new JSONException("Invalid scene state"); }
+        ids.addAll(scenes.getScenes().keySet());
         String selection = saved.getString("selected");
         if (!validSelection(selection, ids) || hiddenIds.contains(selection)) {
             throw new JSONException("Invalid selection");
         }
         List<Tab> restoredTabs = readTabs(saved.getJSONArray("tabs"), ids);
-        return new State(entries, hiddenIds, selection, deletes, restoredTabs,
+        State state = new State(entries, hiddenIds, selection, deletes, restoredTabs,
                 saved.getString("migrationNotice"));
+        state.editor = scenes;
+        return state;
     }
 
     private static List<Item> readMedia(JSONArray entries) throws JSONException {
@@ -274,6 +290,7 @@ final class MediaLibrary {
         pendingDeletes = new LinkedHashSet<>(state.pendingDeletes);
         tabs = copyTabs(state.tabs);
         migrationNotice = state.migrationNotice;
+        editor = state.editor;
     }
 
     private static List<Tab> copyTabs(List<Tab> source) {
@@ -292,6 +309,11 @@ final class MediaLibrary {
     synchronized boolean available(String id) {
         if (!readable) return false;
         if (ThemeSelection.isValid(id)) return !hidden.contains(id);
+        ScreenScene scene = scene(id);
+        if (scene != null) {
+            for (ImageLayer layer : scene.getLayers()) if (!file(layer.getMediaId()).isFile()) return false;
+            return true;
+        }
         return find(id) != null && file(id).isFile();
     }
 
@@ -314,12 +336,15 @@ final class MediaLibrary {
                 .put("language", language).put("hidden", new JSONArray(hidden)).put("media", entries)
                 .put("tabs", tabEntries).put("activationRevision", ACTIVATION_REVISION)
                 .put("migrationNotice", migrationNotice).put("initializationMillis", initializationMillis)
-                .put("readable", readable);
+                .put("readable", readable).put("scenes", editor.json().getJSONArray("scenes"))
+                .put("drafts", editor.json().getJSONArray("drafts"))
+                .put("durationMs", durationMs());
     }
 
     synchronized void select(String id) throws IOException {
         requireReadable();
-        if (available(id)) save(media, hidden, id, pendingDeletes, tabs, "");
+        if (available(id) && (scene(id) == null || scene(id).getPurpose() == ScenePurpose.CHARGING))
+            save(media, hidden, id, pendingDeletes, tabs, "");
     }
 
     synchronized void setEnabled(String id, boolean enabled) throws IOException {
@@ -372,7 +397,7 @@ final class MediaLibrary {
 
     synchronized void setTabMember(String tabId, String theme, boolean member) throws IOException {
         requireReadable();
-        if (!ThemeSelection.isValid(theme) && find(theme) == null) {
+        if (!ThemeSelection.isValid(theme) && find(theme) == null && scene(theme) == null) {
             throw new IllegalArgumentException("Unknown design");
         }
         if (tab(tabId) == null) throw new IllegalArgumentException("Unknown tab");
@@ -406,6 +431,8 @@ final class MediaLibrary {
 
     synchronized void remove(String id) throws IOException {
         requireReadable();
+        if (scene(id) != null) { removeScene(id); return; }
+        if (referenced(id)) throw new IOException("Image is used by a scene or draft");
         if (!available(id)) return;
         List<Item> remaining = new ArrayList<>(media);
         Set<String> nextHidden = new LinkedHashSet<>(hidden);
@@ -421,7 +448,8 @@ final class MediaLibrary {
         }
         List<Tab> nextTabs = copyTabs(tabs);
         if (imported != null) for (Tab value : nextTabs) value.members.remove(id);
-        save(remaining, nextHidden, next, nextDeletes, nextTabs, migrationNotice);
+        save(remaining, nextHidden, next, nextDeletes, nextTabs, migrationNotice,
+                imported == null ? editor : editor.withLayout(id, null).withoutDraft(id));
         if (imported != null) {
             try { retryPendingDeletes(); }
             catch (IOException error) { throw new CleanupPending(); }
@@ -432,7 +460,7 @@ final class MediaLibrary {
     synchronized void retryPendingDeletes() throws IOException {
         if (!readable || pendingDeletes.isEmpty()) return;
         Set<String> remaining = new LinkedHashSet<>(pendingDeletes);
-        for (String id : pendingDeletes) if (MediaValidation.deleteCopies(directory, id)) remaining.remove(id);
+        for (String id : pendingDeletes) if (!referenced(id) && MediaValidation.deleteCopies(directory, id)) remaining.remove(id);
         if (!remaining.equals(pendingDeletes)) {
             save(media, hidden, selected(), remaining, tabs, migrationNotice);
         }
@@ -445,6 +473,10 @@ final class MediaLibrary {
     }
 
     void importDocument(Uri uri) throws IOException {
+        importDocument(uri, true);
+    }
+
+    String importDocument(Uri uri, boolean selectForCharging) throws IOException {
         if (uri == null || !"content".equals(uri.getScheme())) throw new MediaValidation.InvalidMedia("invalid");
         synchronized (this) {
             if (!readable) throw new IOException("Library manifest is unreadable");
@@ -471,7 +503,7 @@ final class MediaLibrary {
             synchronized (this) {
                 List<Item> added = new ArrayList<>(media);
                 added.add(new Item(id, name, mime));
-                save(added, hidden, id, pendingDeletes, tabs, "");
+                save(added, hidden, selectForCharging ? id : selected(), pendingDeletes, tabs, "");
                 saved = true;
             }
         } catch (SecurityException error) {
@@ -484,6 +516,7 @@ final class MediaLibrary {
                 thumbnail(id).delete();
             }
         }
+        return id;
     }
 
     synchronized InputStream open(String id, boolean thumb) throws IOException {
@@ -504,7 +537,68 @@ final class MediaLibrary {
     private List<String> order() {
         List<String> order = new ArrayList<>(ThemeSelection.IDS);
         for (Item item : media) order.add(item.id);
+        for (ScreenScene scene : editor.getScenes().values())
+            if (scene.getPurpose() == ScenePurpose.CHARGING && available(scene.getId())) order.add(scene.getId());
         return order;
+    }
+
+    private static java.util.Map<String,String> mimeById(List<Item> media) {
+        java.util.Map<String,String> result = new java.util.LinkedHashMap<>();
+        for (Item item : media) result.put(item.id, item.mime);
+        return result;
+    }
+    synchronized List<Item> items() { return new ArrayList<>(media); }
+    synchronized ScreenScene scene(String id) { return editor.getScenes().get(id); }
+    synchronized List<ScreenScene> scenes() { return new ArrayList<>(editor.getScenes().values()); }
+    synchronized List<InfoPlacement> chargeInfo(String id) {
+        List<InfoPlacement> value = editor.getLayouts().get(id);
+        return value == null ? null : new ArrayList<>(value);
+    }
+    synchronized int durationMs() { return editor.getDuration(); }
+    synchronized void setDurationMs(int ms) throws IOException { saveEditor(editor.withDuration(ms)); }
+    synchronized EditorDraft editorDraft(String id) { return editor.getDrafts().get(id); }
+    synchronized List<EditorDraft> editorDrafts() { return new ArrayList<>(editor.getDrafts().values()); }
+    synchronized void discardEditorDraft(String id) throws IOException { saveEditor(editor.withoutDraft(id)); }
+    synchronized void saveEditorDraft(EditorDraft draft) throws IOException {
+        saveEditor(editor.withDraft(draft));
+    }
+    synchronized void saveChargeInfo(String id, List<InfoPlacement> info) throws IOException {
+        saveEditor(editor.withLayout(id, info).withoutDraft(id));
+    }
+    synchronized void saveScene(ScreenScene scene, List<InfoPlacement> info) throws IOException {
+        saveEditor(editor.withScene(scene, info));
+    }
+    synchronized void removeScene(String id) throws IOException {
+        requireReadable();
+        if (scene(id) == null) return;
+        List<Tab> nextTabs = copyTabs(tabs);
+        for (Tab tab : nextTabs) tab.members.remove(id);
+        Set<String> unavailable = new HashSet<>(hidden); unavailable.add(id);
+        String next = ThemeSelection.nextVisible(selected(), order(), unavailable);
+        save(media, hidden, next, pendingDeletes, nextTabs, migrationNotice, editor.withoutScene(id));
+    }
+    private void saveEditor(SceneData next) throws IOException {
+        save(media, hidden, selected, pendingDeletes, tabs, migrationNotice, next);
+    }
+    private boolean referenced(String id) { return editor.references(id) || leases.containsKey(id); }
+    synchronized java.io.Closeable leaseMedia(List<String> ids) throws IOException {
+        requireReadable();
+        Set<String> unique = new HashSet<>(ids);
+        for (String id : unique) if (find(id) == null || !file(id).isFile()) throw new IOException("Missing scene image");
+        for (String id : unique) leases.put(id, leases.containsKey(id) ? leases.get(id) + 1 : 1);
+        return new java.io.Closeable() {
+            private boolean closed;
+            @Override public void close() {
+                synchronized (MediaLibrary.this) {
+                    if (closed) return;
+                    closed = true;
+                    for (String id : unique) {
+                        int count = leases.get(id);
+                        if (count == 1) leases.remove(id); else leases.put(id, count - 1);
+                    }
+                }
+            }
+        };
     }
 
     private String documentName(Uri uri) {
@@ -584,6 +678,10 @@ final class MediaLibrary {
 
     private void save(List<Item> entries, Set<String> hiddenIds, String selection, Set<String> deletes,
             List<Tab> tabEntries, String notice) throws IOException {
+        save(entries, hiddenIds, selection, deletes, tabEntries, notice, editor);
+    }
+    private void save(List<Item> entries, Set<String> hiddenIds, String selection, Set<String> deletes,
+            List<Tab> tabEntries, String notice, SceneData nextEditor) throws IOException {
         requireReadable();
         byte[] bytes;
         try {
@@ -596,6 +694,7 @@ final class MediaLibrary {
                     .put("hidden", new JSONArray(hiddenIds)).put("selected", selection)
                     .put("pendingDeletes", new JSONArray(deletes))
                     .put("tabs", savedTabs).put("migrationNotice", notice)
+                    .put("editor", nextEditor.json())
                     .toString().getBytes(StandardCharsets.UTF_8);
         } catch (JSONException error) { throw new IOException(error); }
         if (bytes.length > MAX_MANIFEST_BYTES) throw new IOException("Library is full");

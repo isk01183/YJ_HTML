@@ -12,9 +12,12 @@ class WallpaperPolicyTest {
         assertFalse(WallpaperPolicy.supportsStill(37, "both"))
         assertFalse(WallpaperPolicy.supportsStill(37, ""))
     }
-    @Test fun onlyTheTwoArtworkThemesAreAllowed() {
+    @Test fun artworkAndImportedIdsAreAllowedButPathsAreRejected() {
+        assertTrue(WallpaperPolicy.allowedTheme("scene-11111111-1111-4111-8111-111111111111"))
+        assertFalse(WallpaperPolicy.allowedTheme("scene-../../private"))
         assertTrue(WallpaperPolicy.allowedTheme("ref-W03"))
         assertTrue(WallpaperPolicy.allowedTheme("ref-R01"))
+        assertTrue(WallpaperPolicy.allowedTheme("11111111-1111-4111-8111-111111111111"))
         for (id in listOf(null, "native-N01", "ref-C03", "W03", ""))
             assertFalse(WallpaperPolicy.allowedTheme(id))
     }
@@ -23,6 +26,13 @@ class WallpaperPolicyTest {
         assertFalse(WallpaperPolicy.shouldRender(false, true, false))
         assertFalse(WallpaperPolicy.shouldRender(true, false, false))
         assertFalse(WallpaperPolicy.shouldRender(true, true, true))
+    }
+    @Test fun previewNeverReusesAnAssignedUploadSlot() {
+        assertEquals("upload-slot-2", WallpaperPolicy.freeUploadSlot(setOf("upload-slot-0", "upload-slot-1")))
+        assertNull(WallpaperPolicy.freeUploadSlot(setOf("upload-slot-0", "upload-slot-1", "upload-slot-2")))
+        assertTrue(WallpaperPolicy.confirmed("upload-slot-2", "upload-slot-2"))
+        assertFalse(WallpaperPolicy.confirmed("upload-slot-2", "upload-slot-1"))
+        assertEquals("unconfirmed", WallpaperPolicy.liveResult("upload-slot-2", "upload-slot-2", "W03", false))
     }
     @Test fun confirmationRequiresTheActualRequestedComponent() {
         assertTrue(WallpaperPolicy.confirmed("R01", "R01"))

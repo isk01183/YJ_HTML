@@ -13,6 +13,7 @@ const url = name => pathToFileURL(path.join(assets,name)).href;
         page.setDefaultTimeout(4000);
         const errors=[]; page.on('pageerror', error=>errors.push(error.message));
         await page.goto(url('gallery.html'));
+        await page.locator('#open-charging').click();
         assert.equal(await page.locator('[data-language]').count(),3, 'Three in-app language choices must be available');
         for (const [language,title,charging,manageInactive,createTab] of [
             ['ko','마법진 보관함','충전 시작','비활성 도안 관리','＋ 탭 만들기'],
@@ -20,7 +21,7 @@ const url = name => pathToFileURL(path.join(assets,name)).href;
             ['ja','魔法陣の書庫','充電開始','非表示デザインを管理','＋ タブを作成']
         ]) {
             await page.locator('[data-language="'+language+'"]').click();
-            assert.equal(await page.locator('h1').textContent(),title);
+            assert.equal(await page.locator('#charging-screen h1').textContent(),title);
             assert.equal(await page.locator('html').getAttribute('lang'),language);
             assert.equal(await page.locator('#manage-inactive').textContent(),manageInactive);
             assert.equal(await page.locator('#create-tab').textContent(),createTab);

@@ -48,6 +48,7 @@ for(let i=0;theme?.code[0]!=='F'&&i<18;i++){
 }
 let requested=false,ready=false,deadline=0;
 window.chargingCollectionError=false;
+window.prepareChargingAnimation=()=>ready&&!window.chargingCollectionError;
 function reveal(){
  if(!requested||!ready||document.documentElement.classList.contains('running'))return;
  const remaining=deadline-performance.now();
@@ -61,12 +62,13 @@ if(direct){
  const host=document.createElement('div');host.id='direct-art';
  host.innerHTML=DirectCircles.svg(theme.code,{surface:'charge'});host.querySelector('svg').setAttribute('aria-hidden','true');image.replaceWith(host);ready=true;
 }else if(theme){
- image.onload=()=>{ready=true;reveal();};
+ image.onload=()=>{ready=true;if(params.get('demo')==='1')window.startChargingAnimation();else reveal();};
  image.onerror=()=>{window.chargingCollectionError=true;document.getElementById('loading').textContent=MagicI18n.t('mediaFailed',language);};
  const run=/^\d+$/.test(params.get('run')||'')?params.get('run'):String(Date.now());
  image.src='https://appassets.androidplatform.net/collection/'+theme.code+'.svg?run='+run;
 }
 window.startChargingAnimation=(remainingMs=7000)=>{
+ if(!ready)return false;
  if(!theme||window.chargingCollectionError)return false;
  if(document.documentElement.classList.contains('running'))return performance.now()<deadline;
  if(!requested){
@@ -76,4 +78,4 @@ window.startChargingAnimation=(remainingMs=7000)=>{
  return document.documentElement.classList.contains('running');
 };
 if(params.get('demo')==='1')window.startChargingAnimation();
-</script></body></html>
+</script><script src="charge-runtime.js"></script></body></html>

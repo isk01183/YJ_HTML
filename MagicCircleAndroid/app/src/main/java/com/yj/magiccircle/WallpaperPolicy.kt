@@ -1,13 +1,14 @@
 package com.yj.magiccircle
 
 object WallpaperPolicy {
+    fun freeUploadSlot(used: Set<String>): String? = (0..2).map { "upload-slot-$it" }.firstOrNull { it !in used }
     @JvmStatic fun supportsStill(sdk: Int, target: String): Boolean =
         sdk >= 23 && (target == "home" || (target == "lock" && sdk >= 24))
-    @JvmStatic fun allowedTheme(id: String?): Boolean = id == "ref-W03" || id == "ref-R01"
+    @JvmStatic fun allowedTheme(id: String?): Boolean = id == "ref-W03" || id == "ref-R01" || MediaValidation.isId(id) || SceneRules.isSceneId(id)
     @JvmStatic fun shouldRender(visible: Boolean, surfaceReady: Boolean, destroyed: Boolean): Boolean =
         visible && surfaceReady && !destroyed
     @JvmStatic fun confirmed(requested: String, actual: String?): Boolean =
-        requested in setOf("W03", "R01") && requested == actual
+        (requested in setOf("W03", "R01") || requested.matches(Regex("upload-slot-[0-2]"))) && requested == actual
 
     fun bitmapSize(width: Int, height: Int): Pair<Int, Int> {
         require(width > 0 && height > 0)

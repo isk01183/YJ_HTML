@@ -2,6 +2,11 @@ package com.yj.magiccircle;
 
 public final class ChargingTransitionSelfTest {
     public static void main(String[] args) {
+        if (ChargingTransition.prepareDeadline(10000L) != 12000L) throw new AssertionError("Preparation deadline");
+        for (int duration : new int[] {1000, 3000, 5000, 7000}) {
+            if (ChargingTransition.displayDeadline(10000L, duration) != 10000L + duration)
+                throw new AssertionError("Visible duration must start after preparation");
+        }
         ChargingTransition.Event screenOff;
         try { screenOff = ChargingTransition.Event.valueOf("SCREEN_OFF"); }
         catch (IllegalArgumentException error) { throw new AssertionError("Screen-off must end the active run before sleep"); }

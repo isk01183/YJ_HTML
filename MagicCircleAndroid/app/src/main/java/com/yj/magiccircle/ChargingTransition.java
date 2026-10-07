@@ -7,6 +7,14 @@ final class ChargingTransition {
 
     private ChargingTransition() {}
 
+    static long durationMs(int value) {
+        return value == 1000 || value == 3000 || value == 5000 || value == 7000 ? value : 7000L;
+    }
+
+    static long prepareDeadline(long connectedAt) { return connectedAt + 2000L; }
+
+    static long displayDeadline(long startedAt, int duration) { return startedAt + durationMs(duration); }
+
     static State next(State current, Event event) {
         if (event == Event.CONNECT) return State.LOADING;
         if (event == Event.NATIVE_READY && current == State.LOADING) return State.PLAYING;

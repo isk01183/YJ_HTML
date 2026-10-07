@@ -14,6 +14,7 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
    await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><circle cx="512" cy="512" r="460" fill="none" stroke="gold" stroke-width="4"/></svg>'});
   });
   await page.goto(url('gallery.html')+'?lang=ko');
+  await page.locator('#open-charging').click();
   assert.equal(await page.locator('.card').count(),174);
   await page.locator('#search').fill('C03');assert.equal(await page.locator('.card:visible').count(),1);
   await page.locator('[data-theme="ref-C03"]').click();
@@ -46,8 +47,7 @@ const url=name=>pathToFileURL(path.join(root,name)).href;
   await page.goto(url('collection_circle.html')+'?theme=ref-C99');
   assert.equal(await page.evaluate(()=>window.startChargingAnimation()),false);assert.equal(requests,before);
   await page.goto(url('collection_circle.html')+'?theme=ref-A01&run=124',{waitUntil:'domcontentloaded'});
-  await page.evaluate(()=>window.startChargingAnimation(0));
-  await page.waitForFunction(()=>window.chargingCollectionError===true);
+  assert.equal(await page.evaluate(()=>window.startChargingAnimation(0)),false);
   assert.equal(await page.locator('html').evaluate(n=>n.classList.contains('running')),false,'Expired native budget must never reopen a sequence');
   for(const width of [320,800,1440]){
    await page.setViewportSize({width,height:900});await page.goto(url('gallery.html')+'?lang=en');

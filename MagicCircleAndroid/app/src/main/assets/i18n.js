@@ -3,7 +3,22 @@
     // Bundled translations: the app never needs a network request or a downloaded font.
     const strings = {};
     const add = (key, ja, ko, en) => { strings[key] = {ja, ko, en}; };
+    add('createScreen','画面を作る','화면 직접 만들기','Create a screen');
+    add('createHint','画像を重ね、位置・角度・情報を自由に。','이미지를 겹치고 위치·각도·충전 정보를 자유롭게 꾸며요.','Layer images and arrange every detail.');
+    add('editInformation','充電情報を編集','충전 정보 편집','Edit charge information');
+    add('editScene','作品を編集','작품 편집','Edit scene');
+    add('duration','表示時間','표시 시간','Display duration');
     add('galleryTitle', '魔法陣の書庫', '마법진 보관함', 'The Arcane Archive');
+    add('homeTitle', 'あなたの画面に、魔法を。', '내 화면에 담는 마법', 'A little magic for your screen');
+    add('homeIntro', '変更する画面を選んでください。', '꾸미고 싶은 화면을 선택해 주세요.', 'Choose what you want to personalize.');
+    add('wallpaperMenu', '壁紙 / ロック画面', '배경화면 / 잠금화면', 'Wallpaper / Lock screen');
+    add('chargingMenu', '充電アニメーションを変更', '충전 애니메이션 변경', 'Change charging animation');
+    add('wallpaperMenuHint', '魔法陣やマイファイルで、いつもの画面を彩ります。', '마법진이나 내 파일로 평소 사용하는 화면을 꾸며 보세요.', 'Personalize your everyday screen with artwork or your own files.');
+    add('chargingMenuHint', '充電器をつなぐたびに、選んだ演出を再生します。', '충전기를 연결할 때마다 선택한 연출을 보여 줍니다.', 'Play your chosen animation whenever you connect the charger.');
+    add('backHome', '← メイン画面', '← 첫 화면', '← Home');
+    add('wallpaperTarget', '適用先', '적용할 화면', 'Apply to');
+    add('wallpaperFileHint', 'JPG・PNGは静止画、GIFは静止画または動く壁紙にできます。画面に合わせて中央を切り抜きます。ライブの適用先は端末の設定で選びます。', 'JPG·PNG는 정지 배경화면으로, GIF는 정지 또는 움직이는 배경화면으로 사용할 수 있어요. 화면에 맞게 가운데를 기준으로 잘라 표시합니다. 라이브 적용 대상은 기기 설정에서 선택해 주세요.', 'Use JPG/PNG as still wallpapers and GIF as still or animated wallpapers. Images fill the screen with a centered crop. Choose the live wallpaper destination in system settings.');
+    add('wallpaperUse', 'プレビューして適用', '미리 보고 적용', 'Preview and apply');
     add('changeWallpaper', 'ホーム画面を変更', '배경화면 변경', 'Change wallpaper');
     add('changeLockScreen', 'ロック画面を変更', '잠금화면 변경', 'Change lock screen');
     add('wallpaperChoose', '壁紙の図案を選択してください。次に静止画またはライブを選び、確認して適用します。', '배경화면 도안을 선택하세요. 다음으로 정지 또는 라이브를 선택하고 확인 후 적용합니다.', 'Choose a wallpaper design, then still or live. Preview and confirm before applying.');
@@ -38,7 +53,7 @@
     add('search', '魔法陣の名前を検索', '마법진 이름 검색', 'Search magic circles');
     add('noResults', '該当する魔法陣はありません。', '검색 결과가 없습니다.', 'No circles found.');
     add('note', '中央の星形は回転しません。外周の光と粒子が静かに巡ります。\n端子を外すと終了し、再接続すると最初から再生します。', '가운데 별은 고정되고 바깥 빛과 입자가 은은하게 움직입니다.\n충전기를 분리하면 종료되며, 다시 연결하면 처음부터 재생됩니다.', 'The central stars stay still while outer lights and particles drift gently.\nDisconnect to dismiss; reconnect to play again from the beginning.');
-    add('preview', '▷ 7秒プレビュー', '▷ 7초 미리보기', '▷ 7-second preview');
+    add('preview', '▷ {seconds}秒プレビュー', '▷ {seconds}초 미리보기', '▷ {seconds}-second preview');
     add('apply', 'この魔法陣を適用', '이 마법진 적용', 'Apply this circle');
     add('applied', '✓ 適用済み', '✓ 적용됨', '✓ Applied');
     add('appliedBadge', '適用中', '적용 중', 'Active');

@@ -33,25 +33,31 @@ const valid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(media||'');
 const level=Number(params.get('battery'));
 document.querySelector('[data-level]').textContent=params.has('battery')&&Number.isInteger(level)&&level>=0&&level<=100?String(level):'—';
 if(params.get('mime')==='image/gif')document.documentElement.classList.add('gif');
-let requested=false;
+let requested=false,ready=false;
 window.chargingMediaError=false;
-window.startChargingAnimation=(remainingMs=7000)=>{
+window.prepareChargingAnimation=()=>{
     if(!valid||window.chargingMediaError)return false;
     if(document.documentElement.classList.contains('running'))return true;
     if(!requested){
         requested=true;
-        const started=performance.now(), budget=Number.isFinite(remainingMs)?Math.min(7000,Math.max(0,remainingMs)):7000;
         image.onload=()=>{
-            const remaining=budget-(performance.now()-started);
-            if(image.naturalWidth<=0||remaining<250){window.chargingMediaError=true;return;}
-            document.documentElement.classList.add('running');
-            document.getAnimations().forEach(animation=>animation.playbackRate=7000/remaining);
+            ready=image.naturalWidth>0;
+            if(!ready)window.chargingMediaError=true;
         };
         image.onerror=()=>{window.chargingMediaError=true;document.getElementById('loading').textContent=MagicI18n.t('mediaFailed',language);};
         image.src='https://appassets.androidplatform.net/media/'+media+'?run='+encodeURIComponent(params.get('run')||Date.now());
     }
-    return false;
+    return ready;
 };
-if(params.get('demo')==='1')window.startChargingAnimation();
+window.startChargingAnimation=(remainingMs=7000)=>{
+ if(!window.prepareChargingAnimation())return false;
+ if(document.documentElement.classList.contains('running'))return true;
+ document.documentElement.classList.add('running');
+ document.getAnimations().forEach(a=>{if(a.effect.getTiming().iterations!==Infinity)a.playbackRate=7000/Math.max(1,remainingMs)});
+ return true;
+};
+window.prepareChargingAnimation();
+if(params.get('demo')==='1')image.addEventListener('load',()=>window.startChargingAnimation());
 </script>
+<script src="charge-runtime.js"></script>
 </body></html>

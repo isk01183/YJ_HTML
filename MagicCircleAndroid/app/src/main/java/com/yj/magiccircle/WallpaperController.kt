@@ -31,11 +31,14 @@ class WallpaperController(private val activity: Activity) {
     private var pendingTheme: String? = null
     private var pendingTarget: String? = null
     private var previousComponent: String? = null
+    private var pendingComponent: String? = null
 
     fun show(theme: String, target: String) {
         if (closed || pendingTheme != null) return
         if (!valid(theme, target)) { message(R.string.wallpaper_unavailable); return }
         pause()
+        val imported = MediaLibrary.get(activity).find(theme)
+        if (imported != null && imported.mime != "image/gif") { previewStill(theme, target); return }
         dialog = AlertDialog.Builder(activity)
             .setTitle(title(theme, target))
             .setItems(arrayOf(text(R.string.wallpaper_still), text(R.string.wallpaper_live))) { _, which ->
@@ -44,7 +47,8 @@ class WallpaperController(private val activity: Activity) {
     }
 
     private fun valid(theme: String, target: String) = WallpaperPolicy.allowedTheme(theme) &&
-        target in setOf("home", "lock") && MediaLibrary.get(activity).available(theme)
+        target in setOf("home", "lock") && MediaLibrary.get(activity).available(theme) &&
+        (!SceneRules.isSceneId(theme) || MediaLibrary.get(activity).scene(theme)?.purpose==ScenePurpose.WALLPAPER)
 
     private fun canSet(): Boolean = manager.isWallpaperSupported &&
         (Build.VERSION.SDK_INT < 24 || manager.isSetWallpaperAllowed)
@@ -78,7 +82,7 @@ class WallpaperController(private val activity: Activity) {
             try {
                 if (closed || generation != token) return@execute
                 bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                WallpaperArtwork(theme).use { renderer ->
+                WallpaperArtwork(theme, activity.applicationContext).use { renderer ->
                     renderer.prepare(width, height)
                     renderer.draw(Canvas(bitmap), 0, false)
                 }
@@ -89,6 +93,7 @@ class WallpaperController(private val activity: Activity) {
                     else ready.recycle()
                 }
             } catch (_: OutOfMemoryError) { report(token, R.string.wallpaper_memory_error) }
+            catch (_: IOException) { report(token, R.string.wallpaper_error) }
             catch (_: RuntimeException) { report(token, R.string.wallpaper_error) }
             finally { bitmap?.recycle() }
         }
@@ -153,17 +158,35 @@ class WallpaperController(private val activity: Activity) {
 
     private fun openLive(theme: String, target: String) {
         if (!valid(theme, target)) { message(R.string.wallpaper_unavailable); return }
+        if (MediaValidation.isId(theme) || SceneRules.isSceneId(theme)) {
+            val token = ++generation
+            message(R.string.wallpaper_preparing)
+            worker.execute {
+                try {
+                    if (closed || generation != token) return@execute
+                    val key = UploadedWallpaperStore.stage(activity.applicationContext, theme)
+                    main.post { if (alive() && generation == token) launchLive(theme, target, key) }
+                } catch (_: IOException) { report(token, R.string.wallpaper_error) }
+                catch (_: RuntimeException) { report(token, R.string.wallpaper_error) }
+            }
+        } else launchLive(theme, target, theme.removePrefix("ref-"))
+    }
+
+    private fun launchLive(theme: String, target: String, key: String) {
         try {
             if (!canSet()) { message(R.string.wallpaper_denied); return }
             previousComponent = actualTheme(target)
             pendingTheme = theme
             pendingTarget = target
-            val component = ComponentName(activity,
+            pendingComponent = key
+            val component = if (MediaValidation.isId(theme) || SceneRules.isSceneId(theme)) UploadedWallpaperStore.component(activity, key)
+                else ComponentName(activity,
                 if (theme == "ref-W03") W03WallpaperService::class.java else R01WallpaperService::class.java)
             activity.startActivityForResult(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
                 .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component), LIVE_REQUEST)
         } catch (_: ActivityNotFoundException) { clearPending(); message(R.string.wallpaper_picker_error) }
         catch (_: SecurityException) { clearPending(); message(R.string.wallpaper_denied) }
+        catch (_: RuntimeException) { clearPending(); message(R.string.wallpaper_error) }
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -172,9 +195,10 @@ class WallpaperController(private val activity: Activity) {
         val theme = pendingTheme
         val target = pendingTarget
         val before = previousComponent
+        val component = pendingComponent
         clearPending()
-        if (theme == null || target == null) { message(R.string.wallpaper_unconfirmed); return true }
-        val outcome = WallpaperPolicy.liveResult(theme.removePrefix("ref-"), actualTheme(target), before,
+        if (theme == null || target == null || component == null) { message(R.string.wallpaper_unconfirmed); return true }
+        val outcome = WallpaperPolicy.liveResult(component, actualTheme(target), before,
             resultCode == Activity.RESULT_OK)
         when (outcome) {
             "confirmed" -> { remember(theme, target, "live"); message(R.string.wallpaper_applied) }
@@ -191,7 +215,7 @@ class WallpaperController(private val activity: Activity) {
         when (info?.component) {
             ComponentName(activity, W03WallpaperService::class.java) -> "W03"
             ComponentName(activity, R01WallpaperService::class.java) -> "R01"
-            else -> null
+            else -> UploadedWallpaperStore.key(activity, info?.component)
         }
     } catch (_: RuntimeException) { null }
 
@@ -199,6 +223,7 @@ class WallpaperController(private val activity: Activity) {
         pendingTheme?.let { state.putString("wallpaper.theme", it) }
         pendingTarget?.let { state.putString("wallpaper.target", it) }
         previousComponent?.let { state.putString("wallpaper.before", it) }
+        pendingComponent?.let { state.putString("wallpaper.component", it) }
     }
 
     fun restoreState(state: Bundle?) {
@@ -207,12 +232,13 @@ class WallpaperController(private val activity: Activity) {
         if (!WallpaperPolicy.allowedTheme(theme) || target !in setOf("home", "lock")) return
         pendingTheme = theme
         pendingTarget = target
-        previousComponent = state.getString("wallpaper.before")?.takeIf { it == "W03" || it == "R01" }
+        previousComponent = state.getString("wallpaper.before")
+        pendingComponent = state.getString("wallpaper.component")
     }
 
     fun pause() { generation++; dialog?.dismiss(); dialog = null }
     fun close() { closed = true; pause(); worker.shutdown() }
-    private fun clearPending() { pendingTheme = null; pendingTarget = null; previousComponent = null }
+    private fun clearPending() { pendingTheme = null; pendingTarget = null; previousComponent = null; pendingComponent = null }
     private fun alive() = !closed && !activity.isFinishing && !activity.isDestroyed
     private fun flag(target: String) = if (target == "lock") WallpaperManager.FLAG_LOCK else WallpaperManager.FLAG_SYSTEM
     private fun remember(theme: String, target: String, mode: String) {
@@ -225,7 +251,7 @@ class WallpaperController(private val activity: Activity) {
         config.setLocale(Locale.forLanguageTag(WebViews.selectedLanguage(activity)))
         return activity.createConfigurationContext(config).getString(resource)
     }
-    private fun title(theme: String, target: String) = theme.removePrefix("ref-") + " · " +
+    private fun title(theme: String, target: String) = (MediaLibrary.get(activity).scene(theme)?.name ?: MediaLibrary.get(activity).find(theme)?.name ?: theme.removePrefix("ref-")) + " · " +
         text(if (target == "lock") R.string.wallpaper_lock else R.string.wallpaper_home)
     private fun message(resource: Int) { if (alive()) Toast.makeText(activity, text(resource), Toast.LENGTH_LONG).show() }
     companion object { const val LIVE_REQUEST = 31 }

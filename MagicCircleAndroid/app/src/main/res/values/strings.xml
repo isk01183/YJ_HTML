@@ -4,7 +4,9 @@
     <string name="accessibility_service_description">Displays an offline magic circle animation for up to 7 seconds when a charger is connected.</string>
     <string name="close_preview">Close</string>
     <string name="library_importing">Copying image to the app…</string>
-    <string name="library_imported">Image added and selected.</string>
+    <string name="library_imported">Image added.</string>
+    <string name="wallpaper_uploaded">My file wallpaper</string>
+    <string name="wallpaper_uploaded_description">Show an imported image or animated GIF as your wallpaper.</string>
     <string name="library_invalid">Choose a readable GIF, PNG, or JPEG image.</string>
     <string name="library_too_large">This file is too large. Choose an image of 20 MiB or less.</string>
     <string name="library_dimensions">This image or GIF animation is too large. Use a smaller image or a shorter GIF.</string>

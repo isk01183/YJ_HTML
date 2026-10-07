@@ -1,0 +1,189 @@
+package com.yj.magiccircle
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.text.InputType
+import android.view.Gravity
+import android.view.View
+import android.widget.*
+import java.util.UUID
+import java.util.concurrent.Executors
+
+class ScreenEditorActivity: Activity() {
+    private lateinit var editor: ScreenEditorView
+    private lateinit var tools: LinearLayout
+    private lateinit var library: MediaLibrary
+    private lateinit var name: EditText
+    private lateinit var status: TextView
+    private var dirty=false
+    private var busy=false
+    private var initial: EditorDraft?=null
+    private var previewDialog: android.app.Dialog?=null
+    private val ui=Handler(Looper.getMainLooper())
+    private val language get()=WebViews.selectedLanguage(this)
+    private fun w(k: String,j: String,e: String)=words(language,k,j,e)
+    private fun dp(v: Int)=(v*resources.displayMetrics.density).toInt()
+    private val saveDraft=Runnable { persistDraft() }
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state)
+        library=MediaLibrary.get(this)
+        if(!library.isReadable()) {finish();return}
+        val key=state?.getString("key") ?: intent.getStringExtra("themeId") ?: "scene-${UUID.randomUUID()}"
+        val purpose=runCatching {ScenePurpose.valueOf(intent.getStringExtra("scenePurpose") ?: "CHARGING")}.getOrDefault(ScenePurpose.CHARGING)
+        val scene=library.scene(key) ?: if(SceneRules.isSceneId(key))ScreenScene(key,w("새 화면","新しい画面","New scene"),purpose,emptyList())else null
+        if(scene==null && !ThemeSelection.isValid(key) && library.find(key)==null) {finish();return}
+        initial=EditorDraft(key,scene,if(scene?.purpose==ScenePurpose.WALLPAPER) emptyList() else library.chargeInfo(key))
+        val draft=library.editorDraft(key) ?: initial!!
+        dirty=library.editorDraft(key)!=null
+        val root=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setBackgroundColor(0xff080e18.toInt());setPadding(dp(16),dp(8),dp(16),dp(8))}
+        root.setOnApplyWindowInsetsListener {v,insets->
+            @Suppress("DEPRECATION")
+            v.setPadding(dp(16)+insets.systemWindowInsetLeft,dp(8)+insets.systemWindowInsetTop,dp(16)+insets.systemWindowInsetRight,dp(8)+insets.systemWindowInsetBottom)
+            insets
+        }
+        name=EditText(this).apply {setText(draft.scene?.name ?: key);setTextColor(0xfff2dfb9.toInt());textSize=22f;typeface=Typeface.create("serif",Typeface.NORMAL);isSingleLine=true;isEnabled=draft.scene!=null;contentDescription=w("작품 이름","作品名","Scene name")}
+        root.addView(name,LinearLayout.LayoutParams(-1,dp(52)))
+        status=TextView(this).apply {text=w("드래그로 이동 · 두 손가락으로 크기 조절","ドラッグで移動・ピンチで拡大","Drag to move · Pinch to resize");setTextColor(0xffadbbcb.toInt());textSize=12f;setPadding(0,dp(4),0,dp(8))}
+        root.addView(status)
+        val workspace=LinearLayout(this).apply {orientation=if(resources.configuration.screenWidthDp>=700)LinearLayout.HORIZONTAL else LinearLayout.VERTICAL}
+        root.addView(workspace,LinearLayout.LayoutParams(-1,0,1f))
+        editor=ScreenEditorView(this)
+        val wide=workspace.orientation==LinearLayout.HORIZONTAL
+        workspace.addView(editor,if(wide)LinearLayout.LayoutParams(0,-1,1f)else LinearLayout.LayoutParams(-1,0,1.1f))
+        val scroll=ScrollView(this);tools=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(8),dp(8),dp(8))};scroll.addView(tools)
+        workspace.addView(scroll,if(wide)LinearLayout.LayoutParams(dp(330),-1)else LinearLayout.LayoutParams(-1,0,1f))
+        val actions=row(root)
+        button(actions,w("취소","取消","Cancel")){leave()}
+        button(actions,w("미리보기","プレビュー","Preview")){preview()}
+        button(actions,w("저장","保存","Save")){save()}
+        setContentView(root)
+        editor.onError={status.text=w("이미지를 준비하지 못했습니다. 크기 또는 파일을 확인하세요.","画像を読み込めません。サイズを確認してください。","Cannot prepare image. Check its size or file.")}
+        editor.setDraft(draft)
+        editor.setOnDraftChanged { dirty=true;ui.removeCallbacks(saveDraft);ui.postDelayed(saveDraft,250) }
+        editor.onSelectionChanged={renderTools()}
+        renderTools()
+        if(Build.VERSION.SDK_INT>=33) onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){leave()}
+    }
+    private fun current(): EditorDraft {val d=editor.currentDraft();return d.copy(scene=d.scene?.copy(name=name.text.toString().trim()))}
+    private fun persistDraft(): Boolean = try {library.saveEditorDraft(current());true}catch(_: Exception){status.text=w("저장 실패 — 기존 작품은 유지됩니다","保存失敗 — 既存作品は保護されています","Save failed — existing scene preserved");false}
+    private fun save() {
+        if(busy)return
+        ui.removeCallbacks(saveDraft)
+        try {val d=current();if(d.scene!=null)library.saveScene(d.scene,d.information)else library.saveChargeInfo(d.key,d.information);dirty=false;finish()}
+        catch(_: Exception) {persistDraft();status.text=w("이름·파일·저장 공간을 확인하세요","名前・ファイル・空き容量を確認","Check name, files and storage space")}
+    }
+    private fun leave() {
+        if(busy)return
+        if(!dirty && current()==initial) {finish();return}
+        AlertDialog.Builder(this).setMessage(w("변경 사항을 저장할까요?","変更を保存しますか？","Save changes?"))
+            .setPositiveButton(w("저장","保存","Save")){_,_->save()}
+            .setNegativeButton(w("버리기","破棄","Discard")){_,_->ui.removeCallbacks(saveDraft);try {library.discardEditorDraft(current().key);dirty=false;finish()}catch(_: Exception){persistDraft()}}
+            .setNeutralButton(w("계속 편집","編集を続ける","Keep editing"),null).show()
+    }
+    @android.annotation.SuppressLint("GestureBackNavigation") // API 33+ uses the native dispatcher registered in onCreate.
+    @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
+    override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);super.onSaveInstanceState(out)}
+    override fun onStop() {previewDialog?.dismiss();super.onStop();if(!isFinishing && ::editor.isInitialized) {ui.removeCallbacks(saveDraft);persistDraft()}}
+    override fun onDestroy() {previewDialog?.dismiss();ui.removeCallbacksAndMessages(null);if(::editor.isInitialized)editor.close();super.onDestroy()}
+    private fun row(parent: LinearLayout)=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;parent.addView(this,LinearLayout.LayoutParams(-1,-2))}
+    private fun button(parent: LinearLayout,label: String,action:()->Unit)=Button(this).apply {
+        text=label;textSize=12f;isAllCaps=false;minHeight=dp(48);setTextColor(0xfff3dfb6.toInt())
+        backgroundTintList=android.content.res.ColorStateList.valueOf(0xff202b3a.toInt())
+        val params=if(parent.orientation==LinearLayout.HORIZONTAL)LinearLayout.LayoutParams(0,-2,1f)else LinearLayout.LayoutParams(-1,-2)
+        params.setMargins(dp(2),dp(2),dp(2),dp(2));parent.addView(this,params)
+        setOnClickListener {if(!busy)action()}
+    }
+    private fun heading(text: String) {tools.addView(TextView(this).apply {this.text=text;setTextColor(0xffc0cede.toInt());textSize=13f;setPadding(0,dp(14),0,dp(6))})}
+    private fun fieldName(f: InfoField)=when(f){
+        InfoField.BATTERY->w("배터리 %","バッテリー %","Battery %");InfoField.STATUS->w("충전 상태","充電状態","Charge status")
+        InfoField.TEMPERATURE->w("온도","温度","Temperature");InfoField.HEALTH->w("배터리 상태","バッテリー状態","Health")
+        InfoField.CONNECTION->w("연결 방식","接続方式","Connection");InfoField.METER->w("충전 막대","充電バー","Meter");InfoField.MESSAGE->w("단계 메시지","段階メッセージ","Stage message")}
+    private fun renderTools() {
+        tools.removeAllViews();val d=editor.currentDraft();val s=d.scene
+        if(s!=null) {
+            heading(w("이미지 레이어 · ${s.layers.size}/8","画像レイヤー · ${s.layers.size}/8","Image layers · ${s.layers.size}/8"))
+            val add=row(tools);button(add,w("파일 추가","ファイル追加","Import")){importFile()};button(add,w("보관함","ライブラリ","Library")){chooseExisting()}
+            for((i,l) in s.layers.withIndex()) button(tools,(if(l.id==editor.selectedLayer)"● " else "○ ")+"${i+1}. "+(library.find(l.mediaId)?.name ?: "Image")+(if(l.visible)"" else " ◌")) {editor.selectedLayer=l.id;editor.selectedField=null;renderTools()}
+            val layer=s.layers.find {it.id==editor.selectedLayer}
+            if(layer!=null) {
+                position(layer.x,layer.y){x,y->editor.modifyLayer {it.copy(x=x,y=y)}}
+                slider(w("크기 %","サイズ %","Size %"),(layer.width*100).toInt(),5,400){v->editor.modifyLayer {it.copy(width=v/100f)}}
+                slider(w("각도 °","角度 °","Rotation °"),layer.angle.toInt(),-180,179){v->editor.modifyLayer {it.copy(angle=v.toFloat())}}
+                val r=row(tools);button(r,w("좌우 반전","左右反転","Flip")){editor.modifyLayer {it.copy(flipX=!it.flipX)};renderTools()}
+                button(r,w("표시 / 숨김","表示 / 非表示","Show / Hide")){editor.modifyLayer {it.copy(visible=!it.visible)};renderTools()}
+                val order=row(tools);button(order,w("뒤로","背面へ","Back")){moveLayer(-1)};button(order,w("앞으로","前面へ","Front")){moveLayer(1)}
+                button(tools,w("레이어 제거","レイヤー削除","Remove layer")){val latest=editor.currentDraft();latest.scene?.let {editor.change(latest.copy(scene=it.copy(layers=it.layers.filter {item->item.id!=layer.id})))};editor.selectedLayer=null;renderTools()}
+            }
+        }
+        if(s?.purpose!=ScenePurpose.WALLPAPER) {
+            heading(w("충전 정보 · 위치와 표시","充電情報 · 位置と表示","Charge information · Position & visibility"))
+            for(f in InfoField.entries) {
+                val p=editor.information().single {it.field==f}
+                val r=row(tools);button(r,(if(editor.selectedField==f)"● " else "")+fieldName(f)){editor.selectedField=f;editor.selectedLayer=null;renderTools()}
+                button(r,if(p.visible)w("켜짐","表示","On")else w("꺼짐","非表示","Off")) {
+                    editor.toggleField(f);renderTools()
+                }
+            }
+            editor.information().find {it.field==editor.selectedField}?.let {p->position(p.x,p.y){x,y->editor.modifyField {it.copy(x=x,y=y)}}}
+            button(tools,w("정보 기본 배치","情報の初期配置","Reset information")){editor.resetInformation();renderTools()}
+            heading(w("애니메이션 표시 시간","アニメーション表示時間","Animation duration"))
+            val r=row(tools);for(ms in listOf(1000,3000,5000,7000)) button(r,(if(library.durationMs()==ms)"● " else "")+"${ms/1000}s") {try {library.setDurationMs(ms);renderTools()}catch(_:Exception){persistDraft()}}
+        }
+    }
+    private fun position(x: Float,y: Float,change:(Float,Float)->Unit) {
+        slider("X %",(x*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val p=editor.information().find {it.field==editor.selectedField};change(value/100f,l?.y ?: p?.y ?: y)}
+        slider("Y %",(y*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val p=editor.information().find {it.field==editor.selectedField};change(l?.x ?: p?.x ?: x,value/100f)}
+        button(tools,w("가운데로","中央へ","Center")){change(.5f,.5f);renderTools()}
+    }
+    private fun slider(label: String,value: Int,min: Int,max: Int,change:(Int)->Unit) {
+        var currentValue=value
+        val row=row(tools);val text=TextView(this).apply {this.text="$label  $value";setTextColor(Color.LTGRAY);textSize=12f;gravity=Gravity.CENTER_VERTICAL;row.addView(this,LinearLayout.LayoutParams(0,dp(48),1f))}
+        button(row,w("숫자 입력","数値入力","Value")) {
+            val input=EditText(this).apply {inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED;setText(currentValue.toString())}
+            AlertDialog.Builder(this).setTitle("$label ($min–$max)").setView(input).setPositiveButton("OK"){_,_->input.text.toString().toIntOrNull()?.let {change(it.coerceIn(min,max));renderTools()}}.setNegativeButton(w("취소","取消","Cancel"),null).show()
+        }
+        tools.addView(SeekBar(this).apply {this.max=max-min;progress=value-min;contentDescription=label;minimumHeight=dp(48)
+            setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {override fun onProgressChanged(s: SeekBar,v: Int,user: Boolean){if(user){currentValue=v+min;text.text="$label  $currentValue";change(currentValue)}};override fun onStartTrackingTouch(s: SeekBar){};override fun onStopTrackingTouch(s: SeekBar){} })},LinearLayout.LayoutParams(-1,dp(48)))
+    }
+    private fun moveLayer(delta: Int) {val d=editor.currentDraft();val s=d.scene ?: return;val list=s.layers.toMutableList();val i=list.indexOfFirst {it.id==editor.selectedLayer};val j=i+delta;if(i>=0 && j in list.indices){java.util.Collections.swap(list,i,j);editor.change(d.copy(scene=s.copy(layers=list)));renderTools()}}
+    private fun addLayer(id: String) {
+        val d=current();val s=d.scene ?: return
+        val next=s.copy(layers=s.layers+ImageLayer(UUID.randomUUID().toString(),id,.5f,.5f,1f,0f,false,true))
+        try {SceneRules.validate(next,library.items().associate {it.id to it.mime});editor.change(d.copy(scene=next));editor.selectedLayer=next.layers.last().id;renderTools();persistDraft()}
+        catch(_:Exception){status.text=w("이미지 8개 / GIF 2개까지만 추가할 수 있습니다","画像8枚 / GIF2枚までです","Up to 8 images / 2 GIF layers")}
+    }
+    private fun chooseExisting() {val items=library.items();AlertDialog.Builder(this).setTitle(w("보관함에서 추가","ライブラリから追加","Add from library")).setItems(items.map {it.name}.toTypedArray()){_,i->addLayer(items[i].id)}.show()}
+    private fun importFile() {persistDraft();try {startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*").putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("image/jpeg","image/png","image/gif")).putExtra(Intent.EXTRA_LOCAL_ONLY,true),81)}catch(_:Exception){status.text=w("파일 선택기를 열 수 없습니다","ファイル選択不可","File picker unavailable")}}
+    @Deprecated("Platform document picker") override fun onActivityResult(requestCode: Int,resultCode: Int,data: Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode!=81 || resultCode!=RESULT_OK)return
+        val uri=data?.data ?: return
+        busy=true;status.text=w("이미지를 안전하게 가져오는 중…","画像を読み込み中…","Importing image…")
+        val key=current().key
+        IO.execute {val result=runCatching {library.importDocument(uri,false)};ui.post {
+            if(isDestroyed || isFinishing)return@post
+            busy=false
+            if(current().key==key) result.onSuccess {addLayer(it);status.text=w("이미지를 추가했습니다","画像を追加しました","Image added")}.onFailure {status.text=w("파일 형식·크기를 확인하세요","形式とサイズを確認","Check file type and size")}
+        }}
+    }
+    private fun preview() {
+        previewDialog?.dismiss()
+        val d=current();val dialog=android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar_Fullscreen)
+        val host=ChargingSceneView(this,d.key,d.information,d.scene)
+        val timeout=Runnable {dialog.dismiss()}
+        previewDialog=dialog
+        dialog.setContentView(host);dialog.setOnDismissListener {ui.removeCallbacks(timeout);host.close();if(previewDialog===dialog)previewDialog=null};dialog.show()
+        dialog.window?.apply {setBackgroundDrawableResource(android.R.color.transparent);clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);setLayout(-1,-1)}
+        ui.postDelayed(timeout,2000)
+        host.prepare(Runnable {ui.removeCallbacks(timeout);val now=android.os.SystemClock.uptimeMillis();host.start(now,now+library.durationMs());ui.postDelayed(timeout,library.durationMs().toLong())},Runnable {dialog.dismiss()})
+    }
+    companion object {private val IO=Executors.newSingleThreadExecutor()}
+}

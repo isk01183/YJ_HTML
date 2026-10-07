@@ -63,7 +63,7 @@ abstract class MagicWallpaperService : WallpaperService() {
                         pending = null
                     }
                     try {
-                        val renderer = artwork ?: WallpaperArtwork(fixedTheme).also { artwork = it }
+                        val renderer = artwork ?: WallpaperArtwork(fixedTheme, this@MagicWallpaperService).also { artwork = it }
                         if (preparedWidth != w || preparedHeight != h) {
                             renderer.prepare(w, h)
                             preparedWidth = w; preparedHeight = h
@@ -75,12 +75,14 @@ abstract class MagicWallpaperService : WallpaperService() {
                             if (canvas == null) { stopSurface(); return }
                             try { renderer.draw(canvas, SystemClock.elapsedRealtime() - started, true) }
                             finally { surfaceHolder.unlockCanvasAndPost(canvas) }
-                            if (current(token)) {
+                            if (current(token) && renderer.animated) {
                                 pending = this
                                 handler.postDelayed(this, 34L)
                             }
                         }
                     } catch (error: RuntimeException) {
+                        failed(token, error)
+                    } catch (error: java.io.IOException) {
                         failed(token, error)
                     } catch (error: OutOfMemoryError) {
                         failed(token, error)

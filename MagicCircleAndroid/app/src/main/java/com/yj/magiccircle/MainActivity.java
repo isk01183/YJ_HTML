@@ -51,12 +51,18 @@ public final class MainActivity extends Activity {
     private WebView gallery;
     private Dialog previewDialog;
     private WallpaperController wallpaperController;
+    private String galleryScreen = "home";
+    private boolean importingWallpaper;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         wallpaperController = new WallpaperController(this);
         wallpaperController.restoreState(state);
+        if (state != null) {
+            galleryScreen = state.getString("gallery.screen", "home");
+            importingWallpaper = state.getBoolean("gallery.importingWallpaper");
+        }
         activeActivity = new WeakReference<>(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF05080B);
@@ -92,7 +98,8 @@ public final class MainActivity extends Activity {
         root.addView(gallery, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
-        DebugReview.install(this, root);
+        if (Build.VERSION.SDK_INT >= 33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::navigateBack);
         gallery.loadUrl(GALLERY_URL);
         MediaLibrary library = MediaLibrary.get(this);
         if (!library.isReadable()) message(R.string.library_load_error);
@@ -108,6 +115,29 @@ public final class MainActivity extends Activity {
                 || uri.getFragment() != null || (uri.getPath() != null && !uri.getPath().isEmpty())) return;
         String action = uri.getAuthority();
         MediaLibrary library = MediaLibrary.get(this);
+        if ("screen".equals(action) && hasExactQuery(uri, "name")) {
+            String name = uri.getQueryParameter("name");
+            if ("home".equals(name) || "wallpaper".equals(name) || "charging".equals(name)) galleryScreen = name;
+            return;
+        }
+        if ("create".equals(action) && hasExactQuery(uri, "purpose")) {
+            String purpose = uri.getQueryParameter("purpose");
+            if (!libraryBusy && ("wallpaper".equals(purpose) || "charging".equals(purpose)))
+                startActivity(new Intent(this, ScreenEditorActivity.class).putExtra("scenePurpose", purpose.toUpperCase(Locale.ROOT)));
+            return;
+        }
+        if ("edit".equals(action) && hasExactQuery(uri, "theme")) {
+            String id = uri.getQueryParameter("theme");
+            if (!libraryBusy && (ThemeSelection.isValid(id) || library.find(id) != null || library.scene(id) != null || library.editorDraft(id) != null))
+                startActivity(new Intent(this, ScreenEditorActivity.class).putExtra("themeId", id));
+            return;
+        }
+        if ("duration".equals(action) && hasExactQuery(uri, "ms")) {
+            String ms = uri.getQueryParameter("ms");
+            if (java.util.Arrays.asList("1000", "3000", "5000", "7000").contains(ms))
+                changeLibrary(() -> library.setDurationMs(Integer.parseInt(ms)), 0);
+            return;
+        }
         if ("settings".equals(action) && uri.getQuery() == null) {
             startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             return;
@@ -121,7 +151,11 @@ public final class MainActivity extends Activity {
             return;
         }
         if ("import".equals(action) && uri.getQuery() == null) {
-            if (!libraryBusy) chooseMedia();
+            if (!libraryBusy) chooseMedia(false);
+            return;
+        }
+        if ("import-wallpaper".equals(action) && uri.getQuery() == null) {
+            if (!libraryBusy) chooseMedia(true);
             return;
         }
         if ("wallpaper".equals(action)) {
@@ -221,19 +255,20 @@ public final class MainActivity extends Activity {
         if (gallery == null || !GALLERY_URL.equals(gallery.getUrl())) return;
         try {
             String json = MediaLibrary.get(this).galleryState(isServiceEnabled(), WebViews.selectedLanguage(this))
-                    .put("busy", libraryBusy).toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
+                    .put("busy", libraryBusy).put("screen", galleryScreen).toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
             gallery.evaluateJavascript("if (typeof window.setGalleryState === 'function') "
                     + "window.setGalleryState(" + json + ")", null);
         } catch (JSONException error) { message(R.string.library_storage_error); }
     }
 
-    private void chooseMedia() {
+    private void chooseMedia(boolean forWallpaper) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
                 .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"image/gif", "image/png", "image/jpeg"})
                 .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
+            importingWallpaper = forWallpaper;
             libraryBusy = true;
             updateGalleryState();
             startActivityForResult(intent, IMPORT_DOCUMENT);
@@ -253,8 +288,10 @@ public final class MainActivity extends Activity {
         if (resultCode == RESULT_OK && data != null && data.getData() != null) {
             Uri uri = data.getData();
             MediaLibrary library = MediaLibrary.get(this);
+            boolean selectForCharging = !importingWallpaper;
+            importingWallpaper = false;
             message(R.string.library_importing);
-            changeLibrary(() -> library.importDocument(uri), R.string.library_imported);
+            changeLibrary(() -> library.importDocument(uri, selectForCharging), R.string.library_imported);
         } else updateGalleryState();
     }
 
@@ -298,77 +335,43 @@ public final class MainActivity extends Activity {
         dismissPreview();
         Dialog dialog = new Dialog(this, android.R.style.Theme_Material_NoActionBar_Fullscreen);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF000000);
-        boolean nativeTheme = ThemeSelection.isNative(theme);
-        MainMagicChargeView nativePreview = nativeTheme ? new MainMagicChargeView(this, theme) : null;
-        WebView preview = nativeTheme ? null : WebViews.magicCircle(this);
-        long previewDeadline = android.os.SystemClock.uptimeMillis() + 7000L;
-        if (preview != null) preview.setWebViewClient(new WebViews.LocalClient(this) {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView current, String url) { return true; }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView current, WebResourceRequest request) { return true; }
-
-            @Override
-            public void onPageFinished(WebView current, String url) {
-                if (previewDialog == dialog && current == preview) WebViews.startMagicCircle(current,
-                        previewDeadline - android.os.SystemClock.uptimeMillis(), null);
-            }
-
-            @Override
-            public void onReceivedError(WebView current, WebResourceRequest request,
-                                        WebResourceError error) {
-                if (previewDialog == dialog && current == preview && request.isForMainFrame()) {
-                    dismissPreview();
-                }
-            }
-
-            @Override
-            public boolean onRenderProcessGone(WebView current, RenderProcessGoneDetail detail) {
-                super.onRenderProcessGone(current, detail);
-                if (previewDialog == dialog) dismissPreview();
-                return true;
-            }
-        });
-        root.addView(nativeTheme ? nativePreview : preview, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        MediaLibrary library = MediaLibrary.get(this);
+        ChargingSceneView scene = new ChargingSceneView(this, theme, library.chargeInfo(theme));
+        root.addView(scene, new FrameLayout.LayoutParams(-1, -1));
         Button close = new Button(this);
         close.setText(localizedString(R.string.close_preview));
         close.setTextColor(0xFFF1DEC0);
         close.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xCC17212A));
         close.setOnClickListener(v -> dismissPreview());
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.END);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         closeParams.setMargins(dp(12), dp(12), dp(12), dp(12));
         root.addView(close, closeParams);
         dialog.setContentView(root);
+        Runnable timeout = () -> { if (previewDialog == dialog) dismissPreview(); };
         dialog.setOnDismissListener(ignored -> {
-            if (previewDialog == dialog) {
-                handler.removeCallbacks(finishPreview);
-                previewDialog = null;
-            }
-            if (nativePreview != null) nativePreview.stop();
-            if (preview != null) destroyWebView(preview);
+            handler.removeCallbacks(timeout);
+            if (previewDialog == dialog) previewDialog = null;
+            scene.close();
         });
         previewDialog = dialog;
         dialog.show();
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setLayout(-1, -1);
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             fitSystemInsets(window, root);
         }
-        handler.postDelayed(finishPreview, 7_000L);
-        try {
-            if (nativePreview != null) nativePreview.start();
-            else preview.post(() -> {
-                if (previewDialog == dialog) WebViews.loadMagicCircle(preview, theme);
-            });
-        } catch (RuntimeException error) {
-            dismissPreview();
-        }
+        handler.postDelayed(timeout, 2000);
+        scene.prepare(() -> {
+            if (previewDialog != dialog) return;
+            handler.removeCallbacks(timeout);
+            long now = android.os.SystemClock.uptimeMillis();
+            long deadline = ChargingTransition.displayDeadline(now, library.durationMs());
+            handler.postAtTime(timeout, deadline);
+            scene.start(now, deadline);
+        }, () -> { if (previewDialog == dialog) dismissPreview(); });
     }
 
     private void dismissPreview() {
@@ -445,6 +448,18 @@ public final class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle state) {
         wallpaperController.saveState(state);
+        state.putString("gallery.screen", galleryScreen);
+        state.putBoolean("gallery.importingWallpaper", importingWallpaper);
         super.onSaveInstanceState(state);
     }
+
+    private void navigateBack() {
+        if (gallery == null) { finish(); return; }
+        gallery.evaluateJavascript("typeof window.navigateBack === 'function' && window.navigateBack()",
+                handled -> { if (!"true".equals(handled)) finish(); });
+    }
+
+    @SuppressWarnings("deprecation")
+    @android.annotation.SuppressLint("GestureBackNavigation") // API 23–32 only; API 33+ uses the registered OnBackInvokedCallback.
+    @Override public void onBackPressed() { navigateBack(); }
 }

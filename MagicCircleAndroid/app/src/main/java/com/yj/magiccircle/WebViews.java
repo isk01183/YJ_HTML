@@ -89,8 +89,11 @@ final class WebViews {
     }
 
     static void loadMagicCircle(WebView view, String id) {
+        loadMagicCircle(view, id, false);
+    }
+    static void loadMagicCircle(WebView view, String id, boolean editableInfo) {
         MediaLibrary library = MediaLibrary.get(view.getContext());
-        if (!library.available(id)) return;
+        if (!library.available(id) && !ThemeSelection.isValid(id)) return;
         String theme = id;
         MediaLibrary.Item media = library.find(theme);
         Intent battery = view.getContext().registerReceiver(null,
@@ -104,6 +107,7 @@ final class WebViews {
         String page = media != null ? "media_circle.html" : ThemeSelection.page(theme);
         Uri uri = Uri.parse("file:///android_asset/" + page).buildUpon()
                 .appendQueryParameter("theme", theme)
+                .appendQueryParameter("editableInfo", editableInfo ? "1" : "0")
                 .appendQueryParameter("media", media == null ? "" : media.id)
                 .appendQueryParameter("mime", media == null ? "" : media.mime)
                 .appendQueryParameter("lang", selectedLanguage(view.getContext()))
@@ -143,9 +147,11 @@ final class WebViews {
 
     static class LocalClient extends WebViewClient {
         private final MediaLibrary library;
+        private final Context context;
         private final android.content.res.AssetManager assets;
 
         LocalClient(Context context) {
+            this.context = context.getApplicationContext();
             library = MediaLibrary.get(context);
             assets = context.getAssets();
         }
@@ -166,6 +172,15 @@ final class WebViews {
                     && path != null && path.startsWith("/android_asset/") && !path.contains("..")) return null;
             WebResourceResponse generated = generatedArtwork(uri);
             if (generated != null) return generated;
+            if ("https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getEncodedAuthority())
+                    && uri.getFragment() == null && path != null && path.startsWith("/scene-thumbnails/")) {
+                String sceneId = path.substring("/scene-thumbnails/".length());
+                if (SceneRules.isSceneId(sceneId) && library.scene(sceneId) != null) try {
+                    return new WebResourceResponse("image/png", null, 200, "OK",
+                            Collections.singletonMap("Cache-Control", "no-store"),
+                            new ByteArrayInputStream(WallpaperArtwork.thumbnail(sceneId, context)));
+                } catch (Exception | OutOfMemoryError ignored) { /* No network fallback. */ }
+            }
             String collectionAsset = CollectionCatalog.assetPath(uri.toString());
             if (collectionAsset != null) try {
                 InputStream packed = assets.open(collectionAsset);
