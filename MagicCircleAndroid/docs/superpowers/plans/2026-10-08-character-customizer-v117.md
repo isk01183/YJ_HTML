@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-07-character-customizer-design-ko.md` — 2026-10-08 승인.
 
-상태: **실행 계획 검토 전 / 제품 코드 미수정**. 아래 파일 경로는 별도 표시가 없으면 `MagicCircleAndroid` 기준이다. 실행은 각 작업의 실패 테스트 → 최소 구현 → 통과 확인 → 해당 파일만 커밋 순서다.
+상태: **실행 계획 검토 중 / 제품 코드 미수정**. 2026-10-08 사용자가 추가한 에린 커넥트 드레스룸 참고를 설계의 `추가 참고` 절과 아래 작업 2·3·5에 반영했다. 기존 2.5D 우선 범위는 유지한다. 아래 파일 경로는 별도 표시가 없으면 `MagicCircleAndroid` 기준이다. 실행은 각 작업의 실패 테스트 → 최소 구현 → 통과 확인 → 해당 파일만 커밋 순서다.
 
 ## Global Constraints
 
@@ -69,7 +69,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 
 - [ ] **실패 테스트 작성:** 각 체형 파라미터 최소/기본/최대와 교차 극단 조합에서 `soleY-crownY == heightCm`(오차 .001f), 좌우 발바닥 높이 동일, 모든 좌표 유한, 바뀌지 않은 설정 불변을 검사한다. 계측 검사에는 닫힌 경로, 투명 배경, 모든 허용 부품 ID의 렌더링, 프레임 차이 검사를 추가한다.
 - [ ] `./gradlew.bat testDebugUnitTest --tests '*CharacterGeometryTest'`로 실패를 확인한다.
-- [ ] 관절·비율 계산과 캐시된 벡터 부품 제작. 곡선 선화, 피부/머리/직물 기본색·그림자·하이라이트, 눈동자와 표정 부품을 분리한다. 부품 접점에 겹침 여유를 주고 머리/상완/전완/손/허벅지/종아리/발 변환을 공유한다. 각 ID는 실제로 구별되는 모양이어야 한다. 세부 장비 수·형태는 작업 1 목록을 사용한다.
+- [ ] 관절·비율 계산과 캐시된 벡터 부품 제작. 곡선 선화, 피부/머리/직물 기본색·그림자·하이라이트, 눈동자와 표정 부품을 분리한다. 부품 접점에 겹침 여유를 주고 머리/상완/전완/손/허벅지/종아리/발 변환을 공유한다. 각 ID는 실제로 구별되는 모양이어야 한다. 세부 장비 수·형태는 작업 1 목록을 사용한다. 설계의 드레스룸 참고에 맞춰 bob/long/tied 각각의 앞·옆·뒷머리 실루엣, 겹침, 명암·가는 결을 별도 경로로 만든다. 큰 눈·작은 코/입의 조형을 유지하며 게임 모델/썸네일은 복사하지 않는다.
 - [ ] STILL은 정적, IDLE은 약한 호흡·눈 깜박임, WAVE는 어깨·팔꿈치·손과 소매·장갑을 함께 움직인다. 시간 0의 animated=false/true는 같은 초기 포즈. 코드 내부에서 화면 배경이나 타이머를 소유하지 않고 호출자가 생명주기를 제어한다. Paint/Path/Shader는 인스턴스별 캐시, 단순 틸트는 제한된 2.5D로만 제공한다.
 - [ ] 계측에서 `static(t=0)==static(t=5000)`, `live(t=0)==static(t=0)`, 동작별 후속 프레임 차이, update 뒤 다른 렌더러 불변, close 반복 안전을 검사한다. 전신·얼굴·장비·최소/최대 체형 캡처를 실제로 열어 기준 시안과 비교하고 관절 틈/직선 인형/부품 누락을 수정한다. 픽셀 차이만으로 품질 합격을 선언하지 않는다.
 - [ ] 관련 테스트 통과 및 비교 캡처 후 해당 파일만 커밋: `feat: render layered customizable fantasy characters`.
@@ -81,7 +81,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 **Interfaces:** `CharacterActivity`는 추가 Intent 없음이면 관리 목록, `characterId`가 있으면 해당 캐릭터 편집. 존재하지 않는 ID는 오류 후 목록. `CharacterPreviewView.setCharacter(value: CharacterDefinition)`, `fitToView()`, `resetView()`; 핀치는 보기 배율만 조절하고 설정을 변경하지 않는다. 작업 1 저장소와 작업 2 렌더러를 사용한다. 배경화면 진입은 작업 4가 정의하는 `characterId` Intent로 연결한다.
 
 - [ ] **실패 계측 작성:** `CharacterEditorChecks`에 생성/수정/복제/이름 변경/삭제 취소, body·headgear·hair 독립 변경, HEX 부분 입력/취소, view-only 핀치, 회전·재실행 초안 복원을 작성한다. 기존 `checkOnMain`으로 UI 작업을 실행한다. `character-editor` 실행 실패를 먼저 기록한다.
-- [ ] 홈에 `캐릭터 만들기` 진입을 추가하고 exported=false Activity에서 목록과 편집을 제공한다. 새 작성은 임시 ID, 명시 저장 전 목록에 완성본으로 나타나지 않는다. 부품 교체·색상·체형·동작 탭은 모두 실제 렌더러에 연결하고 3D는 준비 중으로 안내한다.
+- [ ] 홈에 `캐릭터 만들기` 진입을 추가하고 exported=false Activity에서 목록과 편집을 제공한다. 새 작성은 임시 ID, 명시 저장 전 목록에 완성본으로 나타나지 않는다. 부품 교체·색상·체형·동작 탭은 모두 실제 렌더러에 연결하고 3D는 준비 중으로 안내한다. 외형 선택은 드레스룸처럼 이름+실제 부품 썸네일을 함께 제공하되, 썸네일은 공통 CharacterRenderer로 생성·캐시한다. 얼굴형 교체로 눈/눈썹/코/입을 바꾸지 않는 검사를 CharacterEditorChecks에 포함한다.
 - [ ] 48dp 이상 버튼/SeekBar와 숫자 입력, 고정 발 위치와 키 눈금, 별도 보기 조절·체형 초기화 구현. 색상 패널은 유효한 RGB/HEX만 미리보기에 반영하고 잘못된 입력을 자동 잘라내어 저장하지 않는다. cancel은 원래 색을 복원한다. 입력 중 문자열과 선택 탭/스크롤/보기 상태는 회전 때 보존한다.
 - [ ] 이름·체형 등 마지막 유효 초안을 저장하고 저장/버리기/계속 편집을 구분한다. lifecycle stop에서 프레임 중지, 재개 때 단일 루프 재시작, close에서 콜백 제거. 늦은 저장/썸네일 응답에는 현재 캐릭터/화면 세대 검사를 한다. UI 저장 실패는 기존 데이터 유지와 오류 표시로 처리한다.
 - [ ] 휴대전화와 태블릿에서 폰트 확대·키보드·3개 언어·전체 부품과 슬롯을 실제 조작한다. 취소/초기화가 다른 슬롯의 선택·색을 바꾸지 않는지 확인한다. 단위/계측 통과 후 해당 파일만 커밋: `feat: add character wardrobe and body editor`.
@@ -113,7 +113,7 @@ assertNull(CharacterColors.parseRgb("256", "0", "0"))
 - [ ] app 버전과 workflow의 metadata 기대값·파일명·tag·제목을 함께 `20/1.17`로 올린다. `./gradlew.bat testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`가 성공해야 한다.
 - [ ] 설치는 Android CLI로 확인한 에뮬레이터 하나씩 실행한다. `android run --device=<serial> --apks=<검증한 APK>`; 테스트 APK 설치 후 `adb -s <serial> shell am instrument -w -e checks character-storage com.yj.magiccircle.test/com.yj.magiccircle.V113Instrumentation`을 실행한다. character-render/editor/scene와 선택 옵션 없는 전체 러너도 실행하여 성공 출력을 확인한다. 기기 UI 조작 전에 android-cli의 interact/journeys 참조를 읽는다.
 - [ ] API 36 Phone/Tablet에서 화면 캡처, 실제 설정 변경, 정적·라이브 미리보기, 백그라운드 정지·복귀를 확인한다. 가능하면 API 23도 검사하되 설치돼 있지 않으면 검증 범위를 명시한다. 실제 삼성 기기의 잠금화면 정책을 에뮬레이터로 증명했다고 하지 않는다.
-- [ ] 기준 이미지와 전신/얼굴/체형/의상/배경화면 캡처를 나란히 비교하고 차이점을 보고서에 남긴다. 눈 크기·단발 윤곽·튜닉 디테일·음영·관절·의상 맞춤 중 부족한 부분을 구체적으로 수정한다. 부위별 변경 없는 버튼, 스냅샷 대신 시안 표시, 실제 3D 표기는 배포 실패 조건이다.
+- [ ] 기준 이미지와 전신/얼굴/체형/의상/배경화면 캡처를 나란히 비교하고 차이점을 보고서에 남긴다. 공식 드레스룸 참고도 사용하되 이터니티 이미지와 같은 모델이라고 단정하지 않는다. 같은 배율로 세 헤어를 확대해 갈래·옆머리 윤곽·명암을 확인한다. 눈 크기·단발 윤곽·튜닉 디테일·음영·관절·의상 맞춤 중 부족한 부분을 구체적으로 수정한다. 부위별 변경 없는 버튼, 스냅샷 대신 시안 표시, 실제 3D 표기는 배포 실패 조건이다.
 - [ ] `graphify update .`를 AST-only로 실행해 코드 그래프를 갱신한다. 유료 외부 모델 환경변수나 semantic 호출을 사용하지 않는다. diff 검사와 독립 최종 코드 리뷰를 거치고 필요한 파일만 커밋한다.
 - [ ] 기존 공개 저장소/작업 브랜치인지 재확인 후 push하고 GitHub Actions 성공을 확인한다. main은 병합하지 않는다. CI는 단위 테스트/lint/APK만 수행하므로 계측 결과와 구분한다.
 - [ ] 같은 소스의 로컬 호환 서명 APK를 기존 v1.16 인증서 지문·packageId·versionCode와 비교한다. 서명 불일치를 앱 삭제로 해결하지 않는다. 자격증명/키는 읽어 출력하거나 Git/CI에 넣지 않는다.
