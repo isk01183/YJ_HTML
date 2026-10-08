@@ -7,7 +7,9 @@ enum class ScenePurpose { WALLPAPER, CHARGING }
 enum class InfoField { BATTERY, STATUS, TEMPERATURE, HEALTH, CONNECTION, METER, MESSAGE }
 data class ImageLayer(val id: String, val mediaId: String, val x: Float, val y: Float,
     val width: Float, val angle: Float, val flipX: Boolean, val visible: Boolean)
-data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>)
+data class CharacterLayer(val definition: CharacterDefinition, val x: Float=.5f,val y: Float=.5f,
+    val width: Float=1f,val angle: Float=0f,val flipX: Boolean=false,val visible: Boolean=true,val beforeImage: Int=0)
+data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>,val character: CharacterLayer?=null)
 data class StageMessages(val connected: String, val charging: String, val complete: String) {
     fun at(progress: Float) = when { progress<.28f -> connected; progress<.83f -> charging; else -> complete }
 }
@@ -21,6 +23,13 @@ object SceneRules {
         require(scene.name == scene.name.trim() && scene.name.length in 1..40 && scene.name.none { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() })
         require(scene.layers.size <= 8 && scene.layers.map { it.id }.toSet().size == scene.layers.size)
         require(scene.layers.count { mimeById[it.mediaId] == "image/gif" } <= 2)
+        scene.character?.let {
+            require(scene.purpose==ScenePurpose.WALLPAPER)
+            CharacterRules.validate(it.definition)
+            require(it.beforeImage in 0..scene.layers.size)
+            require(it.x.isFinite() && it.x in 0f..1f && it.y.isFinite() && it.y in 0f..1f)
+            require(it.width.isFinite() && it.width in .05f..4f && it.angle.isFinite() && it.angle>=-180f && it.angle<180f)
+        }
         scene.layers.forEach {
             require(it.id.isNotBlank() && it.id.length <= 80)
             require(mimeById[it.mediaId] in setOf("image/jpeg", "image/png", "image/gif"))
@@ -67,9 +76,15 @@ internal data class SceneData(
         @JvmStatic fun sceneJson(s: ScreenScene): JSONObject = JSONObject().put("id",s.id).put("name",s.name).put("purpose",s.purpose.name)
             .put("layers",JSONArray(s.layers.map { l -> JSONObject().put("id",l.id).put("mediaId",l.mediaId)
                 .put("x",l.x.toDouble()).put("y",l.y.toDouble()).put("width",l.width.toDouble()).put("angle",l.angle.toDouble()).put("flipX",l.flipX).put("visible",l.visible) }))
+            .put("character",s.character?.let { c->JSONObject().put("definition",CharacterRules.toJson(c.definition))
+                .put("x",c.x.toDouble()).put("y",c.y.toDouble()).put("width",c.width.toDouble()).put("angle",c.angle.toDouble())
+                .put("flipX",c.flipX).put("visible",c.visible).put("beforeImage",c.beforeImage) } ?: JSONObject.NULL)
         fun readScene(o: JSONObject) = ScreenScene(o.getString("id"),o.getString("name"),ScenePurpose.valueOf(o.getString("purpose")),
             o.getJSONArray("layers").objects().map { l -> ImageLayer(l.getString("id"),l.getString("mediaId"),l.getDouble("x").toFloat(),l.getDouble("y").toFloat(),
-                l.getDouble("width").toFloat(),l.getDouble("angle").toFloat(),l.getBoolean("flipX"),l.getBoolean("visible")) })
+                l.getDouble("width").toFloat(),l.getDouble("angle").toFloat(),l.getBoolean("flipX"),l.getBoolean("visible")) },
+            if(!o.has("character") || o.isNull("character"))null else o.getJSONObject("character").let { c->
+                CharacterLayer(CharacterRules.fromJson(c.getJSONObject("definition")),c.getDouble("x").toFloat(),c.getDouble("y").toFloat(),
+                    c.getDouble("width").toFloat(),c.getDouble("angle").toFloat(),c.getBoolean("flipX"),c.getBoolean("visible"),c.getInt("beforeImage")) })
         private fun infoJson(info: List<InfoPlacement>) = JSONArray(info.map { p -> JSONObject().put("field",p.field.name).put("x",p.x.toDouble()).put("y",p.y.toDouble()).put("visible",p.visible).also { o ->
             p.messages?.let { o.put("messages",JSONObject().put("connected",it.connected).put("charging",it.charging).put("complete",it.complete)) }
         } })

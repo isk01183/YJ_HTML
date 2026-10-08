@@ -127,6 +127,7 @@ function render(){
     materialButton.hidden=!media.some(item=>item.id===focused);
     materialButton.disabled=busy||!native||!readable;
     document.getElementById('open-create').disabled=busy||!readable||!native;
+    characterButton.disabled=busy||!native;
     document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.duration)===durationMs));b.disabled=busy||!native||!readable;});
     const deleteButton=document.getElementById('delete-design');
     deleteButton.disabled=busy||!focused;
@@ -165,7 +166,7 @@ function render(){
 }
 window.setGalleryState=state=>{
     scenes=(Array.isArray(state.scenes)?state.scenes:[]).filter(s=>/^scene-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s.id)&&['WALLPAPER','CHARGING'].includes(s.purpose))
-        .map(s=>({...s,name:String(s.name),url:'https://appassets.androidplatform.net/scene-thumbnails/'+s.id+'?v='+encodeURIComponent(JSON.stringify(s.layers))}));
+        .map(s=>({...s,name:String(s.name),url:'https://appassets.androidplatform.net/scene-thumbnails/'+s.id+'?v='+encodeURIComponent(JSON.stringify([s.layers,s.character||null]))}));
     drafts=Array.isArray(state.drafts)?state.drafts:[];
     durationMs=[1000,3000,5000,7000].includes(state.durationMs)?state.durationMs:7000;
     delete document.getElementById('hero-art').dataset.renderedTheme;

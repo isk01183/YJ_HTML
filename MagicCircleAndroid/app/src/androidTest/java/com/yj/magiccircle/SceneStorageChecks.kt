@@ -42,6 +42,12 @@ object SceneStorageChecks {
         lease.close(); lease.close()
         restored.remove(media)
         check(!image.exists())
-        check(JSONObject(file.readText()).getInt("version")==3)
+        check(JSONObject(file.readText()).getInt("version")==4)
+        val legacyScene=wallpaper.copy(layers=emptyList())
+        val legacy=JSONObject(file.readText()).put("version",3).put("editor",SceneData(scenes=mapOf(wallpaper.id to legacyScene),duration=3000).json()).toString()
+        file.writeText(legacy)
+        val upgraded=MediaLibrary(context,root,"classic")
+        check(upgraded.isReadable() && upgraded.scene(wallpaper.id)==legacyScene && upgraded.durationMs()==3000)
+        check(File(root,"media-library.v3-recovery.json").readText()==legacy)
     }
 }

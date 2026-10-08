@@ -6,7 +6,7 @@ import android.content.Context
 import java.io.ByteArrayOutputStream
 
 /** Shared static/live entry point. Call prepare on size change and close when released. */
-class WallpaperArtwork(val themeId: String, context: Context? = null) : AutoCloseable {
+class WallpaperArtwork(val themeId: String, context: Context? = null,sceneOverride: ScreenScene?=null) : AutoCloseable {
     companion object {
         @JvmStatic @JvmOverloads fun thumbnail(themeId: String, context: Context? = null): ByteArray {
             val (width, height) = when (themeId) {
@@ -32,7 +32,7 @@ class WallpaperArtwork(val themeId: String, context: Context? = null) : AutoClos
 
     private val library = context?.let {MediaLibrary.get(it)}
     private val snapshot = if(themeId.matches(Regex("upload-slot-[0-2]"))) UploadedWallpaperStore.snapshot(checkNotNull(context),themeId) else null
-    private val scene = snapshot?.scene ?: if(SceneRules.isSceneId(themeId))checkNotNull(library?.scene(themeId))else null
+    private val scene = sceneOverride ?: snapshot?.scene ?: if(SceneRules.isSceneId(themeId))checkNotNull(library?.scene(themeId))else null
     private val lease = if(snapshot==null) library?.leaseMedia(scene?.layers?.map {it.mediaId} ?: if(MediaValidation.isId(themeId))listOf(themeId)else emptyList())else null
     private val layered = scene?.let {s->LayeredSceneRenderer(s,{id->snapshot?.open(id) ?: checkNotNull(library).open(id,false)},LayeredSceneRenderer.budget(checkNotNull(context)))}
     private val media = when {

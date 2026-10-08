@@ -60,7 +60,7 @@ object LibraryStorageChecks {
         check(savedTab.getString("name") == "Étoile")
         check(savedTab.getJSONArray("members").getString(0) == "ref-C03")
         check(File(root, "media-library.v1-recovery.json").readText() == V1)
-        check(JSONObject(manifest.readText()).getInt("version") == 3)
+        check(JSONObject(manifest.readText()).getInt("version") == 4)
 
         reloaded.renameTab(tab, "Night")
         check(runCatching { reloaded.createTab("Night") }.exceptionOrNull() is IllegalArgumentException)

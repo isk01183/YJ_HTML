@@ -27,6 +27,7 @@ class ScreenEditorActivity: Activity() {
     private var busy=false
     private var initial: EditorDraft?=null
     private var previewDialog: android.app.Dialog?=null
+    private var pendingCharacterId: String?=null
     private val ui=Handler(Looper.getMainLooper())
     private val language get()=WebViews.selectedLanguage(this)
     private fun w(k: String,j: String,e: String)=words(language,k,j,e)
@@ -70,6 +71,7 @@ class ScreenEditorActivity: Activity() {
         editor.setOnDraftChanged { dirty=true;ui.removeCallbacks(saveDraft);ui.postDelayed(saveDraft,250) }
         editor.onSelectionChanged={renderTools()}
         renderTools()
+        (if(state!=null)state.getString("pendingCharacterId")else intent.getStringExtra("characterId"))?.let {addCharacter(it)}
         if(Build.VERSION.SDK_INT>=33) onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){leave()}
     }
     private fun current(): EditorDraft {val d=editor.currentDraft();return d.copy(scene=d.scene?.copy(name=name.text.toString().trim()))}
@@ -90,7 +92,7 @@ class ScreenEditorActivity: Activity() {
     }
     @android.annotation.SuppressLint("GestureBackNavigation") // API 33+ uses the native dispatcher registered in onCreate.
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
-    override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);super.onSaveInstanceState(out)}
+    override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);out.putString("pendingCharacterId",pendingCharacterId);super.onSaveInstanceState(out)}
     override fun onStop() {previewDialog?.dismiss();super.onStop();if(!isFinishing && ::editor.isInitialized) {ui.removeCallbacks(saveDraft);persistDraft()}}
     override fun onDestroy() {previewDialog?.dismiss();ui.removeCallbacksAndMessages(null);if(::editor.isInitialized)editor.close();super.onDestroy()}
     private fun row(parent: LinearLayout)=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;parent.addView(this,LinearLayout.LayoutParams(-1,-2))}
@@ -109,6 +111,27 @@ class ScreenEditorActivity: Activity() {
     private fun renderTools() {
         tools.removeAllViews();val d=editor.currentDraft();val s=d.scene
         if(s!=null) {
+            if(s.purpose==ScenePurpose.WALLPAPER) {
+                heading(w("캐릭터 레이어","キャラクターレイヤー","Character layer"))
+                button(tools,w("보관함에서 캐릭터 선택","一覧からキャラクターを選択","Choose saved character")){chooseCharacter()}
+                s.character?.let { c->
+                    button(tools,(if(editor.selectedCharacter)"● " else "○ ")+c.definition.name){editor.selectedCharacter=true;renderTools()}
+                    if(editor.selectedCharacter) {
+                        position(c.x,c.y){x,y->editor.modifyCharacter {it.copy(x=x,y=y)}}
+                        slider(w("크기 %","サイズ %","Size %"),(c.width*100).toInt(),5,400){v->editor.modifyCharacter {it.copy(width=v/100f)}}
+                        slider(w("각도 °","角度 °","Rotation °"),c.angle.toInt(),-180,179){v->editor.modifyCharacter {it.copy(angle=v.toFloat())}}
+                        val actions=row(tools)
+                        button(actions,w("좌우 반전","左右反転","Flip")){editor.modifyCharacter {it.copy(flipX=!it.flipX)}}
+                        button(actions,w("표시 / 숨김","表示 / 非表示","Show / Hide")){editor.modifyCharacter {it.copy(visible=!it.visible)}}
+                        val order=row(tools)
+                        button(order,w("이미지 뒤로","画像の背面","Behind images")){editor.modifyCharacter {it.copy(beforeImage=0)}}
+                        button(order,w("이미지 앞으로","画像の前面","Above images")){editor.modifyCharacter {it.copy(beforeImage=s.layers.size)}}
+                        slider(w("겹침 순서","重なり順","Layer order"),c.beforeImage,0,s.layers.size){v->editor.modifyCharacter {it.copy(beforeImage=v)}}
+                        button(tools,w("보관함의 최신 외형 가져오기","最新の外見を取り込む","Refresh from saved character")){addCharacter(c.definition.id)}
+                        button(tools,w("캐릭터 레이어 제거","キャラクターを削除","Remove character layer")){val latest=editor.currentDraft();editor.change(latest.copy(scene=latest.scene!!.copy(character=null)));editor.selectedCharacter=false;renderTools()}
+                    }
+                }
+            }
             heading(w("이미지 레이어 · ${s.layers.size}/8","画像レイヤー · ${s.layers.size}/8","Image layers · ${s.layers.size}/8"))
             val add=row(tools);button(add,w("파일 추가","ファイル追加","Import")){importFile()};button(add,w("보관함","ライブラリ","Library")){chooseExisting()}
             for((i,l) in s.layers.withIndex()) button(tools,(if(l.id==editor.selectedLayer)"● " else "○ ")+"${i+1}. "+(library.find(l.mediaId)?.name ?: "Image")+(if(l.visible)"" else " ◌")) {editor.selectedLayer=l.id;editor.selectedField=null;renderTools()}
@@ -169,8 +192,8 @@ class ScreenEditorActivity: Activity() {
         dialog.show()
     }
     private fun position(x: Float,y: Float,change:(Float,Float)->Unit) {
-        slider("X %",(x*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val p=editor.information().find {it.field==editor.selectedField};change(value/100f,l?.y ?: p?.y ?: y)}
-        slider("Y %",(y*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val p=editor.information().find {it.field==editor.selectedField};change(l?.x ?: p?.x ?: x,value/100f)}
+        slider("X %",(x*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val c=if(editor.selectedCharacter)d.scene?.character else null;val p=editor.information().find {it.field==editor.selectedField};change(value/100f,l?.y ?: c?.y ?: p?.y ?: y)}
+        slider("Y %",(y*100).toInt(),0,100){value->val d=editor.currentDraft();val l=d.scene?.layers?.find {it.id==editor.selectedLayer};val c=if(editor.selectedCharacter)d.scene?.character else null;val p=editor.information().find {it.field==editor.selectedField};change(l?.x ?: c?.x ?: p?.x ?: x,value/100f)}
         button(tools,w("가운데로","中央へ","Center")){change(.5f,.5f);renderTools()}
     }
     private fun slider(label: String,value: Int,min: Int,max: Int,change:(Int)->Unit) {
@@ -191,6 +214,27 @@ class ScreenEditorActivity: Activity() {
         catch(_:Exception){status.text=w("이미지 8개 / GIF 2개까지만 추가할 수 있습니다","画像8枚 / GIF2枚までです","Up to 8 images / 2 GIF layers")}
     }
     private fun chooseExisting() {val items=library.items();AlertDialog.Builder(this).setTitle(w("보관함에서 추가","ライブラリから追加","Add from library")).setItems(items.map {it.name}.toTypedArray()){_,i->addLayer(items[i].id)}.show()}
+    private fun chooseCharacter() {
+        busy=true
+        IO.execute {val result=runCatching {CharacterStore.get(this).list()};ui.post {
+            if(isDestroyed || isFinishing)return@post;busy=false
+            result.onSuccess { list->if(list.isEmpty())status.text=w("먼저 캐릭터를 만들고 저장하세요","先にキャラクターを保存してください","Create and save a character first")
+                else AlertDialog.Builder(this).setTitle(w("캐릭터 선택","キャラクター選択","Choose character")).setItems(list.map {it.name}.toTypedArray()){_,i->addCharacter(list[i].id)}.show()
+            }.onFailure {status.text=w("캐릭터 보관함을 읽지 못했습니다","一覧を読み込めません","Could not read character library")}
+        }}
+    }
+    private fun addCharacter(id: String) {
+        if(editor.currentDraft().scene?.purpose!=ScenePurpose.WALLPAPER)return
+        busy=true;pendingCharacterId=id
+        IO.execute {val result=runCatching {CharacterStore.get(this).find(id) ?: error("Character missing")};ui.post {
+            if(isDestroyed || isFinishing)return@post;busy=false;pendingCharacterId=null
+            result.onSuccess { c->
+                val d=editor.currentDraft();val s=d.scene ?: return@onSuccess
+                editor.change(d.copy(scene=s.copy(character=s.character?.copy(definition=c) ?: CharacterLayer(c,beforeImage=s.layers.size))))
+                editor.selectedCharacter=true;renderTools();persistDraft()
+            }.onFailure {status.text=w("캐릭터를 찾지 못했습니다. 기존 작품은 유지됩니다.","キャラクターが見つかりません。作品は保持されます。","Character unavailable. Existing scene preserved.")}
+        }}
+    }
     private fun importFile() {persistDraft();try {startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*").putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("image/jpeg","image/png","image/gif")).putExtra(Intent.EXTRA_LOCAL_ONLY,true),81)}catch(_:Exception){status.text=w("파일 선택기를 열 수 없습니다","ファイル選択不可","File picker unavailable")}}
     @Deprecated("Platform document picker") override fun onActivityResult(requestCode: Int,resultCode: Int,data: Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
@@ -207,6 +251,15 @@ class ScreenEditorActivity: Activity() {
     private fun preview() {
         previewDialog?.dismiss()
         val d=current();val dialog=android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar_Fullscreen)
+        if(d.scene?.purpose==ScenePurpose.WALLPAPER) {
+            val host=WallpaperScenePreview(this,d.scene)
+            val frame=FrameLayout(this).apply {addView(host,FrameLayout.LayoutParams(-1,-1))}
+            val bar=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;setPadding(dp(12),dp(24),dp(12),dp(24))}
+            button(bar,w("닫기","閉じる","Close")){dialog.dismiss()}
+            button(bar,w("정지 / 움직임","静止 / 動き","Still / Motion")){host.animateScene=!host.animateScene;host.invalidate()}
+            frame.addView(bar,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
+            previewDialog=dialog;dialog.setContentView(frame);dialog.setOnDismissListener {host.close();if(previewDialog===dialog)previewDialog=null};dialog.show();return
+        }
         val host=ChargingSceneView(this,d.key,d.information,d.scene)
         val timeout=Runnable {dialog.dismiss()}
         previewDialog=dialog
@@ -215,5 +268,37 @@ class ScreenEditorActivity: Activity() {
         ui.postDelayed(timeout,2000)
         host.prepare(Runnable {ui.removeCallbacks(timeout);val now=android.os.SystemClock.uptimeMillis();host.start(now,now+library.durationMs());ui.postDelayed(timeout,library.durationMs().toLong())},Runnable {dialog.dismiss()})
     }
+    companion object {private val IO=Executors.newSingleThreadExecutor()}
+}
+
+/** Wallpaper preview has no charging timeout and owns its render resources. */
+private class WallpaperScenePreview(context: android.content.Context,private val scene: ScreenScene): View(context),AutoCloseable {
+    var animateScene=true
+    private var artwork: WallpaperArtwork?=null
+    private var generation=0
+    private var closed=false
+    private val started=android.os.SystemClock.uptimeMillis()
+    private val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {color=Color.WHITE;textSize=16*resources.displayMetrics.scaledDensity}
+    private var failed=false
+    private val ui=Handler(Looper.getMainLooper())
+    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) {
+        if(w<=0 || h<=0 || closed)return
+        val token=++generation
+        IO.execute {
+            var next: WallpaperArtwork?=null
+            val result=runCatching {next=WallpaperArtwork(scene.id,context,scene);next!!.prepare(w,h);next!!}
+            if(result.isFailure)next?.close()
+            ui.post {if(closed || token!=generation) {result.getOrNull()?.close();return@post}
+                artwork?.close();artwork=result.getOrNull();failed=result.isFailure;invalidate()}
+        }
+    }
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        canvas.drawColor(Color.BLACK)
+        artwork?.draw(canvas,android.os.SystemClock.uptimeMillis()-started,animateScene)
+        if(failed)canvas.drawText(when(WebViews.selectedLanguage(context)){"ja"->"プレビューを読み込めません";"en"->"Could not load preview";else->"미리보기를 불러오지 못했습니다"},20f,height/2f,paint)
+        if(!closed && isShown && windowVisibility==VISIBLE && animateScene && artwork?.animated==true)postInvalidateDelayed(34)
+    }
+    override fun onWindowVisibilityChanged(visibility: Int){super.onWindowVisibilityChanged(visibility);if(visibility==VISIBLE)invalidate()}
+    override fun close(){closed=true;generation++;artwork?.close();artwork=null}
     companion object {private val IO=Executors.newSingleThreadExecutor()}
 }

@@ -34,4 +34,14 @@ class ScreenSceneTest {
         listOf("", " ", "x\ny", "x".repeat(41)).forEach { name -> rejected { SceneRules.validate(scene(emptyList()).copy(name=name),png) } }
         rejected { SceneRules.validateInformation(listOf(InfoPlacement(InfoField.BATTERY,.5f,.5f,true),InfoPlacement(InfoField.BATTERY,.1f,.1f,false))) }
     }
+    @Test fun characterIsIndependentWallpaperLayer() {
+        val c=CharacterLayer(CharacterRules.defaults(media,"Character"),.5f,.5f,1f,0f,false,true,0)
+        val wallpaper=scene(emptyList()).copy(purpose=ScenePurpose.WALLPAPER,character=c)
+        SceneRules.validate(wallpaper,emptyMap())
+        SceneRules.validate(wallpaper.copy(layers=List(8){layer("$it")},character=c.copy(beforeImage=8)),mapOf(media to "image/png"))
+        rejected {SceneRules.validate(wallpaper.copy(purpose=ScenePurpose.CHARGING),emptyMap())}
+        rejected {SceneRules.validate(wallpaper.copy(character=c.copy(beforeImage=1)),emptyMap())}
+        rejected {SceneRules.validate(wallpaper.copy(character=c.copy(x=Float.NaN)),emptyMap())}
+        rejected {SceneRules.validate(wallpaper.copy(character=c.copy(definition=c.definition.copy(artworkVersion=2))),emptyMap())}
+    }
 }

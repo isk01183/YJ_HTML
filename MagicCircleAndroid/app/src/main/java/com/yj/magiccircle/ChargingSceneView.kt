@@ -22,7 +22,7 @@ import java.util.concurrent.Executors
 class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId: String,
     information: List<InfoPlacement>?, sceneOverride: ScreenScene? = null) : FrameLayout(context), Closeable {
     private val library=MediaLibrary.get(context)
-    private val scene=sceneOverride ?: library.scene(themeId)
+    private var scene=sceneOverride ?: library.scene(themeId)
     private var layout=resolveInformation(information)
     val informationView=ChargeInfoView(context)
     private var native: MainMagicChargeView?=null
@@ -95,7 +95,7 @@ class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId:
                     result=LayeredSceneRenderer(scene,{library.open(it,false)},LayeredSceneRenderer.budget(context))
                     result.prepare(w,h)
                     val renderer=result
-                    ui.post { if(closed) renderer.close() else { layered=renderer;markReady() } }
+                    ui.post { if(closed) renderer.close() else { scene?.let {renderer.updateLayers(it.layers);renderer.updateCharacter(it.character)};layered=renderer;markReady() } }
                 } catch(_: Exception) { result?.close();ui.post { fail() } }
                 catch(_: OutOfMemoryError) { result?.close();ui.post { fail() } }
             }
@@ -145,7 +145,8 @@ class ChargingSceneView @JvmOverloads constructor(context: Context, val themeId:
         ScenePurpose.WALLPAPER -> emptyList()
         null -> null
     }
-    fun updateLayers(layers: List<ImageLayer>) { layered?.updateLayers(layers);imageView.invalidate() }
+    fun updateLayers(layers: List<ImageLayer>) { scene=scene?.copy(layers=layers);layered?.updateLayers(layers);imageView.invalidate() }
+    fun updateCharacter(value: CharacterLayer?) {scene=scene?.copy(character=value);layered?.updateCharacter(value);imageView.invalidate()}
     fun imageAt(x: Float,y: Float)=layered?.hitTest(x,y)
     private fun readBattery(i: Intent?) {
         fun v(key: String)=if(i?.hasExtra(key)==true)i.getIntExtra(key,0)else null

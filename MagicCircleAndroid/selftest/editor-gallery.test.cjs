@@ -4,7 +4,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),path
  p.on('request',r=>{if(r.url().startsWith('magiccircle://'))actions.push(r.url())});p.on('pageerror',e=>errors.push(e.message));
  await p.goto(pathToFileURL(path.resolve(__dirname,'../app/src/main/assets/gallery.html')).href+'?lang=ko');
  await p.evaluate(()=>setGalleryState({selected:'classic',language:'ko',enabled:true,hidden:[],media:[]}));
- assert.equal(await p.locator('#home-screen button').count(),3);
+ assert.equal(await p.locator('#home-screen button').count(),4);
  await p.locator('#open-create').click();await p.locator('[data-create-purpose="charging"]').click();
  await p.waitForTimeout(150);assert(actions.includes('magiccircle://create?purpose=charging'));
  assert.equal(await p.locator('#create-screen-dialog').isVisible(),false);

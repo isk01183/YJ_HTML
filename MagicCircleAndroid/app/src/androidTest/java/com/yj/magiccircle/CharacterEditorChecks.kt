@@ -52,6 +52,23 @@ object CharacterEditorChecks {
             val draft=original.copy(name="Unfinished")
             store.saveDraft(draft)
             check(store.drafts().any {it.id==original.id && it.name=="Unfinished"})
+            val sceneActivity=test.startActivitySync(Intent(test.targetContext,ScreenEditorActivity::class.java)
+                .putExtra("characterId",original.id).putExtra("scenePurpose","WALLPAPER").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as ScreenEditorActivity
+            var composed: EditorDraft?=null
+            val field=ScreenEditorActivity::class.java.getDeclaredField("editor").apply {isAccessible=true}
+            try {
+                repeat(100) {if(composed?.scene?.character==null){test.runOnMainSync {composed=(field.get(sceneActivity) as ScreenEditorView).currentDraft()};Thread.sleep(30)}}
+                check(composed?.scene?.character?.definition==saved) {"Saved character not attached to wallpaper"}
+                test.runOnMainSync {ScreenEditorActivity::class.java.getDeclaredMethod("preview").apply {isAccessible=true}.invoke(sceneActivity)}
+                Thread.sleep(7800)
+                var showing=false
+                test.runOnMainSync {showing=(ScreenEditorActivity::class.java.getDeclaredField("previewDialog").apply {isAccessible=true}.get(sceneActivity) as? android.app.Dialog)?.isShowing==true}
+                check(showing) {"Wallpaper preview inherited charging timeout"}
+            } finally {
+                test.runOnMainSync {sceneActivity.finish()}
+                test.waitForIdleSync()
+                composed?.let {MediaLibrary.get(test.targetContext).discardEditorDraft(it.key)}
+            }
         } finally { test.runOnMainSync { activity.finish() }; store.delete(original.id) }
     }
 }

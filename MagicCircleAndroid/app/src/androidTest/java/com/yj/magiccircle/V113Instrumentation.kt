@@ -34,6 +34,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                     "character-storage" -> CharacterStorageChecks.run(targetContext)
                     "character-render" -> CharacterRenderingChecks.run(targetContext)
                     "character-editor" -> CharacterEditorChecks.run(this)
+                    "character-scene" -> {CharacterSceneChecks.run(targetContext);checkOnMain {CharacterSceneChecks.gesture(targetContext)}}
                     "media116" -> EditorMediaChecks.run(targetContext)
                     "gesture116" -> checkOnMain { EditorGestureChecks.run(targetContext) }
                     "message116" -> checkOnMain { StageMessageChecks.run(targetContext) }
@@ -49,6 +50,8 @@ class V113Instrumentation : android.app.Instrumentation() {
             LibraryStorageChecks.run(targetContext)
             SceneStorageChecks.run(targetContext)
             SceneWallpaperChecks.run(targetContext)
+            CharacterSceneChecks.run(targetContext)
+            checkOnMain {CharacterSceneChecks.gesture(targetContext)}
             LayeredSceneChecks.run()
             checkOnMain { ChargeInfoChecks.run(targetContext) }
             checkOnMain { ScreenEditorChecks.run(targetContext) }

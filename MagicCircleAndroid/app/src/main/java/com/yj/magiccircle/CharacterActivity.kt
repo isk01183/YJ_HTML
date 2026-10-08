@@ -256,7 +256,8 @@ class CharacterActivity: Activity() {
             .setNegativeButton(w("버리기","破棄","Discard")){_,_->ui.removeCallbacks(draftTask);val id=value!!.id;async({store.discardDraft(id)}){dirty=false;showLibrary()}}
             .setNeutralButton(w("계속 편집","編集を続ける","Keep editing"),null).show()
     }
-    @Suppress("DEPRECATION") override fun onBackPressed()=leave()
+    @android.annotation.SuppressLint("GestureBackNavigation") // API 33+ uses the native dispatcher registered in onCreate.
+    @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
     override fun onSaveInstanceState(out: Bundle) {
         value?.let {out.putString("definition",CharacterRules.toJson(it).toString())};out.putBoolean("dirty",dirty);out.putInt("tab",tab);out.putInt("scroll",toolScroll?.scrollY ?: 0)
         out.putBundle("raw",Bundle().also {b->raw.forEach { (k,v)->b.putString(k,v) }});out.putStringArrayList("invalid",ArrayList(invalid))

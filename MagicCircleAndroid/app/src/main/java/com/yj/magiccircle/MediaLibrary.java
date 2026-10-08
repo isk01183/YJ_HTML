@@ -32,7 +32,7 @@ import java.util.UUID;
 /** Private copies and one atomic manifest; source document URIs are never saved or deleted. */
 final class MediaLibrary {
     static final String MEDIA_ORIGIN = "https://appassets.androidplatform.net/media/";
-    private static final int SCHEMA_VERSION = 3;
+    private static final int SCHEMA_VERSION = 4;
     private static final int ACTIVATION_REVISION = 1;
     private static final int MAX_MANIFEST_BYTES = 1024 * 1024;
     @SuppressLint("StaticFieldLeak") // The singleton retains only the application context.
@@ -95,16 +95,16 @@ final class MediaLibrary {
                             migrated.equals(state.selected) ? "" : "selection_reset");
                     save(state.media, state.hidden, state.selected, state.pendingDeletes,
                             state.tabs, state.migrationNotice);
-                } else if (version == 2 || version == SCHEMA_VERSION) {
+                } else if (version == 2 || version == 3 || version == SCHEMA_VERSION) {
                     state = readV2(saved);
-                    if (version == 2) {
-                        AtomicFile v2 = new AtomicFile(new File(storageRoot, "media-library.v2-recovery.json"));
+                    if (version < SCHEMA_VERSION) {
+                        AtomicFile v2 = new AtomicFile(new File(storageRoot, "media-library.v" + version + "-recovery.json"));
                         if (exists(v2)) {
-                            if (!Arrays.equals(original, read(v2))) throw new IOException("Existing v2 recovery differs");
+                            if (!Arrays.equals(original, read(v2))) throw new IOException("Existing recovery differs");
                         } else writeAtomic(v2, original, false);
                     }
-                    apply(state);
-                    if (version == 2) save(media, hidden, selected, pendingDeletes, tabs, migrationNotice);
+                    if (version < SCHEMA_VERSION) save(state.media,state.hidden,state.selected,state.pendingDeletes,state.tabs,state.migrationNotice,state.editor);
+                    else apply(state);
                 } else {
                     throw new JSONException("Unknown library version");
                 }
@@ -198,7 +198,7 @@ final class MediaLibrary {
         Set<String> hiddenIds = readBuiltIns(saved.getJSONArray("hidden"), "hidden");
         Set<String> deletes = readDeletes(saved.getJSONArray("pendingDeletes"), true, ids);
         SceneData scenes;
-        try { scenes = saved.getInt("version") == 3 ? SceneData.read(saved.getJSONObject("editor"), mimeById(entries)) : new SceneData(); }
+        try { scenes = (saved.getInt("version") == 3 || saved.getInt("version") == 4) ? SceneData.read(saved.getJSONObject("editor"), mimeById(entries)) : new SceneData(); }
         catch (IllegalArgumentException error) { throw new JSONException("Invalid scene state"); }
         ids.addAll(scenes.getScenes().keySet());
         String selection = saved.getString("selected");

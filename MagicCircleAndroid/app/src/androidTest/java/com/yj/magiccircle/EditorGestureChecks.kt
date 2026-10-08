@@ -120,6 +120,16 @@ object EditorGestureChecks {
             t.send(MotionEvent.ACTION_UP,Finger(7,30f,40f))
 
             parent.removeView(view)
+            val definition=CharacterRules.defaults(java.util.UUID.randomUUID().toString(),"Gesture")
+            reset(original.copy(scene=scene.copy(purpose=ScenePurpose.WALLPAPER,character=CharacterLayer(definition,width=.4f))))
+            view.selectedCharacter=true
+            t.send(MotionEvent.ACTION_DOWN,Finger(7,cx-40,cy))
+            t.send(MotionEvent.ACTION_POINTER_DOWN,Finger(7,cx-40,cy),Finger(19,cx+40,cy),index=1)
+            t.send(MotionEvent.ACTION_MOVE,Finger(19,cx,cy+80),Finger(7,cx,cy-80))
+            val avatar=view.currentDraft().scene!!.character!!
+            near(avatar.width,.8f,"Character pinch");near(avatar.angle,90f,"Character rotation")
+            check(view.currentDraft().scene!!.layers==scene.layers && view.selectedLayer==null)
+            t.send(MotionEvent.ACTION_CANCEL,Finger(19,cx,cy+80),Finger(7,cx,cy-80))
             reset()
             t.send(MotionEvent.ACTION_DOWN,Finger(7,cx,cy))
             t.send(MotionEvent.ACTION_CANCEL,Finger(7,cx,cy))

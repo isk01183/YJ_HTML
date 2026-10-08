@@ -31,7 +31,7 @@ internal object UploadedWallpaperStore {
         if(!file.exists()) return Snapshot(null,File(root,key),null) // v1.14 single-file slots.
         val bytes=AtomicFile(file).readFully();require(bytes.size<=65536)
         val json=JSONObject(bytes.toString(Charsets.UTF_8))
-        require(json.getInt("version")==1)
+        require(json.getInt("version") in 1..2)
         val generation=json.getString("generation");require(MediaValidation.isId(generation))
         val directory=File(root,generation)
         val scene=if(json.isNull("scene"))null else SceneData.readScene(json.getJSONObject("scene"))
@@ -78,7 +78,7 @@ internal object UploadedWallpaperStore {
             File(directory,media).outputStream().use {out->open(media).use {MediaValidation.copy(it,out,MediaValidation.MAX_BYTES)}}
         }
         if(scene!=null)SceneRules.validate(scene,ids.associateWith {mime(File(directory,it))})
-        val json=JSONObject().put("version",1).put("generation",generation)
+        val json=JSONObject().put("version",2).put("generation",generation)
             .put("scene",scene?.let {SceneData.sceneJson(it)} ?: JSONObject.NULL).put("mediaId",if(scene==null)id else JSONObject.NULL)
         val atomic=AtomicFile(File(root,"$key.json"));val out=atomic.startWrite()
         try {out.write(json.toString().toByteArray(Charsets.UTF_8));atomic.finishWrite(out)}
