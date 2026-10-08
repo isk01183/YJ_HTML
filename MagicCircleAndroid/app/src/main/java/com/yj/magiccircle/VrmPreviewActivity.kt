@@ -133,47 +133,24 @@ class VrmPreviewActivity: Activity() {
             "Could not import. Choose an embedded VRM 1.0 file up to 64 MiB. The previous model is preserved.")
     }
 
-    @SuppressLint("SetJavaScriptEnabled") // Only the three bundled viewer resources are allowed.
-    @Suppress("DEPRECATION")
     private fun showViewer() {
         disposeWebView()
-        val view=WebView(this)
-        web=view
-        view.tag="vrm-webview"
-        view.setBackgroundColor(0xffeee9f3.toInt())
-        view.settings.apply {
-            javaScriptEnabled=true;domStorageEnabled=false
-            allowContentAccess=false;allowFileAccess=false
-            allowFileAccessFromFileURLs=false;allowUniversalAccessFromFileURLs=false
-            blockNetworkLoads=true;cacheMode=WebSettings.LOAD_NO_CACHE
-            mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            setSupportMultipleWindows(false);javaScriptCanOpenWindowsAutomatically=false
-            mediaPlaybackRequiresUserGesture=true
-        }
-        view.webViewClient=object: WebViewClient() {
-            override fun shouldOverrideUrlLoading(v: WebView,url: String)=true
-            override fun shouldOverrideUrlLoading(v: WebView,request: WebResourceRequest)=true
-            override fun shouldInterceptRequest(v: WebView,url: String)=resource(Uri.parse(url),"GET")
-            override fun shouldInterceptRequest(v: WebView,request: WebResourceRequest)=resource(request.url,request.method)
-            override fun onPageFinished(v: WebView,url: String) {
-                if(web===v && !closed)v.evaluateJavascript("window.vrmPreview?.${if(active)"resume" else "pause"}()",null)
+        val entry=store.selected()
+        lateinit var view: WebView
+        view=VrmWebView.create(this,{entry?.let {store.openModel(it.id)}},{failure->
+            if(web===view && !closed) {
+                if(failure==VrmFailure.RENDERER)disposeWebView(true)
+                showWebError()
             }
-            override fun onReceivedError(v: WebView,request: WebResourceRequest,error: WebResourceError) {
-                if(request.isForMainFrame && web===v && !closed)showWebError()
-            }
-            override fun onReceivedHttpError(v: WebView,request: WebResourceRequest,response: WebResourceResponse) {
-                if(request.isForMainFrame && web===v && !closed)showWebError()
-            }
-            override fun onRenderProcessGone(v: WebView,detail: RenderProcessGoneDetail): Boolean {
-                (v.parent as? ViewGroup)?.removeView(v)
-                if(web===v)web=null
-                v.destroy()
-                if(!closed)showWebError()
-                return true
+        }) {v->
+            if(web===v && !closed) {
+                entry?.let {VrmWebView.configure(v,it.placement)}
+                v.evaluateJavascript("window.vrmPreview?.${if(active)"resume" else "pause"}()",null)
             }
         }
+        web=view;view.tag="vrm-webview"
         root.addView(view,LinearLayout.LayoutParams(-1,0,1f))
-        loadPage(view)
+        view.loadUrl(VrmWebView.url(WebViews.selectedLanguage(this),entry!=null,false))
         if(!active)view.onPause()
     }
 
@@ -184,29 +161,6 @@ class VrmPreviewActivity: Activity() {
         retryButton.visibility=View.VISIBLE
     }
 
-    private fun resource(uri: Uri,method: String): WebResourceResponse {
-        fun response(code: Int,mime: String,stream: java.io.InputStream)=WebResourceResponse(mime,"UTF-8",code,
-            if(code==200)"OK"else "Blocked",mapOf("Cache-Control" to "no-store","X-Content-Type-Options" to "nosniff"),stream)
-        fun blocked()=response(403,"text/plain",ByteArrayInputStream(ByteArray(0)))
-        if(method!="GET" || uri.scheme!="https" || uri.encodedAuthority!="appassets.androidplatform.net")return blocked()
-        val path=uri.encodedPath
-        return try {
-            when(path) {
-                "/vrm-preview/index.html"->response(200,"text/html",assets.open("vrm-preview/index.html"))
-                "/vrm-preview/viewer.js"->response(200,"application/javascript",assets.open("vrm-preview/viewer.js"))
-                "/vrm-preview/viewer.css"->response(200,"text/css",assets.open("vrm-preview/viewer.css"))
-                "/vrm-preview/model.vrm"->store.openModel()?.let {response(200,"model/gltf-binary",it)} ?: blocked()
-                else->blocked()
-            }
-        } catch(_: Exception) {blocked()}
-    }
-
-    private fun loadPage(view: WebView) {
-        val url=Uri.parse("https://appassets.androidplatform.net/vrm-preview/index.html").buildUpon()
-        if(store.hasModel())url.appendQueryParameter("model","1")
-        url.appendQueryParameter("lang",WebViews.selectedLanguage(this))
-        view.loadUrl(url.build().toString())
-    }
     private fun reloadModel() {
         pendingReload=false;retryButton.visibility=View.GONE
         showViewer()
@@ -221,10 +175,10 @@ class VrmPreviewActivity: Activity() {
         web?.apply {evaluateJavascript("window.vrmPreview?.pause()",null);onPause()}
         super.onPause()
     }
-    private fun disposeWebView() {
+    private fun disposeWebView(crashed: Boolean=false) {
         val view=web ?: return;web=null
-        view.evaluateJavascript("window.vrmPreview?.dispose()",null)
-        view.stopLoading();(view.parent as? ViewGroup)?.removeView(view);view.destroy()
+        if(!crashed) {view.evaluateJavascript("window.vrmPreview?.dispose()",null);view.stopLoading()}
+        (view.parent as? ViewGroup)?.removeView(view);view.destroy()
     }
     override fun onDestroy() {
         closed=true;active=false;importer.shutdownNow();ui.removeCallbacksAndMessages(null)

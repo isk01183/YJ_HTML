@@ -60,7 +60,7 @@ object VrmPreviewChecks {
                 check(javascript("(()=>{const b=document.getElementById('$id');if(!b||b.disabled)return false;b.click();return window.vrmPreview.info.state==='ready'})()") == "true") {"Viewer control failed: $id"}
             }
             check(javascript("document.getElementById('pose').getAttribute('aria-pressed')") == "\"true\"")
-            check(javascript("document.getElementById('motion').getAttribute('aria-pressed')") == "\"true\"")
+            check(javascript("document.getElementById('motion').getAttribute('aria-pressed')") == "\"false\"")
         } finally {test.runOnMainSync {activity.finish()};test.waitForIdleSync()}
     }
 

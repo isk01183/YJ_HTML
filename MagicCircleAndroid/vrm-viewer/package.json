@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test camera.test.js",
+    "test": "node --test camera.test.js viewer-state.test.js",
     "build": "esbuild viewer.js --bundle --minify --target=chrome100 --format=iife --legal-comments=eof --outfile=../app/src/main/assets/vrm-preview/viewer.js"
   },
   "dependencies": {

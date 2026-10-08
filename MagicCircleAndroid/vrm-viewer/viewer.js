@@ -2,9 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { fitDistance } from './camera.js';
+import { fitDistance, placementFrame } from './camera.js';
+import { shouldRender, normalizePlacement } from './viewer-state.js';
 
 const params = new URLSearchParams(location.search);
+const wallpaper=params.get('wallpaper')==='1';
+document.body.classList.toggle('wallpaper',wallpaper);
 const lang = ['ko','ja','en'].includes(params.get('lang')) ? params.get('lang') : 'ko';
 const w = (ko, ja, en) => ({ko,ja,en})[lang];
 document.documentElement.lang = lang;
@@ -16,23 +19,30 @@ $('full').textContent = w('전신','全身','Full body');
 $('face').textContent = w('얼굴','顔','Face');
 $('pose').textContent = w('T 포즈','Tポーズ','T pose');
 $('motion').textContent = w('눈 깜박임','まばたき','Blink');
-$('details').textContent = w('파일은 이 기기에만 저장됩니다. 배경화면은 변경하지 않습니다.','ファイルはこの端末だけに保存。壁紙は変更しません。','Stored on this device only. Your wallpaper is unchanged.');
+$('details').textContent = w('파일은 이 기기에만 저장됩니다. 적용은 시스템 화면에서 확인하세요.','端末内だけに保存。壁紙の適用はシステム画面で確認してください。','Stored only on this device. Confirm wallpaper in the system preview.');
 
 let renderer, controls, vrm, camera, scene;
-let disposed = false, paused = false, frame = 0, last = 0, elapsed = 0;
-let tPose = false, blinking = false, view = 'full';
+let disposed = false, hostActive = false, frame = 0, last = 0, elapsed = 0;
+let placement=normalizePlacement();
+let tPose = false, blinking = true, view = 'full';
 let bounds, bodyHeight = 1.6;
-const info = {state:'empty', triangles:0, materials:0, frames:0};
-function fail(message) {
-  info.state = 'error'; status.textContent = message;
+const info = {state:'empty', triangles:0, materials:0, frames:0,metaVersion:null,failure:null};
+function fail(message,kind='MODEL') {
+  info.state = 'error'; info.failure=kind; status.textContent = message;
   document.querySelectorAll('button').forEach(button => button.disabled = true);
   pause();
 }
-function pause() { paused = true; cancelAnimationFrame(frame); frame = 0; last = 0; }
-function resume() {
-  if (disposed || info.state === 'error') return;
-  paused = false; last = 0;
-  if (renderer && !frame) frame = requestAnimationFrame(tick);
+function syncLoop() {
+  if(shouldRender(hostActive,!document.hidden,info.state==='ready',disposed)) {
+    if(renderer&&!frame)frame=requestAnimationFrame(tick);
+  } else {cancelAnimationFrame(frame);frame=0;last=0;}
+}
+function pause() {hostActive=false;syncLoop();}
+function resume() {hostActive=true;syncLoop();}
+function configure(value) {
+  placement=normalizePlacement(value);blinking=placement.blink;view='full';
+  $('motion').setAttribute('aria-pressed',String(blinking));
+  if(vrm)frameView();
 }
 function dispose() {
   if (disposed) return;
@@ -41,9 +51,9 @@ function dispose() {
   renderer?.dispose(); renderer?.forceContextLoss();
   vrm = null;
 }
-window.vrmPreview = {pause, resume, dispose, info};
+window.vrmPreview = {pause, resume, dispose, configure, info};
 addEventListener('pagehide', dispose);
-document.addEventListener('visibilitychange', () => document.hidden ? pause() : resume());
+document.addEventListener('visibilitychange',syncLoop);
 
 function resize() {
   if (!renderer || disposed) return;
@@ -65,7 +75,8 @@ function frameView() {
   } else {
     bounds.getCenter(center);
     const size = bounds.getSize(new THREE.Vector3());
-    distance = fitDistance(size.x, size.y, size.z, camera.aspect, camera.fov);
+    const fit=placementFrame(size.x,size.y,size.z,camera.aspect,camera.fov,placement);
+    distance=fit.distance;center.x-=fit.offsetX;center.y-=fit.offsetY;
   }
   camera.position.copy(center).add(new THREE.Vector3(0,0,distance));
   controls.target.copy(center); controls.minDistance = bodyHeight * .22; controls.maxDistance = bodyHeight * 7;
@@ -86,7 +97,7 @@ function pose() {
 }
 function tick(time) {
   frame = 0;
-  if (paused || disposed) return;
+  if (!shouldRender(hostActive,!document.hidden,info.state==='ready',disposed)) return;
   frame = requestAnimationFrame(tick);
   if (last && time - last < 1000 / 30) return;
   const delta = last ? Math.min((time - last) / 1000, .05) : 0;
@@ -115,7 +126,7 @@ async function init() {
     stage.appendChild(renderer.domElement);
     renderer.domElement.addEventListener('webglcontextlost', event => {
       event.preventDefault();
-      if (!disposed) fail(w('그래픽 메모리가 부족합니다. 이 화면을 닫고 다시 열어주세요.','描画が中断されました。画面を開き直してください。','Graphics interrupted. Close and reopen this preview.'));
+      if (!disposed) fail(w('그래픽 보기가 중단되었습니다. 다시 시도하세요.','描画が中断されました。再試行してください。','Graphics interrupted. Please retry.'),'CONTEXT');
     });
     scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff,0xb3acaa,1.0));
@@ -126,6 +137,7 @@ async function init() {
     controls.enableDamping = true; controls.dampingFactor = .15;
     controls.minPolarAngle = .25; controls.maxPolarAngle = Math.PI - .25;
     controls.screenSpacePanning = true;
+    controls.enabled=!wallpaper;
     resize(); addEventListener('resize',resize);
     const manager = new THREE.LoadingManager();
     const modelUrl = new URL('model.vrm',location.href).href;
@@ -138,7 +150,9 @@ async function init() {
     const gltf = await loader.loadAsync(modelUrl);
     if (disposed) { VRMUtils.deepDispose(gltf.scene); return; }
     vrm = gltf.userData.vrm;
-    if (!vrm || vrm.meta.metaVersion !== '1') throw new Error('VRM 1.0 required');
+    if (!vrm || !['0','1'].includes(vrm.meta.metaVersion)) {VRMUtils.deepDispose(gltf.scene);throw new Error('Unsupported VRM');}
+    info.metaVersion=vrm.meta.metaVersion;
+    VRMUtils.rotateVRM0(vrm);
     VRMUtils.removeUnnecessaryVertices(vrm.scene);
     VRMUtils.combineSkeletons(vrm.scene);
     const materials = new Set();
@@ -153,17 +167,17 @@ async function init() {
     scene.add(vrm.scene); pose();
     const floor = new THREE.Mesh(new THREE.CircleGeometry(.42,64),new THREE.MeshBasicMaterial({color:0x707c8e,transparent:true,opacity:.08,depthWrite:false}));
     floor.rotation.x = -Math.PI/2; floor.position.y = bounds.min.y - .006; scene.add(floor);
-    renderer.render(scene,camera);
     info.state = 'ready'; status.textContent = '';
     document.querySelectorAll('button').forEach(button => button.disabled = false);
     $('full').onclick = () => {view = 'full'; frameView();};
     $('face').onclick = () => {view = 'face'; frameView();};
     $('pose').onclick = () => {tPose = !tPose; $('pose').setAttribute('aria-pressed',String(tPose)); pose();};
     $('motion').onclick = () => {blinking = !blinking; $('motion').setAttribute('aria-pressed',String(blinking));};
-    if (!paused && !document.hidden) resume();
+    $('motion').setAttribute('aria-pressed',String(blinking));
+    syncLoop();
   } catch (error) {
     console.error('VRM preview failed', error.message);
-    fail(w('이 모델을 표시하지 못했습니다. VRM 1.0 파일과 최신 Android System WebView가 필요합니다.','表示できません。VRM 1.0と最新のAndroid System WebViewをご確認ください。','Could not display model. Use VRM 1.0 and an up-to-date Android System WebView.'));
+    if(!disposed)fail(w('이 모델을 표시하지 못했습니다. VRM 파일과 Android System WebView를 확인하세요.','表示できません。VRMファイルとAndroid System WebViewをご確認ください。','Could not display model. Check the VRM file and Android System WebView.'));
   }
 }
 init();
