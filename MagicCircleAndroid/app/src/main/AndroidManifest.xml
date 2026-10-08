@@ -58,5 +58,20 @@
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/uploaded_wallpaper" />
         </service>
+        <service android:name=".VrmWallpaperService0" android:exported="true" android:enabled="false"
+            android:label="@string/vrm_wallpaper_title" android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/vrm_wallpaper" />
+        </service>
+        <service android:name=".VrmWallpaperService1" android:exported="true" android:enabled="false"
+            android:label="@string/vrm_wallpaper_title" android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/vrm_wallpaper" />
+        </service>
+        <service android:name=".VrmWallpaperService2" android:exported="true" android:enabled="false"
+            android:label="@string/vrm_wallpaper_title" android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/vrm_wallpaper" />
+        </service>
     </application>
 </manifest>

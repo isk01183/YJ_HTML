@@ -49,4 +49,8 @@
     <string name="library_tab_delete_title">Delete tab?</string>
     <string name="library_tab_delete_message">Only this tab will be deleted. Its designs will be kept.</string>
     <string name="library_tab_delete">Delete tab</string>
+    <string name="vrm_wallpaper_title">VRM character wallpaper</string>
+    <string name="vrm_wallpaper_description">Your privately imported VRM character, with original materials and blinking.</string>
+    <string name="vrm_wallpaper_failed">Wallpaper stopped. Open the app to retry or select a character.</string>
+    <string name="vrm_wallpaper_retrying">Restoring character…</string>
 </resources>
