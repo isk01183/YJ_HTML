@@ -110,16 +110,16 @@ object VrmPreviewChecks {
             fun import(input: InputStream) {store.importModel(input)}
             val original=glb(document())
             import(ByteArrayInputStream(original))
-            val saved=File(root,"model.vrm")
-            check(saved.readBytes().contentEquals(original)) {"Valid embedded VRM1 was not saved intact"}
+            fun savedBytes()=store.openModel()!!.use {it.readBytes()}
+            check(savedBytes().contentEquals(original)) {"Valid embedded VRM1 was not saved intact"}
             val escaped=document().put("extras","quote \" slash \\ newline\n tab\t control\u0001")
             val validSyntax=glb(escaped,rawJson=escaped.toString().replace("\"byteLength\":36","\"byteLength\":3.6e1"))
             import(ByteArrayInputStream(validSyntax))
-            check(saved.readBytes().contentEquals(validSyntax)) {"Valid JSON escapes or exponent notation rejected"}
+            check(savedBytes().contentEquals(validSyntax)) {"Valid JSON escapes or exponent notation rejected"}
             import(ByteArrayInputStream(original))
             fun reject(bytes: ByteArray,label: String) {
                 check(runCatching {import(ByteArrayInputStream(bytes))}.isFailure) {"Accepted $label"}
-                check(saved.readBytes().contentEquals(original)) {"Failed $label replacement destroyed the previous model"}
+                check(savedBytes().contentEquals(original)) {"Failed $label replacement destroyed the previous model"}
                 check(root.listFiles()!!.none {it.name.endsWith(".tmp")}) {"Failed import left private temporary data"}
             }
             reject(original.copyOf(original.size-1),"truncated GLB")
@@ -194,17 +194,49 @@ object VrmPreviewChecks {
             }
             check(runCatching {import(huge)}.isFailure) {"Unbounded stream accepted"}
             check(bytesRead<=64L*1024*1024+1) {"Import read beyond its 64 MiB limit"}
-            check(saved.readBytes().contentEquals(original)) {"Oversized import replaced saved model"}
+            check(savedBytes().contentEquals(original)) {"Oversized import replaced saved model"}
             val unreadable=object: InputStream() {override fun read(): Int=throw IOException("Provider failed")}
             check(runCatching {import(unreadable)}.isFailure)
-            check(saved.readBytes().contentEquals(original)) {"Provider failure replaced saved model"}
+            check(savedBytes().contentEquals(original)) {"Provider failure replaced saved model"}
             import(ByteArrayInputStream(imageFixture(4096,2048,5)))
             val v0=glb(documentV0())
             import(ByteArrayInputStream(v0))
-            check(saved.readBytes().contentEquals(v0)) {"VRM0 not saved intact"}
+            check(savedBytes().contentEquals(v0)) {"VRM0 not saved intact"}
             val replacement=imageFixture(1)
             import(ByteArrayInputStream(replacement))
-            check(saved.readBytes().contentEquals(replacement)) {"Successful replacement did not commit"}
+            check(savedBytes().contentEquals(replacement)) {"Successful replacement did not commit"}
+            val folder=File(root,"collection")
+            val library=VrmModelStore(folder)
+            val a=library.importModel(ByteArrayInputStream(original),"test.vrm")
+            val b=library.importModel(ByteArrayInputStream(v0),"test.vrm")
+            check(a.id!=b.id && library.entries().size==2) {"Same filename overwrote a different character"}
+            library.rename(a.id,"My character")
+            library.savePlacement(a.id,VrmPlacement(.2f,-.3f,1.2f,false))
+            check(library.importModel(ByteArrayInputStream(original),"again.vrm").id==a.id)
+            check(library.entries().size==2 && library.selected()!!.name=="My character")
+            library.select(b.id);library.select(a.id)
+            val reopened=VrmModelStore(folder)
+            check(reopened.selected()==library.selected())
+            check(reopened.selected()!!.placement==VrmPlacement(.2f,-.3f,1.2f,false))
+            check(reopened.openModel(b.id)!!.use {it.readBytes()}.contentEquals(v0))
+            check(runCatching {reopened.select("../model")}.isFailure)
+            check(runCatching {reopened.importModel(ByteArrayInputStream(ByteArray(28)))}.isFailure)
+            check(reopened.entries().size==2 && reopened.selected()!!.id==a.id)
+            Thread.currentThread().interrupt()
+            try {check(runCatching {reopened.importModel(ByteArrayInputStream(v0))}.isFailure)}
+            finally {Thread.interrupted()}
+            check(reopened.selected()!!.id==a.id)
+            val legacy=File(root,"legacy").apply {mkdir()}
+            File(legacy,"model.vrm").writeBytes(original)
+            check(VrmModelStore(legacy).entries().size==1)
+            check(VrmModelStore(legacy).entries().size==1)
+            check(File(legacy,"model.vrm").readBytes().contentEquals(original))
+            val index=File(folder,"index.json")
+            val before=index.readBytes()
+            val obstacle=File(folder,"index.json.new").apply {mkdir();resolve("block").writeText("test")}
+            check(runCatching {reopened.rename(a.id,"should not persist")}.isFailure)
+            check(index.readBytes().contentEquals(before) && reopened.selected()!!.name=="My character")
+            obstacle.deleteRecursively()
         } finally {root.deleteRecursively()}
     }
 

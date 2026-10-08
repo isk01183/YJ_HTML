@@ -3,6 +3,7 @@ package com.yj.magiccircle
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.system.Os
+import android.util.AtomicFile
 import android.util.JsonReader
 import android.util.JsonToken
 import org.json.JSONArray
@@ -18,8 +19,10 @@ import java.io.RandomAccessFile
 import java.io.StringReader
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
+import java.security.MessageDigest
 
 enum class VrmFormat { V0, V1 }
+data class VrmEntry(val id: String,val name: String,val format: VrmFormat,val sizeBytes: Long,val placement: VrmPlacement)
 
 /** Private, embedded VRM models. Originals are never modified. */
 class VrmModelStore(private val root: File) {
@@ -31,14 +34,72 @@ class VrmModelStore(private val root: File) {
             instance ?: VrmModelStore(File(context.applicationContext.noBackupFilesDir,"vrm-preview")).also {instance=it}
         }
     }
-    private val model get()=File(root,"model.vrm")
-    fun hasModel()=model.isFile
-    fun openModel(): InputStream? = try {FileInputStream(model)} catch(_: java.io.FileNotFoundException) {null}
+    private val index get()=AtomicFile(File(root,"index.json"))
+    private fun validId(id: String) {require(id.matches(Regex("[a-f0-9]{64}"))) {"Invalid model ID"}}
+    private fun model(id: String): File {validId(id);return File(root,"models/$id.vrm")}
+    private data class Library(val models: List<VrmEntry>,val selected: String?)
+    @Synchronized fun entries(): List<VrmEntry> = read().models
+    @Synchronized fun selected(): VrmEntry? = read().let {library->library.models.find {it.id==library.selected}}
+    fun hasModel()=selected()!=null
+    fun openModel(): InputStream? = selected()?.let {openModel(it.id)}
+    fun openModel(id: String): InputStream? = try {FileInputStream(model(id))} catch(_: java.io.FileNotFoundException) {null}
+    @Synchronized fun select(id: String) {
+        validId(id);val library=read();require(library.models.any {it.id==id})
+        write(library.copy(selected=id))
+    }
+    @Synchronized fun rename(id: String,name: String) {
+        require(name.trim().length in 1..80 && name.none {it<' '})
+        update(id){it.copy(name=name.trim())}
+    }
+    @Synchronized fun savePlacement(id: String,placement: VrmPlacement)=update(id){it.copy(placement=placement.normalized())}
+    private fun update(id: String,change: (VrmEntry)->VrmEntry) {
+        validId(id);val library=read();require(library.models.any {it.id==id})
+        write(library.copy(models=library.models.map {if(it.id==id)change(it)else it}))
+    }
+    private fun read(): Library {
+        if(!index.baseFile.exists() && !File(root,"index.json.bak").exists()) {
+            val legacy=File(root,"model.vrm")
+            if(legacy.isFile)legacy.inputStream().use {copyModel(it,"test.vrm",Library(emptyList(),null))}
+            else return Library(emptyList(),null)
+        }
+        val bytes=index.openRead().use {it.readBytesLimited(1024*1024)}
+        val json=JSONObject(bytes.toString(Charsets.UTF_8));require(json.getInt("version")==1)
+        val array=json.getJSONArray("models");require(array.length()<=1024)
+        val models=(0 until array.length()).map {i->
+            val entry=array.getJSONObject(i);val id=entry.getString("id");validId(id)
+            val name=entry.getString("name");require(name.length in 1..80)
+            val size=entry.getLong("size");require(size in 28..MAX_BYTES && model(id).length()==size)
+            val p=entry.getJSONObject("placement")
+            VrmEntry(id,name,VrmFormat.valueOf(entry.getString("format")),size,
+                VrmPlacement(p.optDouble("x",0.0).toFloat(),p.optDouble("y",0.0).toFloat(),p.optDouble("scale",1.0).toFloat(),p.optBoolean("blink",true)).normalized())
+        }
+        require(models.map {it.id}.toSet().size==models.size)
+        val selected=if(json.isNull("selected"))null else json.getString("selected")
+        require(selected==null && models.isEmpty() || models.any {it.id==selected})
+        return Library(models,selected)
+    }
+    private fun InputStream.readBytesLimited(limit: Int): ByteArray {
+        val out=java.io.ByteArrayOutputStream();val buffer=ByteArray(8192)
+        while(true) {val count=read(buffer);if(count<0)break;require(count>0 && out.size()+count<=limit);out.write(buffer,0,count)}
+        return out.toByteArray()
+    }
+    private fun write(library: Library) {
+        val entries=JSONArray()
+        for(entry in library.models)entries.put(JSONObject().put("id",entry.id).put("name",entry.name)
+            .put("format",entry.format.name).put("size",entry.sizeBytes).put("placement",JSONObject()
+                .put("x",entry.placement.x).put("y",entry.placement.y).put("scale",entry.placement.scale).put("blink",entry.placement.blink)))
+        val bytes=JSONObject().put("version",1).put("models",entries).put("selected",library.selected ?: JSONObject.NULL).toString().toByteArray()
+        require(bytes.size<=1024*1024 && library.models.size<=1024)
+        val atomic=index;val out=atomic.startWrite()
+        try {out.write(bytes);atomic.finishWrite(out)}catch(e: Exception){atomic.failWrite(out);throw e}
+    }
 
-    @Synchronized fun importModel(input: InputStream) {
+    @Synchronized fun importModel(input: InputStream,displayName: String="test.vrm"): VrmEntry = copyModel(input,displayName,read())
+    private fun copyModel(input: InputStream,displayName: String,library: Library): VrmEntry {
         if(!root.isDirectory && !root.mkdirs())throw IOException("Cannot create private model directory")
         val temp=File.createTempFile("import-",".tmp",root)
         try {
+            val digest=MessageDigest.getInstance("SHA-256")
             FileOutputStream(temp).use {output->
                 val bytes=ByteArray(32*1024);var total=0L
                 while(true) {
@@ -49,13 +110,23 @@ class VrmModelStore(private val root: File) {
                     total+=count
                     require(total<=MAX_BYTES) {"Model exceeds 64 MiB"}
                     output.write(bytes,0,count)
+                    digest.update(bytes,0,count)
                 }
                 output.fd.sync()
             }
-            validate(temp)
+            val format=validate(temp)
             checkInterrupted()
-            // POSIX rename replaces atomically on the same private filesystem, or throws.
-            Os.rename(temp.path,model.path)
+            val id=digest.digest().joinToString(""){"%02x".format(it)}
+            val existing=library.models.find {it.id==id}
+            val name=displayName.filter {it>=' '}.trim().take(80).ifBlank {"test.vrm"}
+            val entry=existing ?: VrmEntry(id,name,format,temp.length(),VrmPlacement())
+            val file=model(id)
+            if(!file.parentFile!!.isDirectory && !file.parentFile!!.mkdirs())throw IOException("Cannot create model storage")
+            if(!file.exists())Os.rename(temp.path,file.path)
+            else require(file.length()==entry.sizeBytes) {"Stored model is damaged"}
+            checkInterrupted()
+            write(Library(if(existing==null)library.models+entry else library.models,id))
+            return entry
         } catch(e: Exception) {throw IOException("VRM import failed; previous model preserved",e)}
         finally {temp.delete()}
     }
