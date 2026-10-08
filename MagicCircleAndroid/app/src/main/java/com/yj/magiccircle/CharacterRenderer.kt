@@ -14,7 +14,7 @@ class CharacterRenderer(definition: CharacterDefinition) {
     fun update(definition: CharacterDefinition) {
         check(!closed); CharacterRules.validate(definition)
         if(this.definition==definition) return
-        if(this.definition.appearance!=definition.appearance || this.definition.outfit!=definition.outfit || this.definition.colors!=definition.colors) parts=CharacterParts(definition)
+        if(this.definition.appearance!=definition.appearance || this.definition.outfit!=definition.outfit || this.definition.colors!=definition.colors || this.definition.body.shoulders!=definition.body.shoulders || this.definition.body.torsoWidth!=definition.body.torsoWidth) parts=CharacterParts(definition)
         if(this.definition.body!=definition.body) frame=CharacterGeometry.measure(definition.body)
         this.definition=definition
     }
@@ -24,7 +24,7 @@ class CharacterRenderer(definition: CharacterDefinition) {
         val t=if(animated && this.animated) elapsedMs.coerceAtLeast(0).toDouble()/1000.0 else 0.0
         val breath=(sin(t*1.65)*.24).toFloat()
         val wave=if(definition.motion==CharacterMotion.WAVE) ((1-cos(t*2.2))*.5).toFloat() else 0f
-        val s=min(width/130f,height/220f)
+        val s=min(width/160f,height/220f)
         canvas.save(); canvas.translate(width/2f,(height-220f*s)/2f+10f*s); canvas.scale(s,s)
         val f=frame; val b=definition.body
         // Feet stay at y=200 when height changes; camera scale is separate.

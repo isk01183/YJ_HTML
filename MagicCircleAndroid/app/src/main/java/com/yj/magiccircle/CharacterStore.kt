@@ -31,6 +31,11 @@ class CharacterStore(private val root: File, private val file: AtomicFile=Atomic
     @Synchronized fun drafts(): List<CharacterDefinition> = read().drafts
     @Synchronized fun find(id: String) = read().saved.find { it.id==id }
     @Synchronized fun draft(id: String) = read().drafts.find { it.id==id }
+    @Synchronized fun rename(id: String,name: String) {
+        val s=read();val saved=s.saved.find {it.id==id} ?: throw IOException("Character missing")
+        CharacterRules.validate(saved.copy(name=name))
+        write(State(s.saved.map {if(it.id==id)it.copy(name=name)else it},s.drafts.map {if(it.id==id)it.copy(name=name)else it}))
+    }
     @Synchronized fun save(v: CharacterDefinition) {
         CharacterRules.validate(v); val s=read()
         write(State(s.saved.filterNot { it.id==v.id }+v,s.drafts.filterNot { it.id==v.id }))
@@ -52,7 +57,11 @@ class CharacterStore(private val root: File, private val file: AtomicFile=Atomic
     }
     private fun atomicWrite(target: AtomicFile,bytes: ByteArray) {
         val stream=target.startWrite()
-        try { stream.write(bytes); target.finishWrite(stream) }
+        try {
+            stream.write(bytes); stream.fd.sync(); target.finishWrite(stream)
+            // AtomicFile can log a failed rename without throwing. Never report an uncommitted save.
+            if(!target.readFully().contentEquals(bytes)) throw IOException("Character commit verification failed")
+        }
         catch(e: Exception) { target.failWrite(stream); throw IOException("Character save failed",e) }
     }
 }

@@ -28,6 +28,11 @@ object CharacterStorageChecks {
         })
         check(runCatching { failing.save(a) }.exceptionOrNull() is IOException)
         check(file.readBytes().contentEquals(bytes) && failing.list() == listOf(b))
+        val silent = CharacterStore(root, object : AtomicFile(file) {
+            override fun finishWrite(stream: FileOutputStream?) { failWrite(stream) }
+        })
+        check(runCatching { silent.save(a) }.exceptionOrNull() is IOException)
+        check(file.readBytes().contentEquals(bytes) && silent.list() == listOf(b))
         file.writeText("{broken")
         check(runCatching { CharacterStore(root).list() }.isFailure)
         check(runCatching { CharacterStore(root).save(a) }.isFailure)

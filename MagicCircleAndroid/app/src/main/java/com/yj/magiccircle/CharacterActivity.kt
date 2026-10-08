@@ -116,7 +116,7 @@ class CharacterActivity: Activity() {
         dialog.setOnShowListener {dialog.getButton(-1).setOnClickListener {
             val next=c.copy(name=field.text.toString().trim())
             if(runCatching {CharacterRules.validate(next)}.isFailure) {field.error=w("1–40자의 이름을 입력하세요","1–40文字で入力","Enter 1–40 characters");return@setOnClickListener}
-            async({store.save(next)}){dialog.dismiss();showLibrary()}
+            async({store.rename(c.id,next.name)}){dialog.dismiss();showLibrary()}
         }};dialog.show()
     }
     private fun load(id: String) {

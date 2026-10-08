@@ -95,7 +95,7 @@ internal class CharacterParts(private val v: CharacterDefinition) {
             val ry=when(v.appearance.eyes) { "almond"->2.65f; "soft"->3.15f; else->3.9f }
             shape(white) { moveTo(x-4f,18.8f); cubicTo(x-3.4f,15f,x+3.3f,15.3f,x+4f,18.5f); quadTo(x+3f,20f+ry,x,20f+ry); quadTo(x-3.6f,20f+ry,x-4f,18.8f); close() }
             val iris=v.colors.getValue("eyes")
-            path(iris,shader=LinearGradient(x,16.3f,x,23f,hairDark,iris,Shader.TileMode.CLAMP)) { addOval(x-2.65f,16.5f,x+2.65f,20f+ry,Path.Direction.CW) }
+            path(iris,shader=LinearGradient(x,16.3f,x,23f,tint(iris,0xff191d36.toInt(),.58f),iris,Shader.TileMode.CLAMP)) { addOval(x-2.65f,16.5f,x+2.65f,20f+ry,Path.Direction.CW) }
             oval(x,19.2f,1.18f,ry*.8f,0xff332239.toInt())
             line(tint(iris,white,.55f),.6f) { moveTo(x-1.8f,20f+ry*.6f); quadTo(x,22f+ry*.5f,x+1.8f,20f+ry*.6f) }
             oval(x-1.2f,17.5f,1.05f,1.15f,white); oval(x+1.2f,21f,.45f,.6f,white)
@@ -140,7 +140,7 @@ internal class CharacterParts(private val v: CharacterDefinition) {
             path(hairLight) { moveTo(side*4f,3.7f); quadTo(side*9f,4.3f,side*12.7f,7.2f); lineTo(side*12.2f,8f); quadTo(side*8f,5.4f,side*4.5f,4.4f); close() }
         }
         if(v.appearance.hair=="tied") for(side in listOf(-1f,1f)) {
-            oval(side*16f,10f,2.6f,1.1f,accent); line(outline,.25f) { moveTo(side*14f,10f); lineTo(side*18f,10f) }
+            oval(side*16f,10f,2.6f,1.1f,hairLight); line(outline,.25f) { moveTo(side*14f,10f); lineTo(side*18f,10f) }
         }
     }
     val headgear=CharacterPart().apply {
@@ -148,13 +148,16 @@ internal class CharacterParts(private val v: CharacterDefinition) {
             val color=v.colors.getValue("head.base")
             shape(color) { moveTo(8f,4f); cubicTo(8f,-4f,19f,-4f,17f,5f); lineTo(11f,7f); cubicTo(19f,7f,20f,14f,13f,11f); close() }
             oval(11f,6f,1.8f,2.1f,v.colors.getValue("head.accent"))
-        } else if(v.outfit[OutfitSlot.HEAD]=="star") star(this,12f,8f,3.3f,v.colors.getValue("head.base"))
+        } else if(v.outfit[OutfitSlot.HEAD]=="star") {
+            star(this,12f,8f,3.3f,v.colors.getValue("head.base"))
+            star(this,12f,8f,1.6f,v.colors.getValue("head.accent"))
+        }
     }
     val halo=CharacterPart().apply {
         if(v.outfit[OutfitSlot.HALO]!="none") {
             oval(0f,-10f,13f,3.2f,v.colors.getValue("halo.base"),.7f)
             oval(0f,-10f,11.7f,2.5f,v.colors.getValue("halo.accent"),.18f)
-            if(v.outfit[OutfitSlot.HALO]=="star") for(i in 0..4) star(this,(i-2)*5f,-10f,1.7f,accent)
+            if(v.outfit[OutfitSlot.HALO]=="star") for(i in 0..4) star(this,(i-2)*5f,-10f,1.7f,v.colors.getValue("halo.accent"))
         }
     }
     val neck=CharacterPart().apply {
@@ -165,11 +168,13 @@ internal class CharacterParts(private val v: CharacterDefinition) {
     val torso=CharacterPart().apply {
         val type=v.outfit[OutfitSlot.TORSO]
         val bottom=if(type=="robe") 67f else 47f
+        // The sleeve pivot follows shoulders, while waist width remains independently editable.
+        val shoulder=18f*v.body.shoulders/(v.body.torsoWidth*if(v.appearance.bodyType=="masculine")1.13f else 1f)
         shape(cloth,gradient(tint(cloth,white,.16f),tint(cloth,outline,.24f),bottom)) {
-            moveTo(-9f,-2f); lineTo(-18f,1f); quadTo(-17f,12f,-14f,20f)
+            moveTo(-9f,-2f); lineTo(-shoulder,1f); quadTo(-shoulder+1f,12f,-14f,20f)
             quadTo(-12f,25f,-14f,30f); lineTo(-20f,bottom-2f)
             quadTo(0f,bottom+3f,20f,bottom-2f); lineTo(14f,30f)
-            quadTo(12f,25f,14f,20f); lineTo(18f,1f); lineTo(9f,-2f); quadTo(0f,8f,-9f,-2f); close()
+            quadTo(12f,25f,14f,20f); quadTo(shoulder-1f,12f,shoulder,1f); lineTo(9f,-2f); quadTo(0f,8f,-9f,-2f); close()
         }
         shape(white) { moveTo(-9f,-2f); lineTo(-13f,-.5f); lineTo(-6f,10f); lineTo(0f,6f); lineTo(6f,10f); lineTo(13f,-.5f); lineTo(9f,-2f); quadTo(0f,5f,-9f,-2f); close() }
         shape(tint(cloth,outline,.7f)) { moveTo(-5.3f,6f); lineTo(0f,17f); lineTo(5.3f,6f); quadTo(0f,9f,-5.3f,6f); close() }
@@ -198,7 +203,7 @@ internal class CharacterParts(private val v: CharacterDefinition) {
     }
     val upperArm=CharacterPart().apply {
         shape(white,gradient(white,0xffbfc6d3.toInt(),26f)) { moveTo(-5f,0f); quadTo(-7f,13f,-4.2f,27f); quadTo(0f,30f,4.2f,27f); quadTo(6f,12f,5f,0f); close() }
-        shape(cloth,gradient(cloth,tint(cloth,outline,.2f),14f)) { moveTo(-5.8f,-1f); quadTo(-8f,5f,-7.2f,15f); quadTo(0f,17f,7.2f,15f); quadTo(8f,5f,5.8f,-1f); close() }
+        shape(cloth,gradient(cloth,tint(cloth,outline,.2f),14f)) { moveTo(-5.8f,-1f); quadTo(-8f,5f,-7.2f,15f); quadTo(0f,17f,7.2f,15f); quadTo(8f,5f,5.8f,-1f);quadTo(0f,-5.5f,-5.8f,-1f); close() }
         line(accent,.45f) { moveTo(-6.9f,13.8f); quadTo(0f,15.6f,6.9f,13.8f) }
         line(tint(cloth,outline,.27f),.2f) { moveTo(-2f,2f); quadTo(-4f,7f,-4f,12f) }
     }
@@ -253,7 +258,7 @@ internal class CharacterParts(private val v: CharacterDefinition) {
             for(i in 0..13) {
                 val x=side*(14f+i*2.1f); val y=9f-i*2f
                 shape(tint(base,white,(i%3)*.09f)) { moveTo(x,y); cubicTo(x+side*9f,y-9f,x+side*10f,y-12f,x+side*10f,y-19f); cubicTo(x+side*13f,y+3f,x+side*3f,y+16f,x,y+17f); quadTo(x+side*3f,y+6f,x,y); close() }
-                line(tint(base,0xff607391.toInt(),.35f),.14f) { moveTo(x+side*2f,y+9f); quadTo(x+side*6f,y,x+side*8f,y-8f) }
+                line(tint(trim,0xff607391.toInt(),.35f),.35f) { moveTo(x+side*2f,y+9f); quadTo(x+side*6f,y,x+side*8f,y-8f) }
             }
         } else if(type=="fairy") for(side in listOf(-1f,1f)) {
             for(i in 0..1) {

@@ -39,7 +39,7 @@ class CharacterPreviewView(context: Context): View(context) {
     override fun onDraw(c: Canvas) {
         super.onDraw(c)
         paint.shader=backdrop; paint.style=Paint.Style.FILL; c.drawRect(0f,0f,width.toFloat(),height.toFloat(),paint); paint.shader=null
-        val scale=min(width/130f,height/220f); val top=(height-220f*scale)/2f+10f*scale
+        val scale=min(width/160f,height/220f); val top=(height-220f*scale)/2f+10f*scale
         paint.color=0x387fe3ff; paint.strokeWidth=1f
         for(i in 0..27) { val x=((i*83+17)%101)/101f*width; val y=((i*47+5)%97)/97f*height; c.drawCircle(x,y,if(i%4==0)2f else 1f,paint) }
         paint.color=0x408ddaef; paint.style=Paint.Style.STROKE

@@ -8,7 +8,7 @@ enum class InfoField { BATTERY, STATUS, TEMPERATURE, HEALTH, CONNECTION, METER, 
 data class ImageLayer(val id: String, val mediaId: String, val x: Float, val y: Float,
     val width: Float, val angle: Float, val flipX: Boolean, val visible: Boolean)
 data class CharacterLayer(val definition: CharacterDefinition, val x: Float=.5f,val y: Float=.5f,
-    val width: Float=1f,val angle: Float=0f,val flipX: Boolean=false,val visible: Boolean=true,val beforeImage: Int=0)
+    val width: Float=.6f,val angle: Float=0f,val flipX: Boolean=false,val visible: Boolean=true,val beforeImage: Int=0)
 data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>,val character: CharacterLayer?=null)
 data class StageMessages(val connected: String, val charging: String, val complete: String) {
     fun at(progress: Float) = when { progress<.28f -> connected; progress<.83f -> charging; else -> complete }

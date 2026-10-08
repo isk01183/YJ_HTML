@@ -7,6 +7,7 @@ import java.util.UUID
 
 object CharacterRenderingChecks {
     fun run(context: Context) {
+        CharacterColorChecks.run(context)
         val base=CharacterRules.defaults(UUID.randomUUID().toString(),"별빛")
         val renderer=CharacterRenderer(base)
         renderer.prepare(720,1080)
@@ -44,6 +45,11 @@ object CharacterRenderingChecks {
             canvas.save(); canvas.translate(i*400f,0f); renderer.draw(canvas,0,false); canvas.restore()
         }
         File(context.getExternalFilesDir(null),"character-variants.png").outputStream().use { check(sheet.compress(Bitmap.CompressFormat.PNG,100,it)) }; sheet.recycle()
+        val extremes=Bitmap.createBitmap(1200,900,Bitmap.Config.ARGB_8888)
+        val ec=Canvas(extremes);ec.drawColor(0xffebe7f1.toInt())
+        val bodies=listOf(BodyProportions(heightCm=120f,head=1.2f,shoulders=1.2f,torsoWidth=.7f,armWidth=.7f),BodyProportions(),BodyProportions(heightCm=200f,head=.8f,shoulders=.8f,torso=1.2f,arms=1.2f,legs=1.2f,torsoWidth=1.3f,legWidth=1.3f))
+        bodies.forEachIndexed {i,body->renderer.update(base.copy(body=body,motion=CharacterMotion.WAVE));ec.save();ec.translate(i*400f,0f);renderer.draw(ec,1100,true);ec.restore()}
+        File(context.getExternalFilesDir(null),"character-extremes.png").outputStream().use {check(extremes.compress(Bitmap.CompressFormat.PNG,100,it))};extremes.recycle()
         renderer.close(); renderer.close()
     }
 }

@@ -11,6 +11,13 @@ object CharacterSceneChecks {
         val root=File(context.cacheDir,"character-scene-${UUID.randomUUID()}").apply {check(mkdirs())}
         val definition=CharacterRules.defaults(UUID.randomUUID().toString(),"Snapshot")
         val scene=ScreenScene("scene-${UUID.randomUUID()}","Character",ScenePurpose.WALLPAPER,emptyList(),CharacterLayer(definition))
+        val landscape=Bitmap.createBitmap(800,400,Bitmap.Config.ARGB_8888)
+        val tall=scene.copy(character=CharacterLayer(definition.copy(body=BodyProportions(heightCm=200f),motion=CharacterMotion.WAVE)))
+        LayeredSceneRenderer(tall,{error("No media")},1024*1024).use { r->
+            r.prepare(800,400);r.draw(Canvas(landscape),1100,true)
+            for(x in 0 until 800)check(landscape.getPixel(x,0)==android.graphics.Color.BLACK && landscape.getPixel(x,399)==android.graphics.Color.BLACK) {"New character is clipped in landscape"}
+        }
+        landscape.recycle()
         check(SceneData.readScene(SceneData.sceneJson(scene))==scene)
         val old=SceneData.sceneJson(scene.copy(character=null));old.remove("character")
         check(SceneData.readScene(old).character==null)

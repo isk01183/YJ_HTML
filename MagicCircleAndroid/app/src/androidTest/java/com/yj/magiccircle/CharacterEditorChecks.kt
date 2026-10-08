@@ -52,6 +52,9 @@ object CharacterEditorChecks {
             val draft=original.copy(name="Unfinished")
             store.saveDraft(draft)
             check(store.drafts().any {it.id==original.id && it.name=="Unfinished"})
+            store.rename(original.id,"Renamed")
+            check(store.draft(original.id)!!.copy(name=draft.name)==draft) {"Rename destroyed unfinished work"}
+            store.save(saved!!)
             val sceneActivity=test.startActivitySync(Intent(test.targetContext,ScreenEditorActivity::class.java)
                 .putExtra("characterId",original.id).putExtra("scenePurpose","WALLPAPER").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as ScreenEditorActivity
             var composed: EditorDraft?=null
@@ -69,6 +72,24 @@ object CharacterEditorChecks {
                 test.waitForIdleSync()
                 composed?.let {MediaLibrary.get(test.targetContext).discardEditorDraft(it.key)}
             }
+            val preferences=test.targetContext.getSharedPreferences("magic_circle",0)
+            val oldLanguage=preferences.getString("language",null)
+            try {
+                for(language in listOf("ko","ja","en")) {
+                    test.runOnMainSync {activity.finish();WebViews.selectLanguage(test.targetContext,language)}
+                    activity=test.startActivitySync(Intent(test.targetContext,CharacterActivity::class.java)
+                        .putExtra("characterId",original.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CharacterActivity
+                    click("character-tab-1")
+                    val height=waitFor("body-heightCm") as EditText
+                    test.runOnMainSync {height.setText("180")}
+                    click("character-tab-2")
+                    for(slot in OutfitSlot.entries)click("outfit-${slot.name}-${CharacterRules.outfitIds.getValue(slot).last()}")
+                    click("character-tab-4")
+                    val preview=CharacterActivity::class.java.getDeclaredField("preview").apply {isAccessible=true}
+                    test.runOnMainSync {(preview.get(activity) as CharacterPreviewView).apply {restoreView(2f,12f,15f);setActive(false);setActive(true);resetView()}}
+                    check(store.find(original.id)==saved) {"Uncommitted UI edits changed saved character"}
+                }
+            } finally {preferences.edit().apply {if(oldLanguage==null)remove("language")else putString("language",oldLanguage)}.commit()}
         } finally { test.runOnMainSync { activity.finish() }; store.delete(original.id) }
     }
 }
