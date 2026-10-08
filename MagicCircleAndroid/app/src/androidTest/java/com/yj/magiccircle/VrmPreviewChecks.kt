@@ -134,6 +134,24 @@ object VrmPreviewChecks {
             reject(glb(document(),rawJson=document().toString().replace("\"byteLength\":36","\"byteLength\":36.")),"trailing decimal point")
             reject(glb(document().apply {remove("extensions")}),"non-VRM GLB")
             reject(glb(document().apply {getJSONObject("extensions").getJSONObject("VRMC_vrm").put("specVersion","0.0")}),"unsupported VRM version")
+            reject(glb(document().apply {getJSONObject("extensions").put("VRM",documentV0().getJSONObject("extensions").getJSONObject("VRM"))}),"ambiguous VRM extensions")
+            for(zero in listOf(false,true)) {
+                val doc=if(zero)documentV0() else document()
+                val vrm=doc.getJSONObject("extensions").getJSONObject(if(zero)"VRM" else "VRMC_vrm")
+                if(zero)vrm.getJSONObject("humanoid").getJSONArray("humanBones").getJSONObject(1).put("node",0)
+                else vrm.getJSONObject("humanoid").getJSONObject("humanBones").getJSONObject("spine").put("node",0)
+                reject(glb(doc),"duplicate humanoid node")
+            }
+            reject(glb(documentV0().apply {
+                getJSONObject("extensions").getJSONObject("VRM").getJSONObject("humanoid").getJSONArray("humanBones").remove(0)
+            }),"missing VRM0 bone")
+            reject(glb(documentV0().apply {
+                val bones=getJSONObject("extensions").getJSONObject("VRM").getJSONObject("humanoid").getJSONArray("humanBones")
+                for(i in 0 until bones.length()) if(bones.getJSONObject(i).getString("bone")=="chest"){bones.remove(i);break}
+            }),"missing legacy chest")
+            reject(glb(document().apply {
+                getJSONObject("extensions").getJSONObject("VRMC_vrm").getJSONObject("humanoid").getJSONObject("humanBones").getJSONObject("hips").put("node",9999)
+            }),"humanoid index outside nodes")
             for(uri in listOf("https://example.com/texture.png","file:///sdcard/model.bin","../other.bin","data:application/octet-stream;base64,AAAA")) {
                 reject(glb(document().apply {getJSONArray("buffers").getJSONObject(0).put("uri",uri)}),"buffer URI $uri")
                 reject(glb(document().put("images",JSONArray().put(JSONObject().put("uri",uri)))),"image URI $uri")
@@ -145,18 +163,30 @@ object VrmPreviewChecks {
             reject(glb(document().apply {getJSONArray("accessors").getJSONObject(0).put("count",1000)}),"accessor past buffer view")
             reject(glb(document().apply {getJSONArray("accessors").getJSONObject(0).put("count",Int.MAX_VALUE).remove("bufferView")}),"oversized zero-filled accessor")
             reject(glb(document().put("images",JSONArray().put(JSONObject().put("bufferView",0).put("mimeType","image/png")))),"invalid embedded image")
-            fun imageFixture(width: Int): ByteArray {
-                val bitmap=android.graphics.Bitmap.createBitmap(width,1,android.graphics.Bitmap.Config.ARGB_8888)
+            fun imageFixture(width: Int,height: Int=1,copies: Int=1,extraPixel: Boolean=false): ByteArray {
+                val bitmap=android.graphics.Bitmap.createBitmap(width,height,android.graphics.Bitmap.Config.ARGB_8888)
                 val encoded=java.io.ByteArrayOutputStream()
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,encoded);bitmap.recycle()
-                val png=encoded.toByteArray();val bytes=ByteArray(36)+png
+                val png=encoded.toByteArray()
+                val one=if(extraPixel)java.io.ByteArrayOutputStream().also {out->
+                    val single=android.graphics.Bitmap.createBitmap(1,1,android.graphics.Bitmap.Config.ARGB_8888)
+                    single.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);single.recycle()
+                }.toByteArray() else ByteArray(0)
+                val bytes=ByteArray(36)+png+one
                 val json=document()
                 json.getJSONArray("buffers").getJSONObject(0).put("byteLength",bytes.size)
                 json.getJSONArray("bufferViews").put(JSONObject().put("buffer",0).put("byteOffset",36).put("byteLength",png.size))
-                json.put("images",JSONArray().put(JSONObject().put("bufferView",1).put("mimeType","image/png")))
+                json.put("images",JSONArray().apply {repeat(copies){put(JSONObject().put("bufferView",1).put("mimeType","image/png"))}})
+                if(extraPixel) {
+                    json.getJSONArray("bufferViews").put(JSONObject().put("buffer",0).put("byteOffset",36+png.size).put("byteLength",one.size))
+                    json.getJSONArray("images").put(JSONObject().put("bufferView",2).put("mimeType","image/png"))
+                }
                 return glb(json,bytes)
             }
             reject(imageFixture(4097),"oversized compressed texture")
+            reject(imageFixture(1,1,65),"too many images")
+            reject(imageFixture(4096,2048,6),"total texture pixels over bound")
+            reject(imageFixture(4096,2048,5,true),"texture limit plus one pixel")
             var bytesRead=0L
             val huge=object: InputStream() {
                 override fun read(): Int {bytesRead++;return 0}
@@ -168,6 +198,10 @@ object VrmPreviewChecks {
             val unreadable=object: InputStream() {override fun read(): Int=throw IOException("Provider failed")}
             check(runCatching {import(unreadable)}.isFailure)
             check(saved.readBytes().contentEquals(original)) {"Provider failure replaced saved model"}
+            import(ByteArrayInputStream(imageFixture(4096,2048,5)))
+            val v0=glb(documentV0())
+            import(ByteArrayInputStream(v0))
+            check(saved.readBytes().contentEquals(v0)) {"VRM0 not saved intact"}
             val replacement=imageFixture(1)
             import(ByteArrayInputStream(replacement))
             check(saved.readBytes().contentEquals(replacement)) {"Successful replacement did not commit"}
@@ -175,6 +209,21 @@ object VrmPreviewChecks {
     }
 
     // Generated test-only triangle and skeleton; no personal or distributed avatar asset.
+    private fun documentV0(): JSONObject = document().apply {
+        val old=getJSONObject("extensions").getJSONObject("VRMC_vrm")
+        val bones=old.getJSONObject("humanoid").getJSONObject("humanBones")
+        val human=JSONArray()
+        bones.keys().forEach {bone->human.put(JSONObject().put("bone",bone).put("node",bones.getJSONObject(bone).getInt("node")))}
+        for(bone in listOf("chest","neck")) {
+            val nodes=getJSONArray("nodes")
+            human.put(JSONObject().put("bone",bone).put("node",nodes.length()))
+            nodes.put(JSONObject().put("name",bone))
+        }
+        put("extensionsUsed",JSONArray().put("VRM"))
+        put("extensions",JSONObject().put("VRM",JSONObject().put("specVersion","0.0")
+            .put("meta",JSONObject().put("title","Private old VRM").put("author","Test").put("licenseName","Redistribution_Prohibited"))
+            .put("humanoid",JSONObject().put("humanBones",human))))
+    }
     private fun document(): JSONObject {
         val bones=listOf("hips","spine","head","leftUpperLeg","leftLowerLeg","leftFoot","rightUpperLeg","rightLowerLeg","rightFoot","leftUpperArm","leftLowerArm","leftHand","rightUpperArm","rightLowerArm","rightHand")
         val human=JSONObject();bones.forEachIndexed {i,bone->human.put(bone,JSONObject().put("node",i))}

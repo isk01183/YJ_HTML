@@ -19,10 +19,13 @@ import java.io.StringReader
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
-/** A single, private, embedded VRM 1.0 model. Originals are never modified. */
+enum class VrmFormat { V0, V1 }
+
+/** Private, embedded VRM models. Originals are never modified. */
 class VrmModelStore(private val root: File) {
     companion object {
         const val MAX_BYTES=64L*1024*1024
+        const val MAX_TEXTURE_PIXELS=40L*1024*1024
         @Volatile private var instance: VrmModelStore?=null
         fun get(context: Context): VrmModelStore = instance ?: synchronized(this) {
             instance ?: VrmModelStore(File(context.applicationContext.noBackupFilesDir,"vrm-preview")).also {instance=it}
@@ -71,7 +74,7 @@ class VrmModelStore(private val root: File) {
         require(result.length()<=max) {"Too many $key"}
         return result
     }
-    private fun validate(file: File) = RandomAccessFile(file,"r").use {data->
+    private fun validate(file: File): VrmFormat = RandomAccessFile(file,"r").use {data->
         fun u32()=Integer.reverseBytes(data.readInt()).toLong() and 0xffffffffL
         require(file.length() in 28..MAX_BYTES && file.length()%4L==0L) {"Invalid GLB size"}
         require(u32()==0x46546c67L && u32()==2L && u32()==file.length()) {"Invalid GLB header"}
@@ -136,18 +139,38 @@ class VrmModelStore(private val root: File) {
         require(u32()==0x004e4942L && binSize%4L==0L && data.filePointer+binSize==file.length()) {"Invalid BIN chunk"}
         val binStart=data.filePointer
         require(json.getJSONObject("asset").getString("version")=="2.0")
-        val vrm=json.getJSONObject("extensions").getJSONObject("VRMC_vrm")
-        require(vrm.getString("specVersion")=="1.0") {"Export VRM 1.0"}
-        require((0 until json.getJSONArray("extensionsUsed").length()).any {json.getJSONArray("extensionsUsed").getString(it)=="VRMC_vrm"})
+        val extensions=json.getJSONObject("extensions")
+        require(extensions.has("VRM") xor extensions.has("VRMC_vrm")) {"Expected exactly one VRM extension"}
+        val format=if(extensions.has("VRM"))VrmFormat.V0 else VrmFormat.V1
+        val key=if(format==VrmFormat.V0)"VRM" else "VRMC_vrm"
+        val vrm=extensions.getJSONObject(key)
+        require(vrm.getString("specVersion")==if(format==VrmFormat.V0)"0.0" else "1.0") {"Unsupported VRM version"}
+        require((0 until json.getJSONArray("extensionsUsed").length()).any {json.getJSONArray("extensionsUsed").getString(it)==key})
         val meta=vrm.getJSONObject("meta")
-        require(meta.getString("name").isNotBlank() && meta.getString("licenseUrl").isNotBlank())
-        val authors=meta.getJSONArray("authors");require(authors.length()>0)
-        for(i in 0 until authors.length())require(authors.getString(i).isNotBlank())
+        if(format==VrmFormat.V1) {
+            require(meta.getString("name").isNotBlank() && meta.getString("licenseUrl").isNotBlank())
+            val authors=meta.getJSONArray("authors");require(authors.length()>0)
+            for(i in 0 until authors.length())require(authors.getString(i).isNotBlank())
+        } else require(listOf("title","author","licenseName").all {meta.getString(it).isNotBlank()})
         val nodes=array(json,"nodes",4096);require(nodes.length()>0)
-        val bones=vrm.getJSONObject("humanoid").getJSONObject("humanBones")
-        for(bone in listOf("hips","spine","head","leftUpperLeg","leftLowerLeg","leftFoot","rightUpperLeg","rightLowerLeg","rightFoot","leftUpperArm","leftLowerArm","leftHand","rightUpperArm","rightLowerArm","rightHand")) {
-            require(number(bones.getJSONObject(bone),"node")<nodes.length()) {"Invalid humanoid bone"}
+        val bones=mutableMapOf<String,Long>()
+        val human=vrm.getJSONObject("humanoid")
+        if(format==VrmFormat.V1) {
+            val entries=human.getJSONObject("humanBones")
+            entries.keys().forEach {bone->bones[bone]=number(entries.getJSONObject(bone),"node")}
+        } else {
+            val entries=human.getJSONArray("humanBones");require(entries.length()<=256)
+            for(i in 0 until entries.length()) {
+                val entry=entries.getJSONObject(i);val bone=entry.getString("bone")
+                require(bone.isNotBlank() && !bones.containsKey(bone)) {"Duplicate humanoid bone"}
+                bones[bone]=number(entry,"node")
+            }
         }
+        require(bones.values.all {it<nodes.length()} && bones.values.toSet().size==bones.size) {"Invalid or duplicate humanoid node"}
+        for(bone in listOf("hips","spine","head","leftUpperLeg","leftLowerLeg","leftFoot","rightUpperLeg","rightLowerLeg","rightFoot","leftUpperArm","leftLowerArm","leftHand","rightUpperArm","rightLowerArm","rightHand")) {
+            require(bones.containsKey(bone)) {"Missing humanoid bone"}
+        }
+        if(format==VrmFormat.V0)require(bones.containsKey("chest") && bones.containsKey("neck")) {"Missing legacy humanoid bone"}
         val buffers=json.getJSONArray("buffers");require(buffers.length()==1)
         val buffer=buffers.getJSONObject(0);require(!buffer.has("uri")) {"External buffers are not supported"}
         val length=number(buffer,"byteLength")
@@ -214,8 +237,9 @@ class VrmModelStore(private val root: File) {
             require(options.outMimeType==image.getString("mimeType")) {"Image MIME mismatch"}
             require(options.outWidth in 1..4096 && options.outHeight in 1..4096) {"Texture exceeds 4096 pixels"}
             pixels+=options.outWidth.toLong()*options.outHeight
-            require(pixels<=32L*1024*1024) {"Total texture size too large"}
+            require(pixels<=MAX_TEXTURE_PIXELS) {"Total texture size too large"}
         }
         array(json,"meshes",256);array(json,"materials",256)
+        format
     }
 }
