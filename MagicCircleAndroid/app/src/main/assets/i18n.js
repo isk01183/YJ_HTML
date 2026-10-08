@@ -3,6 +3,8 @@
     // Bundled translations: the app never needs a network request or a downloaded font.
     const strings = {};
     const add = (key, ja, ko, en) => { strings[key] = {ja, ko, en}; };
+    add('characterCreate','キャラクターを作る','캐릭터 만들기','Create a character');
+    add('characterHint','髪・体型・衣装・色を選び、壁紙へ。','헤어·체형·의상·색상을 꾸미고 내 배경화면에 초대하세요.','Customize hair, proportions, wardrobe and colors for your wallpaper.');
     add('createScreen','画面を作る','화면 직접 만들기','Create a screen');
     add('createHint','画像を重ね、位置・角度・情報を自由に。','이미지를 겹치고 위치·각도·충전 정보를 자유롭게 꾸며요.','Layer images and arrange every detail.');
     add('editInformation','充電情報を編集','충전 정보 편집','Edit charge information');

@@ -1,0 +1,57 @@
+package com.yj.magiccircle
+
+import android.app.Instrumentation
+import android.content.Intent
+import android.widget.EditText
+import android.view.View
+import java.util.UUID
+
+object CharacterEditorChecks {
+    fun run(test: Instrumentation) {
+        check(android.os.Build.PRODUCT.startsWith("sdk_")) { "Character UI checks are emulator-only" }
+        val store=CharacterStore.get(test.targetContext)
+        val original=CharacterRules.defaults(UUID.randomUUID().toString(),"Editor check")
+        store.save(original)
+        var activity=test.startActivitySync(Intent(test.targetContext,CharacterActivity::class.java)
+            .putExtra("characterId",original.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as CharacterActivity
+        fun waitFor(tag: String): View {
+            var found: View?=null
+            repeat(100) { test.runOnMainSync { found=activity.window.decorView.findViewWithTag(tag) }; if(found!=null) return found!!; Thread.sleep(30) }
+            error("Missing control: $tag")
+        }
+        fun click(tag: String) { val view=waitFor(tag); test.runOnMainSync { check(view.performClick()) }; test.waitForIdleSync() }
+        try {
+            click("appearance-hair-long")
+            click("appearance-face-oval")
+            click("character-tab-3")
+            fun dialog()=CharacterActivity::class.java.getDeclaredField("colorDialog").apply {isAccessible=true}.get(activity) as android.app.AlertDialog
+            click("color-hair")
+            test.runOnMainSync {
+                val inputs=ArrayList<EditText>()
+                fun collect(v: View) {if(v is EditText)inputs.add(v);if(v is android.view.ViewGroup)for(i in 0 until v.childCount)collect(v.getChildAt(i))}
+                collect(dialog().window!!.decorView)
+                inputs[1].setText("999")
+                check(!dialog().getButton(-1).isEnabled)
+            }
+            val monitor=test.addMonitor(CharacterActivity::class.java.name,null,false)
+            test.runOnMainSync {activity.recreate()}
+            activity=test.waitForMonitorWithTimeout(monitor,5000) as? CharacterActivity ?: error("Recreation failed")
+            test.removeMonitor(monitor);test.waitForIdleSync()
+            test.runOnMainSync {
+                check(!dialog().getButton(-1).isEnabled) {"Invalid RGB was replaced on recreation"}
+                dialog().getButton(-2).performClick()
+            }
+            val name=waitFor("character-name") as EditText
+            test.runOnMainSync { name.setText("Edited character") }
+            click("character-save")
+            var saved=store.find(original.id)
+            repeat(100) { if(saved?.name!="Edited character") { Thread.sleep(30); saved=store.find(original.id) } }
+            check(saved?.name=="Edited character")
+            check(saved!!.appearance.hair=="long" && saved!!.appearance.face=="oval")
+            check(saved!!.appearance.eyes==original.appearance.eyes && saved!!.colors==original.colors && saved!!.outfit==original.outfit)
+            val draft=original.copy(name="Unfinished")
+            store.saveDraft(draft)
+            check(store.drafts().any {it.id==original.id && it.name=="Unfinished"})
+        } finally { test.runOnMainSync { activity.finish() }; store.delete(original.id) }
+    }
+}

@@ -28,6 +28,7 @@ class CharacterStore(private val root: File, private val file: AtomicFile=Atomic
         } catch(e: Exception) { throw IOException("Character library could not be read; original preserved",e) }
     }
     @Synchronized fun list(): List<CharacterDefinition> = read().saved
+    @Synchronized fun drafts(): List<CharacterDefinition> = read().drafts
     @Synchronized fun find(id: String) = read().saved.find { it.id==id }
     @Synchronized fun draft(id: String) = read().drafts.find { it.id==id }
     @Synchronized fun save(v: CharacterDefinition) {

@@ -33,6 +33,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                 when(name) {
                     "character-storage" -> CharacterStorageChecks.run(targetContext)
                     "character-render" -> CharacterRenderingChecks.run(targetContext)
+                    "character-editor" -> CharacterEditorChecks.run(this)
                     "media116" -> EditorMediaChecks.run(targetContext)
                     "gesture116" -> checkOnMain { EditorGestureChecks.run(targetContext) }
                     "message116" -> checkOnMain { StageMessageChecks.run(targetContext) }
@@ -44,6 +45,7 @@ class V113Instrumentation : android.app.Instrumentation() {
             }
             CharacterStorageChecks.run(targetContext)
             CharacterRenderingChecks.run(targetContext)
+            CharacterEditorChecks.run(this)
             LibraryStorageChecks.run(targetContext)
             SceneStorageChecks.run(targetContext)
             SceneWallpaperChecks.run(targetContext)
