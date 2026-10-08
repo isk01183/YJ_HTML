@@ -71,11 +71,20 @@ object VrmPreviewChecks {
         check(type!=null) {"Local VRM preview screen is missing"}
         val activity=test.startActivitySync(android.content.Intent(test.targetContext,type)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        val original=VrmModelStore.get(test.targetContext).selected()
         try {
+            val deadline=android.os.SystemClock.elapsedRealtime()+10000
+            var loaded=false
+            while(!loaded && android.os.SystemClock.elapsedRealtime()<deadline) {
+                test.runOnMainSync {loaded=activity.window.decorView.findViewWithTag<android.webkit.WebView>("vrm-webview")!=null}
+                if(!loaded)Thread.sleep(50)
+            }
             test.runOnMainSync {
                 val root=activity.window.decorView
                 check(root.findViewWithTag<android.widget.Button>("vrm-import").isEnabled)
                 check(root.findViewWithTag<android.widget.Button>("vrm-back").isEnabled)
+                for(tag in listOf("vrm-models","vrm-rename","vrm-settings","vrm-apply"))
+                    check(root.findViewWithTag<android.widget.Button>(tag)!=null) {"Missing control: $tag"}
                 val view=root.findViewWithTag<android.webkit.WebView>("vrm-webview")
                 check(view.settings.javaScriptEnabled && view.settings.blockNetworkLoads)
                 check(!view.settings.allowContentAccess && !view.settings.allowFileAccess)
@@ -97,10 +106,53 @@ object VrmPreviewChecks {
                     override fun rendererPriorityAtExit()=0
                 }))
                 check(root.findViewWithTag<android.webkit.WebView>("vrm-webview")==null) {"Dead renderer remained attached"}
+                check(!root.findViewWithTag<android.widget.Button>("vrm-apply").isEnabled) {"Failed renderer can be applied"}
                 check(root.findViewWithTag<android.widget.Button>("vrm-retry").performClick())
                 check(root.findViewWithTag<android.webkit.WebView>("vrm-webview")!==view) {"Retry reused terminated renderer"}
+                val replacement=root.findViewWithTag<android.webkit.WebView>("vrm-webview")
+                client.onRenderProcessGone(view,object: android.webkit.RenderProcessGoneDetail() {
+                    override fun didCrash()=false
+                    override fun rendererPriorityAtExit()=0
+                })
+                check(root.findViewWithTag<android.webkit.WebView>("vrm-webview")===replacement) {"Stale callback destroyed new viewer"}
+                check(!root.findViewWithTag<android.widget.Button>("vrm-apply").isEnabled) {"Loading renderer can be applied"}
             }
-        } finally {test.runOnMainSync {activity.finish()};test.waitForIdleSync()}
+            if(original!=null) {
+                fun panel(): android.view.View = android.view.inspector.WindowInspector.getGlobalWindowViews()
+                    .first {it.findViewWithTag<android.widget.SeekBar>("vrm-x")!=null}
+                test.runOnMainSync {
+                    activity.window.decorView.findViewWithTag<android.widget.Button>("vrm-settings").performClick()
+                    val p=panel()
+                    p.findViewWithTag<android.widget.SeekBar>("vrm-x").progress=70
+                    p.findViewWithTag<android.widget.SeekBar>("vrm-y").progress=0
+                    p.findViewWithTag<android.widget.SeekBar>("vrm-scale").progress=100
+                    p.findViewWithTag<android.widget.Switch>("vrm-blink").isChecked=false
+                    p.findViewById<android.widget.Button>(android.R.id.button1).performClick()
+                }
+                val until=android.os.SystemClock.elapsedRealtime()+5000
+                while(VrmModelStore.get(test.targetContext).selected()?.placement!=VrmPlacement(.35f,-.35f,1.5f,false) && android.os.SystemClock.elapsedRealtime()<until)Thread.sleep(50)
+                check(VrmModelStore.get(test.targetContext).selected()?.placement==VrmPlacement(.35f,-.35f,1.5f,false))
+                test.waitForIdleSync()
+                test.runOnMainSync {
+                    activity.window.decorView.findViewWithTag<android.widget.Button>("vrm-settings").performClick()
+                    val p=panel()
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-x").progress==70)
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-y").progress==0)
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-scale").progress==100)
+                    check(!p.findViewWithTag<android.widget.Switch>("vrm-blink").isChecked)
+                    p.findViewWithTag<android.widget.Button>("vrm-reset").performClick()
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-x").progress==35)
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-y").progress==35)
+                    check(p.findViewWithTag<android.widget.SeekBar>("vrm-scale").progress==50)
+                    check(p.findViewWithTag<android.widget.Switch>("vrm-blink").isChecked)
+                    p.findViewById<android.widget.Button>(android.R.id.button2).performClick()
+                }
+                check(VrmModelStore.get(test.targetContext).selected()?.placement==VrmPlacement(.35f,-.35f,1.5f,false)) {"Cancelled settings changed storage"}
+            }
+        } finally {
+            test.runOnMainSync {activity.finish()};test.waitForIdleSync()
+            original?.let {VrmModelStore.get(test.targetContext).savePlacement(it.id,it.placement)}
+        }
     }
 
     fun run(context: Context) {

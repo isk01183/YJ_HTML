@@ -88,7 +88,7 @@ class CharacterActivity: Activity() {
         button(bar,w("＋ 새 캐릭터","＋ 新規","＋ Create"),"character-new") {
             value=CharacterRules.defaults(UUID.randomUUID().toString(),w("별빛","星あかり","Starlight"));raw.clear();invalid.clear();tab=0;dirty=true;showEditor();scheduleDraft()
         }
-        button(root,w("VRM 3D 미리보기","VRM 3Dプレビュー","VRM 3D preview"),"vrm-preview") {
+        button(root,w("VRM 캐릭터 · 배경화면","VRMキャラクター・壁紙","VRM characters · Wallpaper"),"vrm-preview") {
             startActivity(Intent(this,VrmPreviewActivity::class.java))
         }
         val scroll=ScrollView(this);val list=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))

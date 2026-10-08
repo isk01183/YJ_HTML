@@ -114,6 +114,10 @@ public final class MainActivity extends Activity {
                 || !"magiccircle".equals(uri.getScheme()) || !uri.isHierarchical()
                 || uri.getFragment() != null || (uri.getPath() != null && !uri.getPath().isEmpty())) return;
         String action = uri.getAuthority();
+        if ("vrm".equals(action) && hasExactQuery(uri) && !libraryBusy) {
+            startActivity(new Intent(this, VrmPreviewActivity.class));
+            return;
+        }
         if ("characters".equals(action) && hasExactQuery(uri) && !libraryBusy) {
             startActivity(new Intent(this, CharacterActivity.class));
             return;

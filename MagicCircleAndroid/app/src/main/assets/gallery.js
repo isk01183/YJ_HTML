@@ -10,6 +10,7 @@ const characterButton=document.createElement('button');characterButton.id='open-
 characterButton.innerHTML='<span class="symbol" aria-hidden="true">♧</span><strong data-i18n="characterCreate"></strong><span data-i18n="characterHint"></span>';
 document.querySelector('.home-menu').appendChild(characterButton);
 characterButton.onclick=()=>{if(native&&!busy)location.href='magiccircle://characters';};
+document.getElementById('open-vrm').onclick=()=>{if(native&&!busy)location.href='magiccircle://vrm';};
 const grid=document.getElementById('design-grid');
 const nativeDesign={id:'native-N01',code:'N01',group:'signature',color:'#e4c889'};
 const builtins=[nativeDesign,...CircleDesigns.list,...ReferenceDesigns.list];
@@ -128,6 +129,7 @@ function render(){
     materialButton.disabled=busy||!native||!readable;
     document.getElementById('open-create').disabled=busy||!readable||!native;
     characterButton.disabled=busy||!native;
+    document.getElementById('open-vrm').disabled=busy||!native;
     document.querySelectorAll('[data-duration]').forEach(b=>{b.setAttribute('aria-pressed',String(Number(b.dataset.duration)===durationMs));b.disabled=busy||!native||!readable;});
     const deleteButton=document.getElementById('delete-design');
     deleteButton.disabled=busy||!focused;
