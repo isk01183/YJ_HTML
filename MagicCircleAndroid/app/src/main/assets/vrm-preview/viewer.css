@@ -3,7 +3,7 @@ html,body {margin:0;height:100%;overflow:hidden;font-family:system-ui,sans-serif
 body {display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 42%,#fffdfa 0%,#eae7e3 65%,#d8dbe0 100%)}
 #stage {flex:1;min-height:0;position:relative;touch-action:none}
 canvas {display:block;width:100%;height:100%;outline:none;touch-action:none}
-.caption {position:absolute;top:20px;left:20px;pointer-events:none;color:#526170}
+.caption {order:-1;padding:8px 20px;pointer-events:none;color:#526170}
 .caption span {font-size:10px;letter-spacing:3px;font-weight:650}
 .caption p {font-size:11px;line-height:1.6;margin-top:7px;max-width:230px}
 #status {position:absolute;top:45%;left:8%;width:84%;text-align:center;font-size:14px;line-height:1.65;padding:18px;background:#fffaf0eb;border-radius:16px;pointer-events:none}
@@ -16,4 +16,4 @@ button[aria-pressed=true] {background:#53677a;color:white;border-color:#53677a}
 button:focus-visible {outline:3px solid #55a6d9}
 #details {text-align:center;font-size:10px;line-height:1.5;color:#65717b;margin:7px 4px 0}
 .wallpaper footer,.wallpaper .caption {display:none}
-@media (orientation:landscape) and (max-height:500px) {.caption {top:10px} footer {padding:4px} #details {margin:3px} button {min-height:42px}}
+@media (orientation:landscape) and (max-height:500px) {.caption {padding:4px 20px}.caption p {display:none} footer {padding:4px} #details {margin:3px}}

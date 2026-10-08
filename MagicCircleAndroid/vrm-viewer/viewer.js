@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { fitDistance, placementFrame } from './camera.js';
-import { shouldRender, normalizePlacement } from './viewer-state.js';
+import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-state.js';
 
 const params = new URLSearchParams(location.search);
 const wallpaper=params.get('wallpaper')==='1';
@@ -85,9 +85,10 @@ function frameView() {
 function pose() {
   vrm.humanoid.resetNormalizedPose();
   if (!tPose) {
+    const angle=relaxedArmAngle(vrm.meta.metaVersion);
     vrm.humanoid.setNormalizedPose({
-      leftUpperArm: {rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,-1.15)).toArray()},
-      rightUpperArm: {rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,1.15)).toArray()},
+      leftUpperArm: {rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,angle)).toArray()},
+      rightUpperArm: {rotation: new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,-angle)).toArray()},
     });
   }
   vrm.update(0); vrm.scene.updateMatrixWorld(true);

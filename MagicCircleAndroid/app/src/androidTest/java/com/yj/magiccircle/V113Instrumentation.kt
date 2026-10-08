@@ -33,6 +33,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                 when(name) {
                     "vrm-preview" -> VrmPreviewChecks.run(targetContext)
                     "vrm-wallpaper" -> VrmWallpaperChecks.run(targetContext)
+                    "vrm-wallpaper-live" -> VrmWallpaperChecks.live(this,options?.getString("seconds")?.toIntOrNull() ?: 0)
                     "vrm-preview-screen" -> VrmPreviewChecks.screen(this)
                     "vrm-preview-render" -> VrmPreviewChecks.render(this)
                     "character-storage" -> CharacterStorageChecks.run(targetContext)

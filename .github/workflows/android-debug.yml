@@ -48,7 +48,7 @@ jobs:
       - name: Test, lint, and build
         run: |
           chmod +x gradlew
-          node --test vrm-viewer/camera.test.js
+          node --test vrm-viewer/camera.test.js vrm-viewer/viewer-state.test.js
           ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
       - name: Verify APK and summarize reports
         id: verify
@@ -65,7 +65,7 @@ jobs:
           metadata = json.loads((apk.parent / 'output-metadata.json').read_text())
           assert metadata['applicationId'] == 'com.yj.magiccircle'
           assert metadata['variantName'] == 'debug'
-          assert any(e['outputFile'] == apk.name and e['versionCode'] == 21 and e['versionName'] == '1.18'
+          assert any(e['outputFile'] == apk.name and e['versionCode'] == 22 and e['versionName'] == '1.19'
                      for e in metadata['elements']), 'Unexpected APK version'
           suites = list((root / 'test-results/testDebugUnitTest').glob('TEST-*.xml'))
           assert suites, 'Unit-test reports missing'
@@ -84,9 +84,9 @@ jobs:
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/debug/app-debug.apk
-          asset=MagicCircleCharging-v1.18-debug.apk
-          checksum=MagicCircleCharging-v1.18-debug.apk.sha256
-          tag="v1.18-debug-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          asset=MagicCircleCharging-v1.19-debug.apk
+          checksum=MagicCircleCharging-v1.19-debug.apk.sha256
+          tag="v1.19-debug-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           test -s "$apk"
           refs="$(git ls-remote --tags origin "refs/tags/$tag")"
           test -z "$refs" || { echo "Tag already exists: $tag" >&2; exit 1; }
@@ -96,7 +96,7 @@ jobs:
           digest="$(cut -d' ' -f1 "$checksum")"
           gh release create "$tag" "$asset" "$checksum" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "MagicCircleCharging 1.18 디버그 (${GITHUB_SHA:0:12})" \
+            --title "MagicCircleCharging 1.19 디버그 (${GITHUB_SHA:0:12})" \
             --notes "소스: $GITHUB_SHA. CI 빌드 APK는 임시 디버그 서명이라 기존 앱 위에 업데이트되지 않을 수 있습니다. 로컬 서명 업데이트용 APK는 해당 소스 검증 후 별도 제공하며 개인 서명 키는 CI/Git에 포함하지 않습니다. CI APK SHA-256: $digest" \
             --prerelease --latest=false
           printf 'Download: https://github.com/%s/releases/tag/%s\n\nAPK SHA-256: `%s`\n' \

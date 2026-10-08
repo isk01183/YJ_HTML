@@ -184,6 +184,7 @@ class VrmPreviewActivity: Activity() {
     }
     private fun operationFailed() {
         importCancellation=null
+        entry?.let {saved->web?.let {VrmWebView.configure(it,saved.placement)}}
         status.text=w("작업에 실패했습니다. 이전 자료는 보존됩니다. 내장 텍스처 VRM 0.x/1.0 · 64MiB 이하를 사용해 주세요.",
             "処理できません。既存データは保持されます。テクスチャ内蔵VRM 0.x/1.0・64MiB以下をご利用ください。",
             "Operation failed; previous data is preserved. Use embedded VRM 0.x/1.0 up to 64 MiB.")
@@ -225,7 +226,7 @@ class VrmPreviewActivity: Activity() {
                 val info=runCatching {JSONObject(value)}.getOrNull()
                 val state=info?.optString("state")
                 if(state=="error" || (entry!=null && health.sample(state=="ready",info?.optLong("frames",0) ?: 0,now())!=null))showWebError()
-                else {ready=state=="ready";controls()}
+                else {ready=state=="ready" && (info?.optLong("frames",0) ?: 0)>0;controls()}
             }
             ui.postDelayed(this,500)
         }

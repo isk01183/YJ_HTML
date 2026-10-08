@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldRender, normalizePlacement } from './viewer-state.js';
+import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-state.js';
+
+test('relaxed arms go down in both pre-facing humanoid coordinate systems',()=>{
+  for(const version of ['0','1']) {
+    const y=(version==='0'?-1:1)*Math.sin(relaxedArmAngle(version));
+    assert.ok(y<-.8);
+  }
+});
 test('document visibility cannot override the native host pause or disposal',()=>{
   assert.equal(shouldRender(false,true,true,false),false);
   assert.equal(shouldRender(true,false,true,false),false);

@@ -18,7 +18,7 @@ object VrmPreviewChecks {
         check(VrmModelStore.get(test.targetContext).hasModel()) {"Import a model through SAF before the render check"}
         val activity=test.startActivitySync(android.content.Intent(test.targetContext,VrmPreviewActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        fun javascript(script: String,timeoutMs: Long=5000): String {
+        fun javascript(script: String,timeoutMs: Long=15000): String {
             val ready=java.util.concurrent.CountDownLatch(1);var result="null"
             test.runOnMainSync {activity.window.decorView.findViewWithTag<android.webkit.WebView>("vrm-webview")
                 .evaluateJavascript(script) {result=it;ready.countDown()}}
@@ -29,7 +29,7 @@ object VrmPreviewChecks {
             }
             return result
         }
-        fun info(timeoutMs: Long=5000)=JSONObject(javascript("window.vrmPreview?.info || {state:'loading'}",timeoutMs))
+        fun info(timeoutMs: Long=15000)=JSONObject(javascript("window.vrmPreview?.info || {state:'loading'}",timeoutMs))
         try {
             val deadline=android.os.SystemClock.elapsedRealtime()+45000
             var pageReady=false
@@ -47,20 +47,61 @@ object VrmPreviewChecks {
                 Thread.sleep(200);state=loadingInfo()
             }
             check(state.getString("state")=="ready") {"VRM rendering failed: $state"}
+            val expected=if(VrmModelStore.get(test.targetContext).selected()!!.format==VrmFormat.V0)"0" else "1"
+            check(state.getString("metaVersion")==expected) {"Loaded wrong VRM version"}
+            android.util.Log.i("VrmChecks","RENDER version="+expected+" triangles="+state.getInt("triangles")+" materials="+state.getInt("materials"))
             check(state.getInt("triangles")>0 && state.getInt("materials")>0) {"Model did not create visible geometry/materials"}
-            Thread.sleep(400)
-            check(info().getInt("frames")>1) {"Preview is not rendering frames"}
+            fun waitFrames(after: Int) {
+                val until=android.os.SystemClock.elapsedRealtime()+15000
+                while(info().getInt("frames")<=after && android.os.SystemClock.elapsedRealtime()<until)Thread.sleep(200)
+                check(info().getInt("frames")>after) {"Preview is not rendering frames"}
+            }
+            waitFrames(1)
+            javascript("window.vrmPreview.pause();window.vrmPreview.info.frames=0")
+            Thread.sleep(800)
+            test.runOnMainSync {check(!activity.window.decorView.findViewWithTag<android.widget.Button>("vrm-apply").isEnabled) {"Unrendered ready model could be applied"}}
+            javascript("window.vrmPreview.resume()");waitFrames(1)
             javascript("window.vrmPreview.pause()")
             val paused=info().getInt("frames");Thread.sleep(300)
             check(info().getInt("frames")==paused) {"Paused preview kept rendering"}
             javascript("window.vrmPreview.resume()")
-            Thread.sleep(400)
-            check(info().getInt("frames")>paused) {"Preview did not resume"}
+            waitFrames(paused)
+            val blinkBefore=javascript("document.getElementById('motion').getAttribute('aria-pressed')")
             for(id in listOf("face","full","pose","motion")) {
                 check(javascript("(()=>{const b=document.getElementById('$id');if(!b||b.disabled)return false;b.click();return window.vrmPreview.info.state==='ready'})()") == "true") {"Viewer control failed: $id"}
             }
             check(javascript("document.getElementById('pose').getAttribute('aria-pressed')") == "\"true\"")
-            check(javascript("document.getElementById('motion').getAttribute('aria-pressed')") == "\"false\"")
+            check(javascript("document.getElementById('motion').getAttribute('aria-pressed')") != blinkBefore)
+            // An isolated empty store forces savePlacement to fail without risking private models.
+            val storeField=VrmPreviewActivity::class.java.getDeclaredField("store").apply {isAccessible=true}
+            val savedStore=storeField.get(activity) as VrmModelStore
+            val saved=savedStore.selected()!!
+            val scratch=File(test.targetContext.cacheDir,"vrm-save-failure-${UUID.randomUUID()}")
+            javascript("window.checkedPlacement=null;window.savedConfigure=window.vrmPreview.configure;window.vrmPreview.configure=p=>{window.checkedPlacement=p;window.savedConfigure(p)}")
+            try {
+                test.runOnMainSync {
+                    storeField.set(activity,VrmModelStore(scratch))
+                    activity.window.decorView.findViewWithTag<android.widget.Button>("vrm-settings").performClick()
+                    val panel=android.view.inspector.WindowInspector.getGlobalWindowViews().first {it.findViewWithTag<android.widget.SeekBar>("vrm-x")!=null}
+                    panel.findViewWithTag<android.widget.SeekBar>("vrm-x").progress=if(saved.placement.x==.35f)0 else 70
+                    panel.findViewWithTag<android.widget.Switch>("vrm-blink").isChecked=!saved.placement.blink
+                    panel.findViewById<android.widget.Button>(android.R.id.button1).performClick()
+                }
+                val until=android.os.SystemClock.elapsedRealtime()+5000
+                var idle=false
+                while(!idle && android.os.SystemClock.elapsedRealtime()<until) {
+                    test.runOnMainSync {idle=activity.window.decorView.findViewWithTag<android.widget.Button>("vrm-import").isEnabled}
+                    if(!idle)Thread.sleep(50)
+                }
+                check(idle)
+                val restored=JSONObject(javascript("window.checkedPlacement"))
+                check(kotlin.math.abs(restored.getDouble("x")-saved.placement.x)<.00001 && restored.getBoolean("blink")==saved.placement.blink) {"Failed save left unsaved preview settings"}
+                check(savedStore.selected()==saved) {"Failed save modified the library"}
+            } finally {
+                test.runOnMainSync {storeField.set(activity,savedStore)}
+                javascript("window.vrmPreview.configure=window.savedConfigure")
+                scratch.deleteRecursively()
+            }
         } finally {test.runOnMainSync {activity.finish()};test.waitForIdleSync()}
     }
 
