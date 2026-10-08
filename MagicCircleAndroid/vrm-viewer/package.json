@@ -1,0 +1,14 @@
+{
+  "name": "magic-circle-offline-vrm-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test camera.test.js",
+    "build": "esbuild viewer.js --bundle --minify --target=chrome100 --format=iife --legal-comments=eof --outfile=../app/src/main/assets/vrm-preview/viewer.js"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "3.5.5",
+    "three": "0.180.0"
+  },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

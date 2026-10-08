@@ -88,6 +88,9 @@ class CharacterActivity: Activity() {
         button(bar,w("＋ 새 캐릭터","＋ 新規","＋ Create"),"character-new") {
             value=CharacterRules.defaults(UUID.randomUUID().toString(),w("별빛","星あかり","Starlight"));raw.clear();invalid.clear();tab=0;dirty=true;showEditor();scheduleDraft()
         }
+        button(root,w("VRM 3D 미리보기","VRM 3Dプレビュー","VRM 3D preview"),"vrm-preview") {
+            startActivity(Intent(this,VrmPreviewActivity::class.java))
+        }
         val scroll=ScrollView(this);val list=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         async({store.list() to store.drafts()}) { (entries,drafts) ->
             if(drafts.isNotEmpty()) {
@@ -139,7 +142,8 @@ class CharacterActivity: Activity() {
         stage.addView(preview,LinearLayout.LayoutParams(-1,0,1f))
         val viewTools=row(stage)
         button(viewTools,"2.5D",selected=true){}
-        button(viewTools,"3D"){AlertDialog.Builder(this).setMessage(w("준비 중 — 실제 3D 모델 필요","準備中 — 実際の3Dモデルが必要","Not yet available — a real 3D model is required")).setPositiveButton("OK",null).show()}
+        button(viewTools,"3D"){AlertDialog.Builder(this).setMessage(w("별도의 VRM 파일을 미리 봅니다. 현재 2.5D 캐릭터를 변환하거나 배경화면에 적용하지 않습니다.","別のVRMファイルを表示します。2.5Dキャラクターの変換や壁紙への適用は行いません。","Preview a separate VRM file. This does not convert your 2.5D character or apply a wallpaper."))
+            .setNegativeButton(w("취소","取消","Cancel"),null).setPositiveButton(w("VRM 열기","VRMを開く","Open VRM")){_,_->startActivity(Intent(this,VrmPreviewActivity::class.java))}.show()}
         button(viewTools,w("얼굴 확대","顔を拡大","Face")){preview?.faceView()}
         button(viewTools,w("보기 초기화","表示リセット","Reset view")){preview?.resetView()}
         val panel=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}

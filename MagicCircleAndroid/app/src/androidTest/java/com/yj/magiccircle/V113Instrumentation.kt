@@ -31,6 +31,9 @@ class V113Instrumentation : android.app.Instrumentation() {
             }
             options?.getString("checks")?.let { name ->
                 when(name) {
+                    "vrm-preview" -> VrmPreviewChecks.run(targetContext)
+                    "vrm-preview-screen" -> VrmPreviewChecks.screen(this)
+                    "vrm-preview-render" -> VrmPreviewChecks.render(this)
                     "character-storage" -> CharacterStorageChecks.run(targetContext)
                     "character-render" -> CharacterRenderingChecks.run(targetContext)
                     "character-editor" -> CharacterEditorChecks.run(this)

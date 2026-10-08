@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob:; worker-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>VRM preview</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script defer src="viewer.js"></script>
+</head>
+<body>
+  <main id="stage" aria-label="3D 캐릭터 미리보기"></main>
+  <div class="caption"><span>VRM STUDIO</span><p id="hint"></p></div>
+  <div id="status" role="status" aria-live="polite"></div>
+  <footer>
+    <div id="tools">
+      <button id="full" disabled></button><button id="face" disabled></button>
+      <button id="pose" disabled aria-pressed="false"></button><button id="motion" disabled aria-pressed="false"></button>
+    </div>
+    <p id="details"></p>
+  </footer>
+</body>
+</html>
