@@ -5,6 +5,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { fitDistance, placementFrame, reviewCamera } from './camera.js';
 import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-state.js';
 import { ModelMemory, renderFrame } from './model-memory.js';
+import {bindAvatarDye,avatarProfile,normalizeAppearance} from './avatar-dye.js';
 
 const params = new URLSearchParams(location.search);
 const wallpaper=params.get('wallpaper')==='1';
@@ -26,6 +27,7 @@ $('details').textContent = w('파일은 이 기기에만 저장됩니다. 적용
 
 let renderer, controls, vrm, camera, scene, memory;
 let modelScenes=[];
+let avatar=null,avatarEpoch=0,dyeBinding=null,dyeModelId=null;
 let disposed = false, released = false, hostActive = false, frame = 0, last = 0, elapsed = 0;
 let placement=normalizePlacement();
 let tPose = false, blinking = true, view = 'full';
@@ -56,6 +58,17 @@ function configure(value) {
   $('motion').setAttribute('aria-pressed',String(blinking));
   if(vrm)frameView();
 }
+function appearance(value) {
+  const next=normalizeAppearance(value);
+  if(vrm&&next&&dyeModelId&&dyeModelId!==next.modelId)throw new Error('Avatar model switch requires reload');
+  avatar=next;avatarEpoch++;
+  if(vrm)try {applyAppearance();}catch(error){reportError(error);throw error;}
+}
+function applyAppearance() {
+  if(avatar&&!dyeBinding){dyeBinding=bindAvatarDye(vrm,avatarProfile(avatar.modelId));dyeModelId=avatar.modelId;}
+  dyeBinding?.set(avatar??{hair:null,iris:null});
+  info.appearance=avatar;
+}
 function dispose() {
   if (disposed) return;
   disposed = true; pause(); release();
@@ -63,6 +76,7 @@ function dispose() {
 function release() {
   if(released)return;
   released=true;controls?.dispose();
+  dyeBinding?.dispose();dyeBinding=null;
   for(const modelScene of modelScenes) {modelScene.removeFromParent();VRMUtils.deepDispose(modelScene);}
   modelScenes=[];
   if (scene) VRMUtils.deepDispose(scene);
@@ -70,7 +84,7 @@ function release() {
   renderer?.dispose(); renderer?.forceContextLoss();
   vrm = null;
 }
-window.vrmPreview = {pause, resume, dispose, configure, info};
+window.vrmPreview = {pause, resume, dispose, configure, appearance, info};
 // Only the instrumented local test host supplies this marker; normal preview/wallpaper exposes no review controls.
 if('VrmReview' in window) {
   window.vrmPreview.reviewAnchor=()=>{
@@ -177,6 +191,11 @@ async function init() {
   status.textContent = w('모델과 MToon 재질을 불러오는 중…','モデルとMToon材質を読み込み中…','Loading model and MToon materials…');
   info.state = 'loading';
   try {
+    const initialEpoch=avatarEpoch;
+    const initialResponse=await fetch(new URL('appearance.json',location.href),{cache:'no-store'});
+    if(!initialResponse.ok)throw new Error('Missing local appearance');
+    const initialAppearance=await initialResponse.json();
+    if(initialEpoch===avatarEpoch)avatar=normalizeAppearance(initialAppearance);
     let budgetBytes;
     try {
       const response=await fetch(new URL('memory.json',location.href),{cache:'no-store'});
@@ -232,6 +251,7 @@ async function init() {
       }
     });
     info.materials = materials.size;
+    applyAppearance();
     scene.add(vrm.scene); pose();
     if(!composition) {
       const floor = new THREE.Mesh(new THREE.CircleGeometry(.42,64),new THREE.MeshBasicMaterial({color:0x707c8e,transparent:true,opacity:.08,depthWrite:false}));

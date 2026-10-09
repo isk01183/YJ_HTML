@@ -52,7 +52,7 @@ object VrmHairChecks {
         Log.i("VrmChecks","HAIR_CAPTURE_PATH ${output.absolutePath}")
     }
 
-    private fun capture(test: Instrumentation,web: WebView,file: File) {
+    internal fun capture(test: Instrumentation,web: WebView,file: File) {
         val ready=CountDownLatch(1)
         test.runOnMainSync {web.postVisualStateCallback(1,object: WebView.VisualStateCallback() {
             override fun onComplete(requestId: Long){ready.countDown()}

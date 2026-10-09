@@ -17,6 +17,7 @@ internal object VrmWebView {
     @Suppress("DEPRECATION")
     fun create(context: Context,openModel: ()->InputStream?,onFailure: (VrmFailure)->Unit,
                transparent: Boolean=false,
+               initialAppearance: ()->VrmAvatarAppearance?={null},
                onPageFinished: (WebView)->Unit): WebView = WebView(context).apply {
         setBackgroundColor(if(transparent)android.graphics.Color.TRANSPARENT else 0xffeee9f3.toInt())
         settings.apply {
@@ -35,6 +36,8 @@ internal object VrmWebView {
                     "/vrm-preview/index.html"->response(200,"text/html",context.assets.open("vrm-preview/index.html"))
                     "/vrm-preview/viewer.js"->response(200,"application/javascript",context.assets.open("vrm-preview/viewer.js"))
                     "/vrm-preview/viewer.css"->response(200,"text/css",context.assets.open("vrm-preview/viewer.css"))
+                    "/vrm-preview/appearance.json"->response(200,"application/json",ByteArrayInputStream(
+                        (initialAppearance()?.let {VrmAvatarRules.appearanceJson(it).toString()} ?: "null").toByteArray(Charsets.UTF_8)))
                     "/vrm-preview/memory.json"->{
                         val manager=context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                         val memory=ActivityManager.MemoryInfo().also {manager.getMemoryInfo(it)}
@@ -69,5 +72,9 @@ internal object VrmWebView {
         val p=placement.normalized()
         val json=JSONObject().put("x",p.x).put("y",p.y).put("scale",p.scale).put("blink",p.blink)
         view.evaluateJavascript("window.vrmPreview?.configure($json)",null)
+    }
+    fun appearance(view: WebView,value: VrmAvatarAppearance?) {
+        val json=value?.let {VrmAvatarRules.appearanceJson(it).toString()} ?: "null"
+        view.evaluateJavascript("window.vrmPreview?.appearance($json)",null)
     }
 }
