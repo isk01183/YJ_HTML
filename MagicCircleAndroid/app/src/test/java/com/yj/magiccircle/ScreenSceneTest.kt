@@ -4,6 +4,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenSceneTest {
+    @Test fun legacySceneHasNullAvatar() {assertNull(VrmSceneLayer("a".repeat(64)).avatar)}
+    @Test fun snapshotKeepsOldAvatarRevision() {
+        val a=VrmAvatarDefinition("12345678-1234-4234-8234-123456789abc",1,"Saved",VrmAvatarRules.original())
+        val s=scene(emptyList()).copy(purpose=ScenePurpose.WALLPAPER,vrm=VrmSceneLayer(a.appearance.modelId,avatar=a))
+        val revised=a.copy(revision=2,appearance=a.appearance.copy(dye=VrmDye("#EE2038")))
+        assertEquals(1,s.vrm!!.avatar!!.revision);assertNull(s.vrm.avatar!!.appearance.dye.hair)
+        assertNotEquals(revised,s.vrm.avatar);SceneRules.validate(s,emptyMap())
+    }
+    @Test fun wrongModelAppearanceRejected() {
+        val a=VrmAvatarDefinition("12345678-1234-4234-8234-123456789abc",1,"Saved",VrmAvatarRules.original())
+        val s=scene(emptyList()).copy(purpose=ScenePurpose.WALLPAPER,vrm=VrmSceneLayer("a".repeat(64),avatar=a))
+        rejected {SceneRules.validate(s,emptyMap())}
+        rejected {SceneRules.validate(s.copy(vrm=VrmSceneLayer(a.appearance.modelId,avatar=a.copy(revision=0))),emptyMap())}
+    }
     private val media = "12345678-1234-4234-8234-123456789abc"
     private fun layer(id: String = "a") = ImageLayer(id, media, .5f, .5f, 1f, 0f, false, true)
     private fun scene(layers: List<ImageLayer>) = ScreenScene("scene-$media", "작품", ScenePurpose.CHARGING, layers)

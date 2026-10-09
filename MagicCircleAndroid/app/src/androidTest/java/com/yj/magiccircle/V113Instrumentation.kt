@@ -34,6 +34,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                     "vrm-avatar-storage" -> VrmAvatarStorageChecks.run(targetContext)
                     "vrm-dye" -> VrmDyeChecks.run(this)
                     "vrm-avatar-editor" -> VrmAvatarEditorChecks.run(this)
+                    "vrm-avatar-scene" -> VrmAvatarSceneChecks.run(this)
                     "vrm-scene" -> VrmSceneChecks.run(this,options?.getString("seconds")?.toIntOrNull() ?: 0)
                     "vrm-scene-screen" -> VrmSceneChecks.screen(this,options?.getString("seconds")?.toIntOrNull() ?: 20)
                     "vrm-scene-live" -> VrmSceneChecks.live(this,options?.getString("seconds")?.toIntOrNull() ?: 0,options?.getString("model")?.toIntOrNull() ?: 0,options?.getString("soak")?.toIntOrNull() ?: 0)

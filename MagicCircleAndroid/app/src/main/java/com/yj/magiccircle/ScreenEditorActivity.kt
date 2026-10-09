@@ -29,6 +29,7 @@ class ScreenEditorActivity: Activity() {
     private var initial: EditorDraft?=null
     private var previewDialog: android.app.Dialog?=null
     private var pendingCharacterId: String?=null
+    private var pendingAvatar: String?=null
     private var foreground=false
     private var vrmNames=emptyMap<String,String>()
     private val ui=Handler(Looper.getMainLooper())
@@ -79,6 +80,10 @@ class ScreenEditorActivity: Activity() {
         if(draft.scene?.vrm!=null)IO.execute {val names=runCatching {VrmModelStore.get(this).entries().associate {it.id to vrmLabel(it)}}.getOrDefault(emptyMap())
             ui.post {if(!isDestroyed && !isFinishing){vrmNames=names;renderTools()}}}
         (if(state!=null)state.getString("pendingCharacterId")else intent.getStringExtra("characterId"))?.let {addCharacter(it)}
+        (if(state!=null)state.getString("pendingAvatar")else intent.getStringExtra("avatarDefinition"))?.let {json->
+            runCatching {VrmAvatarRules.fromJson(org.json.JSONObject(json))}.onSuccess(::addAvatar)
+                .onFailure {status.text=w("캐릭터 정보를 읽지 못했습니다. 기존 작품은 유지됩니다.","キャラクター情報を読み込めません。作品は保持されます。","Cannot read character. Existing scene preserved.")}
+        }
         if(Build.VERSION.SDK_INT>=33) onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){leave()}
     }
     private fun current(): EditorDraft {val d=editor.currentDraft();return d.copy(scene=d.scene?.copy(name=name.text.toString().trim()))}
@@ -99,7 +104,7 @@ class ScreenEditorActivity: Activity() {
     }
     @android.annotation.SuppressLint("GestureBackNavigation") // API 33+ uses the native dispatcher registered in onCreate.
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
-    override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);out.putString("pendingCharacterId",pendingCharacterId);super.onSaveInstanceState(out)}
+    override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);out.putString("pendingCharacterId",pendingCharacterId);out.putString("pendingAvatar",pendingAvatar);super.onSaveInstanceState(out)}
     override fun onStart() {super.onStart();foreground=true;if(::editor.isInitialized && previewDialog==null)editor.setRenderingEnabled(true)
         if(intent.getBooleanExtra("previewScene",false)){intent.removeExtra("previewScene");ui.post {if(foreground && !isFinishing)preview()}}}
     override fun onStop() {foreground=false;previewDialog?.dismiss();if(::editor.isInitialized)editor.setRenderingEnabled(false);super.onStop();if(!isFinishing && ::editor.isInitialized) {ui.removeCallbacks(saveDraft);persistDraft()}}
@@ -124,7 +129,7 @@ class ScreenEditorActivity: Activity() {
                 heading(w("캐릭터 레이어","キャラクターレイヤー","Character layer"))
                 button(tools,w("보관함에서 캐릭터 선택","一覧からキャラクターを選択","Choose saved character")){chooseCharacter()}
                 s.vrm?.let { v->
-                    button(tools,(if(editor.selectedVrm)"● " else "○ ")+(vrmNames[v.modelId] ?: "VRM · ${v.modelId.take(8)}")){editor.selectedVrm=true;renderTools()}
+                    button(tools,(if(editor.selectedVrm)"● " else "○ ")+(v.avatar?.let {"${it.name} · r${it.revision}"} ?: vrmNames[v.modelId] ?: "VRM · ${v.modelId.take(8)}")){editor.selectedVrm=true;renderTools()}
                     if(editor.selectedVrm) {
                         heading(w("정면 고정 · 이동·확대는 두 손가락으로도 가능","正面固定・指で移動と拡大","Front view · Drag and pinch to position"))
                         slider("X %",(v.placement.screenX()*100).toInt(),15,85){n->editor.modifyVrm {it.copy(placement=it.placement.withScreenPosition(n/100f,it.placement.screenY()))}}
@@ -243,7 +248,34 @@ class ScreenEditorActivity: Activity() {
     private fun chooseExisting() {val items=library.items();AlertDialog.Builder(this).setTitle(w("보관함에서 추가","ライブラリから追加","Add from library")).setItems(items.map {it.name}.toTypedArray()){_,i->addLayer(items[i].id)}.show()}
     private fun chooseCharacter() {
         AlertDialog.Builder(this).setTitle(w("캐릭터 종류","キャラクターの種類","Character type"))
-            .setItems(arrayOf(w("VRM · 가져온 3D 캐릭터","VRM · 読み込んだ3Dキャラクター","VRM · Imported 3D characters"),"2.5D")){_,i->if(i==0)chooseVrm()else chooseIllustratedCharacter()}.show()
+            .setItems(arrayOf(w("저장한 VRM 캐릭터","保存したVRMキャラクター","Saved VRM characters"),w("VRM · 원본 캐릭터","VRM · 元のキャラクター","VRM · Original models"),"2.5D")){_,i->when(i){0->chooseAvatar();1->chooseVrm();else->chooseIllustratedCharacter()}}.show()
+    }
+    private fun chooseAvatar() {
+        busy=true
+        IO.execute {val result=runCatching {VrmAvatarStore.get(this).list()};ui.post {
+            if(isDestroyed || isFinishing)return@post;busy=false
+            result.onSuccess {items->
+                if(items.isEmpty())status.text=w("먼저 캐릭터 꾸미기에서 저장하세요.","先にキャラクター編集で保存してください。","Save a character in the avatar editor first.")
+                else AlertDialog.Builder(this).setTitle(w("저장한 VRM 캐릭터","保存したVRMキャラクター","Saved VRM characters"))
+                    .setItems(items.map {"${it.name} · r${it.revision}"}.toTypedArray()){_,i->addAvatar(items[i])}.show()
+            }.onFailure {status.text=w("캐릭터 목록을 읽지 못했습니다.","一覧を読み込めません。","Cannot read saved characters.")}
+        }}
+    }
+    private fun addAvatar(avatar: VrmAvatarDefinition) {
+        if(editor.currentDraft().scene?.purpose!=ScenePurpose.WALLPAPER)return
+        VrmAvatarRules.validate(avatar);require(avatar.revision>0)
+        busy=true;pendingAvatar=VrmAvatarRules.toJson(avatar).toString()
+        IO.execute {val result=runCatching {
+            val models=VrmModelStore.get(this);check(models.entries().any {it.id==avatar.appearance.modelId})
+            checkNotNull(models.openModel(avatar.appearance.modelId)).use {VrmModelStore.verifyOutput(avatar.appearance.modelId,it)}
+        };ui.post {
+            if(isDestroyed || isFinishing)return@post;busy=false;pendingAvatar=null
+            result.onSuccess {
+                val d=editor.currentDraft();val s=d.scene ?: return@onSuccess
+                val v=s.vrm?.copy(modelId=avatar.appearance.modelId,avatar=avatar) ?: VrmSceneLayer(avatar.appearance.modelId,beforeImage=s.layers.size,avatar=avatar)
+                editor.change(d.copy(scene=s.copy(character=null,vrm=v)));editor.selectedVrm=true;renderTools();persistDraft()
+            }.onFailure {status.text=w("필요한 VRM 파일이 없거나 손상되었습니다. 기존 작품은 유지됩니다.","必要なVRMがないか破損しています。作品は保持されます。","Required VRM is missing or damaged. Existing scene preserved.")}
+        }}
     }
     private fun vrmLabel(entry: VrmEntry)="${entry.name} · VRM ${if(entry.format==VrmFormat.V1)"1" else "0"} · ${entry.id.take(8)}"
     private fun chooseVrm() {
@@ -255,7 +287,7 @@ class ScreenEditorActivity: Activity() {
                 AlertDialog.Builder(this).setTitle(w("VRM 캐릭터 선택","VRMキャラクター選択","Choose VRM character"))
                     .setItems(entries.map(::vrmLabel).toTypedArray()){_,i->
                         val d=editor.currentDraft();val s=d.scene ?: return@setItems
-                        val v=s.vrm?.copy(modelId=entries[i].id) ?: VrmSceneLayer(entries[i].id,beforeImage=s.layers.size)
+                        val v=s.vrm?.copy(modelId=entries[i].id,avatar=null) ?: VrmSceneLayer(entries[i].id,beforeImage=s.layers.size)
                         editor.change(d.copy(scene=s.copy(character=null,vrm=v)));editor.selectedVrm=true;renderTools();persistDraft()
                     }.setPositiveButton(w("VRM 가져오기 / 관리","VRM読込 / 管理","Import / Manage VRM")){_,_->
                         persistDraft();startActivityForResult(Intent(this,VrmPreviewActivity::class.java),82)

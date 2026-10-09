@@ -85,7 +85,7 @@ internal object VrmWallpaperStore {
         val atomic=AtomicFile(File(root,"$slot.json"))
         val bytes=read(atomic,65536)
         val json=JSONObject(bytes.toString(Charsets.UTF_8));val version=json.getInt("version")
-        require(version in 1..2 && (version!=1 || bytes.size<=8192))
+        require(version in 1..3 && (version!=1 || bytes.size<=8192))
         val id=json.getString("modelId");require(id.matches(Regex("[a-f0-9]{64}")))
         val generation=json.getString("generation");require(UUID.fromString(generation).toString()==generation)
         val p=VrmPlacement(json.optDouble("x",0.0).toFloat(),json.optDouble("y",0.0).toFloat(),
@@ -135,7 +135,7 @@ internal object VrmWallpaperStore {
     }
     private fun publish(root: File,slot: String,snapshot: Snapshot) {
         val p=snapshot.placement
-        val json=JSONObject().put("version",if(snapshot.scene==null)1 else 2).put("generation",snapshot.generation).put("modelId",snapshot.modelId)
+        val json=JSONObject().put("version",if(snapshot.scene==null)1 else 3).put("generation",snapshot.generation).put("modelId",snapshot.modelId)
             .put("x",p.x).put("y",p.y).put("scale",p.scale).put("blink",p.blink)
         snapshot.scene?.let {json.put("scene",SceneData.sceneJson(it))}
         write(AtomicFile(File(root,"$slot.json")),json)

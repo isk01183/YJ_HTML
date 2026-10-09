@@ -14,10 +14,10 @@ import java.io.InputStream
 import java.util.concurrent.Executors
 
 /** One bounded image cache, with the live character between its back and front ranges. */
-internal class VrmSceneView(context: Context,scene: ScreenScene,private val openModel: ()->InputStream?,
+internal class VrmSceneView(context: Context,initialScene: ScreenScene,private val openModel: ()->InputStream?,
     private val openMedia: (String)->InputStream,private val onReady: ()->Unit,
     private val onFailure: (VrmFailure)->Unit): FrameLayout(context),AutoCloseable {
-    private var scene=scene
+    @Volatile private var scene=initialScene
     var webView: WebView?=null;private set
     var ready=false;private set
     private var renderer: LayeredSceneRenderer?=null
@@ -64,7 +64,9 @@ internal class VrmSceneView(context: Context,scene: ScreenScene,private val open
                     fail(when(info.optString("failure")){"CONTEXT"->VrmFailure.CONTEXT;"MEMORY"->VrmFailure.MEMORY;else->VrmFailure.MODEL})
                 } else {
                     val frames=info?.optLong("frames",0) ?: 0
-                    val displayed=configured && info?.optString("state")=="ready" && frames>requiredFrame
+                    val expected=scene.vrm!!.avatar?.appearance
+                    val appearance=info?.optJSONObject("appearance")?.let {runCatching {VrmAvatarRules.readAppearance(it)}.getOrNull()}
+                    val displayed=configured && info?.optString("state")=="ready" && frames>requiredFrame && appearance==expected
                     health.sample(displayed,frames,SystemClock.elapsedRealtime())?.let {fail(it);return@evaluateJavascript}
                     if(displayed)markReady()
                 }
@@ -120,7 +122,7 @@ internal class VrmSceneView(context: Context,scene: ScreenScene,private val open
         if(closed || !modelChecked)return
         val visible=scene.vrm!!.visible
         if(visible && webView==null) {
-            val view=VrmWebView.create(context,openModel,{fail(it)},transparent=true) {v->
+            val view=VrmWebView.create(context,openModel,{fail(it)},transparent=true,initialAppearance={scene.vrm!!.avatar?.appearance}) {v->
                 if(!closed && webView===v){pageReady=true;configure();setActive(active)}
             }
             webView=view;addView(view,1,LayoutParams(-1,-1))
@@ -134,6 +136,7 @@ internal class VrmSceneView(context: Context,scene: ScreenScene,private val open
         val token=revision
         configured=false
         VrmWebView.configure(view,scene.vrm!!.placement)
+        VrmWebView.appearance(view,scene.vrm!!.avatar?.appearance)
         view.evaluateJavascript("window.vrmPreview?.info.frames || 0") {value->
             if(!closed && view===webView && token==revision) {requiredFrame=value.toLongOrNull() ?: 0;configured=true}
         }

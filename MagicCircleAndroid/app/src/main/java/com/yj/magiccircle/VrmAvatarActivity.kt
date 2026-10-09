@@ -136,6 +136,12 @@ class VrmAvatarActivity: Activity() {
         val secondary=row(root)
         button(secondary,w("저장값 복원","保存値に戻す","Revert saved"),"avatar-revert"){revert()}
         button(secondary,w("다시 시도","再試行","Retry"),"avatar-retry"){openWeb()}
+        button(root,w("저장한 캐릭터로 배경화면 만들기","保存したキャラクターで壁紙作成","Create wallpaper with saved character"),"avatar-wallpaper"){
+            val avatar=saved ?: return@button
+            if(dirty || invalid)return@button
+            closeWeb();startActivity(Intent(this,ScreenEditorActivity::class.java).putExtra("scenePurpose","WALLPAPER")
+                .putExtra("avatarDefinition",VrmAvatarRules.toJson(avatar).toString()))
+        }
         renderTools();openWeb();controls()
     }
     private fun switchTab(next: String) {if(invalid){status.text=w("올바른 색상을 입력하거나 원본으로 복원하세요.","正しい色を入力するか元に戻してください。","Enter a valid color or restore original.");return};tab=next;rawHex=null;renderTools()}
@@ -200,7 +206,7 @@ class VrmAvatarActivity: Activity() {
         value=old.copy(appearance=old.appearance.copy(dye=if(tab=="hair-color")dye.copy(hair=color)else dye.copy(iris=color)))
         web?.let {VrmWebView.appearance(it,value!!.appearance)};changed();controls()
     }
-    private fun changed(){dirty=true;ui.removeCallbacks(draftTask);ui.postDelayed(draftTask,250)}
+    private fun changed(){dirty=true;controls();ui.removeCallbacks(draftTask);ui.postDelayed(draftTask,250)}
     private fun persistDraft() {
         val draft=value ?: return;if(!dirty)return
         io.execute {runCatching {store.saveDraft(draft)}.onFailure {ui.post {if(!isDestroyed)status.text=w("초안 저장 실패 — 다시 저장해 주세요","下書き保存失敗・再試行してください","Draft save failed — please retry")}}}
@@ -210,6 +216,7 @@ class VrmAvatarActivity: Activity() {
         root.findViewWithTag<Button>("avatar-save-new")?.isEnabled=ready&&!busy&&!invalid
         root.findViewWithTag<Button>("avatar-save")?.isEnabled=ready&&!busy&&!invalid&&saved!=null
         root.findViewWithTag<Button>("avatar-revert")?.isEnabled=!busy&&saved!=null
+        root.findViewWithTag<Button>("avatar-wallpaper")?.isEnabled=ready&&!busy&&!invalid&&!dirty&&saved!=null
     }
     private fun save(asNew: Boolean) {
         if(!ready||invalid||busy)return
