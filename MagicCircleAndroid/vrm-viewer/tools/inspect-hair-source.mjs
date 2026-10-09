@@ -16,6 +16,7 @@ const protectedNames=new Set([
 ].map(n=>`${n} (Instance)`));
 const extensions=new Set(['VRMC_vrm','VRMC_springBone','VRMC_materials_mtoon','KHR_texture_transform','KHR_materials_unlit']);
 const components={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
+const attributeTypes={POSITION:'VEC3',NORMAL:'VEC3',TEXCOORD_0:'VEC2',JOINTS_0:'VEC4',WEIGHTS_0:'VEC4'};
 function requireValue(ok,message) {if(!ok)throw new Error(message);}
 function integer(n,max=Number.MAX_SAFE_INTEGER) {return Number.isSafeInteger(n)&&n>=0&&n<=max;}
 function at(array,index,label) {requireValue(integer(index,array.length-1),`Invalid ${label} reference`);return array[index];}
@@ -43,6 +44,8 @@ export function readHairSource(input) {
   walk(json);
   requireValue(json.asset?.version==='2.0','Unsupported glTF version');
   if(json.extensions?.VRMC_vrm?.specVersion!=='1.0'||json.extensions?.VRM)unsupported('Expected only VRM 1.0');
+  requireValue(Array.isArray(json.animations??[]),'Invalid animations');
+  if(json.animations?.length)unsupported('Embedded animations require review');
   for(const name of [...(json.extensionsUsed??[]),...(json.extensionsRequired??[])])if(!extensions.has(name))unsupported(`Unsupported extension: ${name}`);
   const arrays={nodes:4096,meshes:4096,skins:256,accessors:8192,bufferViews:8192,materials:256,images:64,textures:256,samplers:256,scenes:32};
   for(const [key,max] of Object.entries(arrays)) {
@@ -129,9 +132,13 @@ export function readHairSource(input) {
       requireValue(position.type==='VEC3','Invalid position type');
       for(const [key,index] of Object.entries(p.attributes)) {
         const a=at(json.accessors,index,'attribute');requireValue(a.count===position.count,'Mismatched attribute counts');
-        if(!['POSITION','NORMAL','TEXCOORD_0','JOINTS_0','WEIGHTS_0'].includes(key))unsupported(`Unsupported attribute: ${key}`);
+        if(!Object.hasOwn(attributeTypes,key))unsupported(`Unsupported attribute: ${key}`);
+        else if(a.type!==attributeTypes[key]||a.componentType!==(key==='JOINTS_0'?5123:5126))unsupported(`Unsupported ${key} encoding`);
       }
-      for(const target of p.targets??[])for(const index of Object.values(target))requireValue(at(json.accessors,index,'morph').count===position.count,'Mismatched morph count');
+      for(const target of p.targets??[])for(const [key,index] of Object.entries(target)) {
+        const a=at(json.accessors,index,'morph');requireValue(a.count===position.count,'Mismatched morph count');
+        if(!['POSITION','NORMAL'].includes(key)||a.type!=='VEC3'||a.componentType!==5126)unsupported('Unsupported morph encoding');
+      }
       const indices=at(json.accessors,p.indices,'indices');requireValue(indices.type==='SCALAR'&&[5123,5125].includes(indices.componentType)&&indices.count%3===0,'Invalid triangle indices');
     });
   });

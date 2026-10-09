@@ -80,3 +80,43 @@ test('missingVariantPreservesInputs and CLI reports a real candidate',()=>{
     assert.deepEqual(readFileSync(a),base);assert.deepEqual(readdirSync(dir),['base.vrm','variant.vrm']);
   } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test('prototype-like root names cannot hide protected rig movement',()=>{
+  const f=fixture();f.json.nodes.push({name:'__proto__',children:[0]});f.json.scenes[0].nodes[0]=5;
+  const base=glb(f);f.json.nodes[5].translation=[1,0,0];setFloat(f,f.position,9,.4);
+  const r=compareHairSources(base,glb(f));assert.equal(r.status,'rejected');assert.ok(r.blockers.length);
+});
+
+test('embedded motion cannot silently bypass protected geometry checks',()=>{
+  const f=fixture(),offset=f.bin.length,bytes=Buffer.alloc(16);bytes.writeFloatLE(1,8);
+  f.bin=Buffer.concat([f.bin,bytes]);f.json.buffers[0].byteLength=f.bin.length;
+  const view=f.json.bufferViews.length,index=f.json.accessors.length;
+  f.json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:4},{buffer:0,byteOffset:offset+4,byteLength:12});
+  f.json.accessors.push({bufferView:view,componentType:5126,type:'SCALAR',count:1},
+    {bufferView:view+1,componentType:5126,type:'VEC3',count:1});
+  f.json.animations=[{samplers:[{input:index,output:index+1}],channels:[{sampler:0,target:{node:1,path:'translation'}}]}];
+  const base=glb(f);f.bin.writeFloatLE(99,offset+8);setFloat(f,f.position,9,.4);
+  const r=compareHairSources(base,glb(f));assert.equal(r.status,'unsupported');
+  assert.ok(r.blockers.some(s=>s.includes('animations')));
+});
+
+for(const repeatedPrimitives of [false,true]) test(`bounded comparison with repeated indices: shared=${repeatedPrimitives}`,()=>{
+  const f=fixture(),count=300000,offset=f.bin.length,indices=Buffer.alloc(count*2);
+  for(let i=0;i<count;i++)indices.writeUInt16LE(i%3,i*2);
+  f.bin=Buffer.concat([f.bin,indices]);f.json.buffers[0].byteLength=f.bin.length;
+  const view=f.json.bufferViews.length,index=f.json.accessors.length;
+  f.json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:indices.length});
+  f.json.accessors.push({bufferView:view,componentType:5123,type:'SCALAR',count});
+  for(const mesh of f.json.meshes)for(const p of mesh.primitives)
+    if(repeatedPrimitives&&p.indices===5)p.indices=index;
+  f.json.meshes[0].primitives[0].indices=index;
+  const dir=mkdtempSync(join(tmpdir(),'hair-budget-'));
+  try {
+    const a=join(dir,'a.vrm'),b=join(dir,'b.vrm'),cli=fileURLToPath(new URL('./compare-hair-source.mjs',import.meta.url));
+    writeFileSync(a,glb(f));setFloat(f,f.position,9,.4);writeFileSync(b,glb(f));
+    const run=spawnSync(process.execPath,['--max-old-space-size=128',cli,a,b],{encoding:'utf8',timeout:20000});
+    assert.equal(run.status,repeatedPrimitives?2:0,run.stderr);
+    const r=JSON.parse(run.stdout);assert.equal(r.status,repeatedPrimitives?'unsupported':'candidate');
+    if(repeatedPrimitives)assert.ok(r.blockers.some(s=>s.includes('Comparison work limit')));
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});

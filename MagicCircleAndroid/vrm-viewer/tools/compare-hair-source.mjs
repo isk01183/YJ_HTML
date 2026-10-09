@@ -12,6 +12,14 @@ const hash=value=>createHash('sha256').update(stable(value)).digest('hex');
 
 function signatures(source) {
   const {json:j,bin,accessor,paths}=source, shapes=new Map(),hair=new Set(),issues=[],imageCache=new Map();
+  // Decoded accessors may be reused by many triangles and morphs; bound that work separately.
+  let comparisonWork=0;
+  for(const node of j.nodes)if(node.mesh!==undefined)for(const p of j.meshes[node.mesh].primitives) {
+    for(const index of [...Object.values(p.attributes),...(p.targets??[]).flatMap(Object.values)]) {
+      comparisonWork+=j.accessors[p.indices].count*accessor(index).length/j.accessors[index].count;
+      if(comparisonWork>16*1024*1024)return {shapes,hair,world:null,issues:['Comparison work limit exceeded']};
+    }
+  }
   const nodePath=n=>{if(!Number.isInteger(n)||!paths[n])throw new Error('Invalid canonical node reference');return paths[n];};
   function refs(value) {
     if(Array.isArray(value))return value.map(refs);
@@ -40,15 +48,15 @@ function signatures(source) {
     }));
   }
   function values(index,vertices,skin,joints=false) {
-    const a=j.accessors[index], data=accessor(index), width=data.length/a.count, result=[];
+    const a=j.accessors[index], data=accessor(index), width=data.length/a.count, result=createHash('sha256');
     for(const vertex of vertices) {
       const tuple=Array.from(data.subarray(vertex*width,(vertex+1)*width));
-      result.push(joints?tuple.map(n=>nodePath(skin.joints[n])):tuple);
+      result.update(JSON.stringify(joints?tuple.map(n=>nodePath(skin.joints[n])):tuple));
     }
-    return result;
+    return result.digest('hex');
   }
   const hairRefs=new Set(source.report.hair.map(p=>`${p.mesh}:${p.primitive}`));
-  const rig={};
+  const rig=Object.create(null);
   for(let ni=0;ni<j.nodes.length;ni++) {
     const node=j.nodes[ni],{mesh:mi,skin:si,children,name,...rest}=node;
     const skin=si===undefined?null:j.skins[si];

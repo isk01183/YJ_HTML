@@ -56,6 +56,12 @@ for(const [label,edit] of [
   assert.equal(report.status,'unsupported');assert.ok(report.reasons.length>0);
 });
 
+test('unsupportedLayoutsAreExplicit: normal vectors must have three float components',()=>{
+  const f=fixture();f.json.accessors[f.normal].type='VEC2';
+  const r=inspectHairSource(glb(f));assert.equal(r.status,'unsupported');
+  assert.ok(r.reasons.some(s=>s.includes('NORMAL')));
+});
+
 test('CLI reads only the supplied file and never prints its binary or metadata',()=>{
   const dir=mkdtempSync(join(tmpdir(),'hair-inspect-'));
   try {
