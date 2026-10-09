@@ -29,6 +29,17 @@ class VrmModelStore(private val root: File) {
     companion object {
         const val MAX_BYTES=64L*1024*1024
         const val MAX_TEXTURE_PIXELS=40L*1024*1024
+        internal fun verifyOutput(id: String,input: InputStream) {
+            // The ID is the hash of the fully validated import; also detects same-size file corruption.
+            val digest=MessageDigest.getInstance("SHA-256");val bytes=ByteArray(32*1024);var total=0L
+            while(true) {
+                val count=input.read(bytes,0,minOf(bytes.size.toLong(),MAX_BYTES-total+1).toInt())
+                if(count<0)break
+                check(count>0 && !Thread.currentThread().isInterrupted)
+                total+=count;require(total<=MAX_BYTES);digest.update(bytes,0,count)
+            }
+            require(total>=28 && digest.digest().joinToString(""){"%02x".format(it)}==id) {"Stored model is damaged"}
+        }
         @Volatile private var instance: VrmModelStore?=null
         fun get(context: Context): VrmModelStore = instance ?: synchronized(this) {
             instance ?: VrmModelStore(File(context.applicationContext.noBackupFilesDir,"vrm-preview")).also {instance=it}

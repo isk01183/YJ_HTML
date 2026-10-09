@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.FrameLayout
 import org.json.JSONObject
-import java.io.DataInputStream
 import java.io.InputStream
 import java.util.concurrent.Executors
 
@@ -90,12 +89,7 @@ internal class VrmSceneView(context: Context,scene: ScreenScene,private val open
             var result: LayeredSceneRenderer?=null
             var failure=VrmFailure.MODEL
             try {
-                // These private models were fully validated at import; check the container is still readable.
-                DataInputStream(checkNotNull(openModel())).use {input->
-                    check(Integer.reverseBytes(input.readInt())==0x46546c67)
-                    check(Integer.reverseBytes(input.readInt())==2)
-                    check(Integer.reverseBytes(input.readInt()).toLong() in 28..VrmModelStore.MAX_BYTES)
-                }
+                checkNotNull(openModel()).use {VrmModelStore.verifyOutput(value.vrm!!.modelId,it)}
                 failure=VrmFailure.MEDIA
                 result=LayeredSceneRenderer(value,openMedia,LayeredSceneRenderer.budget(context))
                 result.prepare(w,h)

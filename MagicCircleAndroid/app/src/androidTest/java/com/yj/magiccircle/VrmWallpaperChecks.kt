@@ -23,7 +23,8 @@ object VrmWallpaperChecks {
                 if(v is android.view.ViewGroup)for(i in 0 until v.childCount)find(v.getChildAt(i))?.let {return it}
                 return null
             }
-            android.view.inspector.WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull(::find)
+            android.view.inspector.WindowInspector.getGlobalWindowViews()
+                .filter {it.tag=="vrm-wallpaper:$slot:false"}.firstNotNullOfOrNull(::find)
         }
         fun js(view: android.webkit.WebView,script: String): String {
             val latch=java.util.concurrent.CountDownLatch(1);var result="null"
@@ -43,7 +44,15 @@ object VrmWallpaperChecks {
             error("Wallpaper did not become ready")
         }
         fun home(){context.startActivity(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))}
-        fun settings(){context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))}
+        fun settings(){
+            context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            val deadline=android.os.SystemClock.elapsedRealtime()+15000
+            while(android.os.SystemClock.elapsedRealtime()<deadline) {
+                if(main {android.view.inspector.WindowInspector.getGlobalWindowViews().any {it.tag=="vrm-wallpaper:$slot:false" && !it.isActivated}})return
+                Thread.sleep(100)
+            }
+            error("Settings did not hide the wallpaper")
+        }
         fun loss(view: android.webkit.WebView) {
             check(js(view,"(()=>{const c=document.querySelector('canvas');const g=c.getContext('webgl2')||c.getContext('webgl');const e=g.getExtension('WEBGL_lose_context');if(!e)return false;e.loseContext();return true})()")=="true")
         }
@@ -114,6 +123,19 @@ object VrmWallpaperChecks {
             check(runCatching {VrmWallpaperStore.stageFiles(root,"vrm-slot-1",scene){throw java.io.IOException("interrupted")}}.isFailure)
             check(File(root,"vrm-slot-1.json").readBytes().contentEquals(published))
             check(composed.open(media).use {it.readBytes()}.contentEquals(encoded))
+            val reading=java.util.concurrent.atomic.AtomicBoolean(true)
+            val readerError=java.util.concurrent.atomic.AtomicReference<Throwable?>()
+            val reader=Thread {
+                while(reading.get())runCatching {VrmWallpaperStore.snapshot(root,"vrm-slot-0")}
+                    .onFailure {readerError.compareAndSet(null,it)}
+            }.apply {start()}
+            try {
+                repeat(64) {
+                    val next=VrmWallpaperStore.stageFiles(root,"vrm-slot-0","a".repeat(64),VrmPlacement())
+                    check(VrmWallpaperStore.snapshot(root,"vrm-slot-0")==next) {"Concurrent reads interrupted atomic publication"}
+                }
+                check(readerError.get()==null) {"Concurrent snapshot read failed: ${readerError.get()}"}
+            } finally {reading.set(false);reader.join(10000);check(!reader.isAlive)}
             check(runCatching {composed.open("../outside")}.isFailure)
             check(runCatching {VrmWallpaperStore.stageFiles(root,"vrm-slot-1",scene){byteArrayOf(1,2,3).inputStream()}}.isFailure)
             check(File(root,"vrm-slot-1.json").readBytes().contentEquals(published))
@@ -135,12 +157,15 @@ object VrmWallpaperChecks {
             pending.writeText(org.json.JSONObject().put("version",1).put("request",requestC).put("slot","vrm-slot-2")
                 .put("generation",candidate.generation).put("launched",false).toString())
             check(VrmWallpaperStore.pendingApplication(isolated)?.generation==candidate.generation)
-            VrmWallpaperStore.markLaunched(isolated,requestC)
+            val launchA=VrmWallpaperStore.markLaunched(isolated,requestC)
             check(VrmWallpaperStore.pendingApplication(isolated)?.launched==true)
             check(runCatching {VrmWallpaperStore.beginApplication(isolated)}.isFailure)
             VrmWallpaperStore.finishApplication(isolated,requestB)
             check(VrmWallpaperStore.pendingApplication(isolated)?.request==requestC)
-            VrmWallpaperStore.finishApplication(isolated,requestC)
+            val launchB=VrmWallpaperStore.markLaunched(isolated,requestC)
+            check(!VrmWallpaperStore.finishApplication(isolated,requestC,launchA)) {"A stale picker released the new picker reservation"}
+            check(VrmWallpaperStore.pendingApplication(isolated)?.launch==launchB)
+            check(VrmWallpaperStore.finishApplication(isolated,requestC,launchB))
             check(VrmWallpaperStore.snapshot(pending.parentFile!!,"vrm-slot-2")==candidate)
             pending.writeText("{broken")
             check(runCatching {VrmWallpaperStore.beginApplication(isolated)}.isFailure)

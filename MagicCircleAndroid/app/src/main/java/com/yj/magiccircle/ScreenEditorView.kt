@@ -27,6 +27,7 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
         set(value) {if(field!=value)stopGesture();field=value;if(value){selectedLayer=null;selectedField=null;selectedCharacter=false};handles.invalidate()}
     var onSelectionChanged: (() -> Unit)?=null
     var onError: (() -> Unit)?=null
+    var onReady: (() -> Unit)?=null
     private var downX=0f;private var downY=0f;private var originX=0f;private var originY=0f
     private var gestureLayer: String?=null
     private var gestureField: InfoField?=null
@@ -85,14 +86,14 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
                 try {
                     val library=MediaLibrary.get(context);val model=value.scene.vrm.modelId
                     lease=library.leaseMedia(value.scene.layers.map {it.mediaId})
-                    val current=VrmSceneView(context,value.scene,{VrmModelStore.get(context).openModel(model)},{library.open(it,false)}, {}, {releaseRenderers();onError?.invoke()})
+                    val current=VrmSceneView(context,value.scene,{VrmModelStore.get(context).openModel(model)},{library.open(it,false)}, {onReady?.invoke()}, {releaseRenderers();onError?.invoke()})
                     vrmHost=current;addView(current,LayoutParams(-1,-1))
                 } catch(_: Exception){lease?.close();lease=null;onError?.invoke()}
             } else {
                 host=ChargingSceneView(context,value.key,value.information,value.scene)
                 addView(host,LayoutParams(-1,-1))
                 val current=host!!
-                current.prepare(Runnable { if(host===current)current.showEditorFrame(previewProgress) },Runnable { if(host===current)onError?.invoke() })
+                current.prepare(Runnable { if(host===current){current.showEditorFrame(previewProgress);onReady?.invoke()} },Runnable { if(host===current)onError?.invoke() })
             }
             addView(handles,LayoutParams(-1,-1))
         } else { value.scene?.let { vrmHost?.updateScene(it);host?.updateLayers(it.layers);host?.updateCharacter(it.character) };host?.setInformation(value.information) }

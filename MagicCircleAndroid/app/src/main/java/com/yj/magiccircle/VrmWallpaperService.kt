@@ -39,6 +39,7 @@ abstract class VrmWallpaperService: WallpaperService() {
         private var display: VirtualDisplay?=null
         private var presentation: Presentation?=null
         private var web: WebView?=null
+        private var composition: VrmSceneView?=null
         private var epoch=0
         private var visible=false
         private var closed=false
@@ -59,11 +60,15 @@ abstract class VrmWallpaperService: WallpaperService() {
         private val start=Runnable {if(canDraw())createRenderer()}
         private val sample=object: Runnable {
             override fun run() {
-                if(!canDraw() || web==null)return
-                val view=web!!;val token=epoch
+                if(!canDraw())return
+                val host=composition
+                if(host!=null && host.ready && snapshot?.scene?.vrm?.visible==false) {state="ready";record("hidden-character");ui.postDelayed(this,1000);return}
+                val view=host?.webView ?: web
+                if(view==null){if(host!=null){health.sample(false,0,now())?.let {fail(it);return};ui.postDelayed(this,1000)};return}
+                val token=epoch
                 health.sample(state=="ready",frames,now())?.let {fail(it);return}
                 view.evaluateJavascript("window.vrmPreview?.info || null") {value->
-                    if(closed || epoch!=token || web!==view)return@evaluateJavascript
+                    if(closed || epoch!=token || (composition?.webView ?: web)!==view)return@evaluateJavascript
                     val info=runCatching {JSONObject(value)}.getOrNull()
                     state=info?.optString("state","loading") ?: "loading"
                     frames=info?.optLong("frames",0) ?: 0
@@ -96,7 +101,7 @@ abstract class VrmWallpaperService: WallpaperService() {
         private fun schedule() {
             if(!canDraw())return
             if(terminal) {if(display==null)showError();return}
-            if(web!=null) {ui.removeCallbacks(sample);ui.post(sample);return}
+            if(web!=null || composition!=null) {ui.removeCallbacks(sample);ui.post(sample);return}
             ui.removeCallbacks(start);ui.postDelayed(start,nextDelay ?: 0L)
         }
         private fun createOutput(): Presentation {
@@ -110,6 +115,8 @@ abstract class VrmWallpaperService: WallpaperService() {
             return Presentation(this@VrmWallpaperService,display!!.display,android.R.style.Theme_Material_NoActionBar_Fullscreen).also {screen->
                 presentation=screen
                 screen.window?.apply {
+                    decorView.tag="vrm-wallpaper:$slot:$isPreview"
+                    decorView.isActivated=visible
                     addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
                     setBackgroundDrawable(ColorDrawable(0xffeee9f3.toInt()));setDimAmount(0f)
                 }
@@ -121,6 +128,13 @@ abstract class VrmWallpaperService: WallpaperService() {
             nextDelay=null;state="loading";frames=0;health.newAttempt(now())
             try {
                 val screen=createOutput()
+                if(applied.scene!=null) {
+                    val host=VrmSceneView(screen.context,applied.scene,{VrmModelStore.get(this@VrmWallpaperService).openModel(applied.modelId)},applied::open,
+                        {if(epoch==token && !closed)state="ready"},{failure->if(epoch==token && !closed)fail(failure)})
+                    composition=host;screen.setContentView(host,ViewGroup.LayoutParams(-1,-1))
+                    screen.setOnDismissListener {if(epoch==token && !closed)fail(VrmFailure.CONTEXT)}
+                    screen.show();screen.window?.setLayout(-1,-1);updateVisibility();ui.post(sample);record("composed");return
+                }
                 val view=VrmWebView.create(screen.context,{VrmModelStore.get(this@VrmWallpaperService).openModel(applied.modelId)},
                     {failure->if(epoch==token && !closed)fail(failure)}) {v->
                     if(epoch==token && web===v && !closed) {VrmWebView.configure(v,applied.placement);updateVisibility()}
@@ -133,6 +147,8 @@ abstract class VrmWallpaperService: WallpaperService() {
             } catch(_: Exception) {if(epoch==token)fail(VrmFailure.CONTEXT)}
         }
         private fun updateVisibility() {
+            presentation?.window?.decorView?.isActivated=visible
+            composition?.setActive(visible)
             web?.apply {
                 visibility=if(visible)View.VISIBLE else View.INVISIBLE
                 if(visible){onResume();evaluateJavascript("window.vrmPreview?.resume()",null)}
@@ -158,6 +174,7 @@ abstract class VrmWallpaperService: WallpaperService() {
         private fun releaseRenderer(crashed: Boolean=false) {
             epoch++;ui.removeCallbacksAndMessages(null)
             val view=web;web=null;val screen=presentation;presentation=null;val output=display;display=null
+            val host=composition;composition=null;host?.close(crashed)
             if(!crashed) {runCatching {view?.evaluateJavascript("window.vrmPreview?.dispose()",null)};runCatching {view?.stopLoading()}}
             runCatching {(view?.parent as? ViewGroup)?.removeView(view)};runCatching {view?.destroy()}
             runCatching {screen?.dismiss()};runCatching {output?.surface=null};runCatching {output?.release()}

@@ -21,6 +21,7 @@ class VrmPreviewActivity: Activity() {
     private val importStream=AtomicReference<InputStream?>()
     private var importCancellation: CancellationSignal?=null
     private lateinit var store: VrmModelStore
+    private lateinit var wallpaper: WallpaperController
     private lateinit var root: LinearLayout
     private lateinit var status: TextView
     private lateinit var importButton: Button
@@ -47,6 +48,7 @@ class VrmPreviewActivity: Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);store=VrmModelStore.get(this)
+        wallpaper=WallpaperController(this).apply {beforeVrmLaunch={disposeWebView();pendingReload=true};restoreState(savedInstanceState)}
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
             if(Build.VERSION.SDK_INT>=26)View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
@@ -164,6 +166,7 @@ class VrmPreviewActivity: Activity() {
     @Deprecated("Platform document picker result for API 23+")
     override fun onActivityResult(requestCode: Int,resultCode: Int,data: Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
+        if(wallpaper.onActivityResult(requestCode,resultCode,data)){pendingReload=true;return}
         if(requestCode==42) {pendingReload=true;return}
         if(requestCode!=41 || resultCode!=RESULT_OK || busy || closed)return
         val uri=data?.data ?: return
@@ -194,12 +197,7 @@ class VrmPreviewActivity: Activity() {
     private fun applyWallpaper() {
         val selected=entry ?: return
         if(!applyButton.isEnabled)return
-        async({VrmWallpaperStore.stage(this,selected.id,selected.placement)}) {slot->
-            disposeWebView();pendingReload=true
-            try {startActivityForResult(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
-                .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,VrmWallpaperStore.component(this,slot)),42)}
-            catch(_: Exception){pendingReload=false;showViewer();operationFailed()}
-        }
+        wallpaper.applyVrm(selected)
     }
     private fun appliedTargets(): List<Pair<String,String>> {
         val manager=WallpaperManager.getInstance(this);val targets=mutableListOf<Pair<String,String>>()
@@ -253,11 +251,13 @@ class VrmPreviewActivity: Activity() {
     private fun reloadModel(){pendingReload=false;showViewer()}
     override fun onResume() {
         super.onResume();active=true;health.setVisible(true,now())
+        wallpaper.resume()
         if(pendingReload)reloadModel()
         web?.apply {onResume();evaluateJavascript("window.vrmPreview?.resume()",null)}
         ui.removeCallbacks(poll);ui.post(poll)
     }
     override fun onPause() {
+        wallpaper.pause()
         active=false;health.setVisible(false,now());ui.removeCallbacks(poll)
         web?.apply {evaluateJavascript("window.vrmPreview?.pause()",null);onPause()};super.onPause()
     }
@@ -268,9 +268,11 @@ class VrmPreviewActivity: Activity() {
         (view.parent as? ViewGroup)?.removeView(view);view.destroy()
     }
     override fun onDestroy() {
+        wallpaper.close()
         closed=true;active=false;settingsDialog?.dismiss();importer.shutdownNow();ui.removeCallbacksAndMessages(null)
         val cancellation=importCancellation;val stream=importStream.getAndSet(null)
         if(cancellation!=null || stream!=null)Thread({runCatching {stream?.close()};runCatching {cancellation?.cancel()}},"vrm-import-close").start()
         disposeWebView();super.onDestroy()
     }
+    override fun onSaveInstanceState(out: Bundle){wallpaper.saveState(out);super.onSaveInstanceState(out)}
 }

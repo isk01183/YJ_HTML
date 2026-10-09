@@ -450,6 +450,7 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (gallery != null) gallery.onResume();
+        wallpaperController.resume();
         updateGalleryState();
     }
 

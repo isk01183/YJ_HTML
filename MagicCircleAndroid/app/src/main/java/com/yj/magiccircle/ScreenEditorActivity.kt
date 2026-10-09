@@ -25,6 +25,7 @@ class ScreenEditorActivity: Activity() {
     private lateinit var status: TextView
     private var dirty=false
     private var busy=false
+    private var renderError=false
     private var initial: EditorDraft?=null
     private var previewDialog: android.app.Dialog?=null
     private var pendingCharacterId: String?=null
@@ -68,7 +69,9 @@ class ScreenEditorActivity: Activity() {
         button(actions,w("미리보기","プレビュー","Preview")){preview()}
         button(actions,w("저장","保存","Save")){save()}
         setContentView(root)
-        editor.onError={status.text=w("이미지 또는 캐릭터를 불러오지 못했습니다. 파일을 확인하거나 캐릭터를 다시 선택하세요.","画像またはキャラクターを読み込めません。ファイルを確認するか再選択してください。","Cannot load image or character. Check files or choose the character again.")}
+        val editHint=status.text
+        editor.onError={renderError=true;status.text=w("이미지 또는 캐릭터를 불러오지 못했습니다. 파일을 확인하거나 캐릭터를 다시 선택하세요.","画像またはキャラクターを読み込めません。ファイルを確認するか再選択してください。","Cannot load image or character. Check files or choose the character again.")}
+        editor.onReady={if(renderError){renderError=false;status.text=editHint}}
         editor.setDraft(draft)
         editor.setOnDraftChanged { dirty=true;ui.removeCallbacks(saveDraft);ui.postDelayed(saveDraft,250) }
         editor.onSelectionChanged={renderTools()}
@@ -299,22 +302,10 @@ class ScreenEditorActivity: Activity() {
         previewDialog?.dismiss()
         val d=current();val dialog=android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar_Fullscreen)
         if(d.scene?.vrm!=null) {
-            val scene=d.scene
-            var lease: AutoCloseable?=null
             try {
-                lease=library.leaseMedia(scene.layers.map {it.mediaId})
                 editor.setRenderingEnabled(false)
-                val state=TextView(this).apply {setTextColor(Color.WHITE);text=w("캐릭터 준비 중…","準備中…","Preparing character…");setPadding(dp(16),dp(28),dp(16),0)}
-                val host=VrmSceneView(this,scene,{VrmModelStore.get(this).openModel(scene.vrm!!.modelId)},{library.open(it,false)},
-                    {state.text=""},{state.text=w("미리보기를 불러오지 못했습니다. 캐릭터나 파일을 다시 선택하세요.","プレビューを読み込めません。再選択してください。","Cannot load preview. Choose the character or files again.")})
-                val frame=FrameLayout(this).apply {addView(host,FrameLayout.LayoutParams(-1,-1));addView(state,FrameLayout.LayoutParams(-1,-2,Gravity.TOP))}
-                val bar=LinearLayout(this).apply {setPadding(dp(12),dp(24),dp(12),dp(24))}
-                button(bar,w("닫기","閉じる","Close")){dialog.dismiss()}
-                frame.addView(bar,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
-                previewDialog=dialog;dialog.setContentView(frame)
-                dialog.setOnDismissListener {host.close();lease.close();if(previewDialog===dialog)previewDialog=null;if(foreground && !isFinishing)editor.setRenderingEnabled(true)}
-                dialog.show()
-            } catch(_: Exception){lease?.close();if(foreground)editor.setRenderingEnabled(true);editor.onError?.invoke()}
+                previewDialog=VrmSceneDialog(this,d.scene,onClosed={previewDialog=null;if(foreground && !isFinishing)editor.setRenderingEnabled(true)}).also {it.show()}
+            } catch(_: Exception){if(foreground)editor.setRenderingEnabled(true);editor.onError?.invoke()}
             return
         }
         if(d.scene?.purpose==ScenePurpose.WALLPAPER) {

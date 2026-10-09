@@ -25,18 +25,28 @@ class WallpaperController(private val activity: Activity) {
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val manager = WallpaperManager.getInstance(activity)
-    private var dialog: AlertDialog? = null
+    private var dialog: android.app.Dialog? = null
     @Volatile private var generation = 0L
     @Volatile private var closed = false
     private var pendingTheme: String? = null
     private var pendingTarget: String? = null
     private var previousComponent: String? = null
     private var pendingComponent: String? = null
+    private var vrmRequest: String?=null
+    private var vrmLaunch: String?=null
+    private var recoveryOffered=false
+    var beforeVrmLaunch: (()->Unit)?=null
 
     fun show(theme: String, target: String) {
-        if (closed || pendingTheme != null) return
+        if (closed || offerPendingVrm() || pendingTheme != null) return
         if (!valid(theme, target)) { message(R.string.wallpaper_unavailable); return }
         pause()
+        val scene=MediaLibrary.get(activity).scene(theme)
+        if(scene?.vrm!=null) {
+            try {dialog=VrmSceneDialog(activity,scene,onApply={prepareVrm(theme,target,scene,null)}).also {it.show()}}
+            catch(_: Exception){message(R.string.wallpaper_error)}
+            return
+        }
         val imported = MediaLibrary.get(activity).find(theme)
         if (imported != null && imported.mime != "image/gif") { previewStill(theme, target); return }
         dialog = AlertDialog.Builder(activity)
@@ -44,6 +54,67 @@ class WallpaperController(private val activity: Activity) {
             .setItems(arrayOf(text(R.string.wallpaper_still), text(R.string.wallpaper_live))) { _, which ->
                 if (which == 0) previewStill(theme, target) else confirmLive(theme, target)
             }.setNegativeButton(text(R.string.library_cancel), null).show()
+    }
+
+    fun applyVrm(entry: VrmEntry) {
+        if(closed || offerPendingVrm() || pendingTheme!=null)return
+        prepareVrm("vrm-${entry.id}","home",null,entry)
+    }
+    fun resume() {if(!closed && !recoveryOffered){recoveryOffered=true;offerPendingVrm()}}
+    private fun w(ko: String,ja: String,en: String)=when(WebViews.selectedLanguage(activity)){"ja"->ja;"en"->en;else->ko}
+    private fun notice(value: String){if(alive())Toast.makeText(activity,value,Toast.LENGTH_LONG).show()}
+    private fun offerPendingVrm(): Boolean {
+        val p=try {VrmWallpaperStore.pendingApplication(activity)}catch(_: Exception){message(R.string.wallpaper_error);return true} ?: return false
+        if(VrmWallpaperStore.isPreparing(activity,p.request)) {
+            notice(w("이전 배경화면을 준비 중입니다. 잠시 후 다시 시도하세요.","壁紙を準備中です。しばらくお待ちください。","The previous wallpaper is still being prepared. Please wait."));return true
+        }
+        dialog?.dismiss()
+        val builder=AlertDialog.Builder(activity).setTitle(w("이전 배경화면 작업","前の壁紙設定","Previous wallpaper request"))
+            .setNegativeButton(text(R.string.library_cancel),null)
+        if(p.generation==null)builder.setMessage(w("준비가 중단되었습니다. 이전 배경은 유지됩니다. 이 작업을 정리할까요?","準備が中断しました。既存の壁紙を保ったまま終了しますか？","Preparation stopped. Keep the existing wallpaper and clear this request?"))
+            .setPositiveButton(w("중단된 작업 정리","中断した処理を終了","Clear interrupted request")){_,_->
+                runCatching {VrmWallpaperStore.finishApplication(activity,p.request)}.onSuccess {clearPending()}.onFailure {message(R.string.wallpaper_error)}
+            }
+        else builder.setMessage(w("준비된 배경화면으로 시스템 미리보기를 다시 엽니다. 새 작품을 덮어쓰지 않습니다.","準備済みの壁紙のプレビューを再開します。","Reopen the prepared wallpaper in system preview without replacing its contents."))
+            .setPositiveButton(w("이전 적용 계속","前の設定を続ける","Continue previous application")){_,_->
+                val token=++generation
+                worker.execute {
+                    val result=runCatching {VrmWallpaperStore.snapshot(activity,p.slot!!).also {check(it.generation==p.generation)}}
+                    main.post {if(alive() && token==generation)result.onSuccess {snapshot->
+                        launchVrm(p.request,p.slot!!,snapshot.scene?.id ?: "vrm-${snapshot.modelId}",pendingTarget ?: "home")
+                    }.onFailure {message(R.string.wallpaper_error)}}
+                }
+            }
+        dialog=builder.show();return true
+    }
+    private fun prepareVrm(theme: String,target: String,scene: ScreenScene?,entry: VrmEntry?) {
+        if(closed)return
+        try {if(!canSet()){message(R.string.wallpaper_denied);return}}catch(_: Exception){message(R.string.wallpaper_denied);return}
+        val request=try {VrmWallpaperStore.beginApplication(activity)}catch(_: Exception){offerPendingVrm();return}
+        vrmRequest=request;pendingTheme=theme;pendingTarget=target
+        val token=++generation;message(R.string.wallpaper_preparing)
+        worker.execute {
+            val result=runCatching {
+                check(!closed && generation==token) {"Preparation interrupted"}
+                if(scene!=null)VrmWallpaperStore.stage(activity,request,scene)
+                else VrmWallpaperStore.stage(activity,request,entry!!.id,entry.placement)
+            }
+            main.post {if(alive() && token==generation)result.onSuccess {launchVrm(request,it,theme,target)}
+                .onFailure {clearPending();message(R.string.wallpaper_error);offerPendingVrm()}}
+        }
+    }
+    private fun launchVrm(request: String,slot: String,theme: String,target: String) {
+        try {
+            vrmRequest=request;previousComponent=actualTheme(target);pendingTheme=theme;pendingTarget=target;pendingComponent=slot
+            vrmLaunch=VrmWallpaperStore.markLaunched(activity,request)
+            beforeVrmLaunch?.invoke()
+            activity.startActivityForResult(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,VrmWallpaperStore.component(activity,slot)),LIVE_REQUEST)
+        } catch(_: Exception){finishVrm();clearPending();message(R.string.wallpaper_picker_error)}
+    }
+    private fun finishVrm(): Boolean {
+        val request=vrmRequest ?: return true
+        return runCatching {VrmWallpaperStore.finishApplication(activity,request,vrmLaunch)}.getOrDefault(false)
     }
 
     private fun valid(theme: String, target: String) = WallpaperPolicy.allowedTheme(theme) &&
@@ -199,7 +270,9 @@ class WallpaperController(private val activity: Activity) {
         val target = pendingTarget
         val before = previousComponent
         val component = pendingComponent
+        val accepted=finishVrm()
         clearPending()
+        if(!accepted){message(R.string.wallpaper_unconfirmed);return true}
         if (theme == null || target == null || component == null) { message(R.string.wallpaper_unconfirmed); return true }
         val outcome = WallpaperPolicy.liveResult(component, actualTheme(target), before,
             resultCode == Activity.RESULT_OK)
@@ -218,7 +291,7 @@ class WallpaperController(private val activity: Activity) {
         when (info?.component) {
             ComponentName(activity, W03WallpaperService::class.java) -> "W03"
             ComponentName(activity, R01WallpaperService::class.java) -> "R01"
-            else -> UploadedWallpaperStore.key(activity, info?.component)
+            else -> UploadedWallpaperStore.key(activity, info?.component) ?: VrmWallpaperStore.key(activity,info?.component)
         }
     } catch (_: RuntimeException) { null }
 
@@ -227,21 +300,25 @@ class WallpaperController(private val activity: Activity) {
         pendingTarget?.let { state.putString("wallpaper.target", it) }
         previousComponent?.let { state.putString("wallpaper.before", it) }
         pendingComponent?.let { state.putString("wallpaper.component", it) }
+        vrmRequest?.let {state.putString("wallpaper.vrmRequest",it)}
+        vrmLaunch?.let {state.putString("wallpaper.vrmLaunch",it)}
     }
 
     fun restoreState(state: Bundle?) {
         val theme = state?.getString("wallpaper.theme") ?: return
         val target = state.getString("wallpaper.target") ?: return
-        if (!WallpaperPolicy.allowedTheme(theme) || target !in setOf("home", "lock")) return
+        if ((!WallpaperPolicy.allowedTheme(theme) && !theme.matches(Regex("vrm-[a-f0-9]{64}"))) || target !in setOf("home", "lock")) return
         pendingTheme = theme
         pendingTarget = target
         previousComponent = state.getString("wallpaper.before")
         pendingComponent = state.getString("wallpaper.component")
+        vrmRequest=state.getString("wallpaper.vrmRequest")?.takeIf {MediaValidation.isId(it)}
+        vrmLaunch=state.getString("wallpaper.vrmLaunch")?.takeIf {MediaValidation.isId(it)}
     }
 
     fun pause() { generation++; dialog?.dismiss(); dialog = null }
     fun close() { closed = true; pause(); worker.shutdown() }
-    private fun clearPending() { pendingTheme = null; pendingTarget = null; previousComponent = null; pendingComponent = null }
+    private fun clearPending() { pendingTheme = null; pendingTarget = null; previousComponent = null; pendingComponent = null;vrmRequest=null;vrmLaunch=null }
     private fun alive() = !closed && !activity.isFinishing && !activity.isDestroyed
     private fun flag(target: String) = if (target == "lock") WallpaperManager.FLAG_LOCK else WallpaperManager.FLAG_SYSTEM
     private fun remember(theme: String, target: String, mode: String) {

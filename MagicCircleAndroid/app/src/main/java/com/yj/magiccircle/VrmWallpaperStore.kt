@@ -25,14 +25,15 @@ internal object VrmWallpaperStore {
         fun acceptsRetry(request: String?)=request?.substringBefore(':')==generation
         fun open(id: String): InputStream {require(MediaValidation.isId(id));return File(checkNotNull(directory),id).inputStream()}
     }
-    data class PendingApplication(val request: String,val slot: String?=null,val generation: String?=null,val launched: Boolean=false)
+    data class PendingApplication(val request: String,val slot: String?=null,val generation: String?=null,val launched: Boolean=false,val launch: String?=null)
     private val working=mutableSetOf<String>()
     private fun workKey(context: Context,request: String)=root(context).absolutePath+":"+request
     private fun pendingFile(context: Context)=AtomicFile(File(root(context),"pending.json"))
-    private fun read(file: AtomicFile,limit: Long): ByteArray = file.openRead().use {input->
+    // AtomicFile.openRead may remove an in-progress .new file; readers and publishers share this lock.
+    @Synchronized private fun read(file: AtomicFile,limit: Long): ByteArray = file.openRead().use {input->
         ByteArrayOutputStream().also {MediaValidation.copy(input,it,limit)}.toByteArray()
     }
-    private fun write(file: AtomicFile,json: JSONObject) {
+    @Synchronized private fun write(file: AtomicFile,json: JSONObject) {
         file.baseFile.parentFile?.let {if(!it.isDirectory && !it.mkdirs())throw IOException("Cannot create wallpaper storage")}
         val bytes=json.toString().toByteArray(Charsets.UTF_8);require(bytes.size<=65536)
         val output=file.startWrite()
@@ -46,15 +47,17 @@ internal object VrmWallpaperStore {
         val slot=if(json.isNull("slot"))null else json.getString("slot").also(::valid)
         val generation=if(json.isNull("generation"))null else json.getString("generation").also {require(MediaValidation.isId(it))}
         val launched=json.getBoolean("launched")
+        val launch=if(json.isNull("launch"))null else json.getString("launch").also {require(MediaValidation.isId(it))}
         require((slot==null)==(generation==null) && (!launched || slot!=null))
-        return PendingApplication(request,slot,generation,launched)
+        return PendingApplication(request,slot,generation,launched,launch)
     }
     private fun writePending(context: Context,p: PendingApplication)=write(pendingFile(context),JSONObject().put("version",1)
-        .put("request",p.request).put("slot",p.slot ?: JSONObject.NULL).put("generation",p.generation ?: JSONObject.NULL).put("launched",p.launched))
+        .put("request",p.request).put("slot",p.slot ?: JSONObject.NULL).put("generation",p.generation ?: JSONObject.NULL).put("launched",p.launched).put("launch",p.launch ?: JSONObject.NULL))
     @Synchronized fun pendingApplication(context: Context): PendingApplication? {
         val p=readPending(context) ?: return null
         // Persist the candidate generation before copying, so a process death after publication is recoverable.
-        val prepared=p.slot!=null && File(root(context),"${p.slot}.json").exists() && snapshot(context,p.slot).generation==p.generation
+        val prepared=p.slot!=null && File(root(context),"${p.slot}.json").exists() &&
+            JSONObject(read(AtomicFile(File(root(context),"${p.slot}.json")),65536).toString(Charsets.UTF_8)).getString("generation")==p.generation
         check(!p.launched || prepared) {"Applied candidate is unavailable"}
         return if(prepared)p else p.copy(generation=null)
     }
@@ -62,16 +65,19 @@ internal object VrmWallpaperStore {
         check(readPending(context)==null) {"Finish the previous wallpaper request first"}
         return UUID.randomUUID().toString().also {writePending(context,PendingApplication(it))}
     }
-    @Synchronized fun markLaunched(context: Context,request: String) {
+    @Synchronized fun markLaunched(context: Context,request: String): String {
         val p=checkNotNull(pendingApplication(context));check(p.request==request && p.generation!=null)
-        writePending(context,p.copy(launched=true))
+        check(!isPreparing(context,request));enable(context,p.slot!!)
+        return UUID.randomUUID().toString().also {writePending(context,p.copy(launched=true,launch=it))}
     }
     @Synchronized fun isPreparing(context: Context,request: String)=workKey(context,request) in working
-    @Synchronized fun finishApplication(context: Context,request: String) {
-        if(readPending(context)?.request!=request)return
+    @Synchronized fun finishApplication(context: Context,request: String,launch: String?=null): Boolean {
+        val p=readPending(context) ?: return false
+        if(p.request!=request || p.launched && p.launch!=launch)return false
         check(!isPreparing(context,request)) {"Wallpaper copy is still running"}
         pendingFile(context).delete()
         check(readPending(context)==null) {"Cannot finish wallpaper request"}
+        return true
     }
     fun snapshot(context: Context,slot: String)=snapshot(root(context),slot)
     fun snapshot(root: File,slot: String): Snapshot {
@@ -89,14 +95,6 @@ internal object VrmWallpaperStore {
         require(scene.vrm?.modelId==id && scene.vrm.placement==p)
         SceneRules.validate(scene,scene.layers.map {it.mediaId}.distinct().associateWith {imageMime(File(directory,it))})
         return Snapshot(generation,id,p,scene,directory)
-    }
-    @Synchronized fun stage(context: Context,modelId: String,placement: VrmPlacement): String {
-        check(readPending(context)==null)
-        require(VrmModelStore.get(context).entries().any {it.id==modelId}) {"Character is unavailable"}
-        val slot=availableSlot(context)
-        stageFiles(root(context),slot,modelId,placement)
-        enable(context,slot)
-        return slot
     }
     private fun availableSlot(context: Context): String {
         val manager=WallpaperManager.getInstance(context);val protectedSlots=mutableSetOf<String>()
@@ -124,7 +122,10 @@ internal object VrmWallpaperStore {
             val reserved=current.copy(slot=availableSlot(context),generation=UUID.randomUUID().toString())
             writePending(context,reserved);working.add(workKey(context,request));reserved
         }
-        try {prepare(p.slot!!,p.generation!!);enable(context,p.slot);return p.slot}
+        try {
+            checkNotNull(VrmModelStore.get(context).openModel(modelId)).use {VrmModelStore.verifyOutput(modelId,it)}
+            prepare(p.slot!!,p.generation!!);enable(context,p.slot);return p.slot
+        }
         finally {synchronized(this){working.remove(workKey(context,request))}}
     }
     fun stageFiles(root: File,slot: String,modelId: String,placement: VrmPlacement): Snapshot {
