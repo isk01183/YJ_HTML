@@ -28,6 +28,7 @@ class VrmAvatarActivity: Activity() {
     private var web: WebView?=null
     private var value: VrmAvatarDefinition?=null
     private var saved: VrmAvatarDefinition?=null
+    private var pendingSave: VrmAvatarDefinition?=null
     private var entries=emptyList<VrmEntry>()
     private var tab="hair"
     private var dirty=false
@@ -69,7 +70,17 @@ class VrmAvatarActivity: Activity() {
         val restored=state?.getString("value")?.let {runCatching {VrmAvatarRules.fromJson(JSONObject(it))}.getOrNull()}
         if(restored!=null) {
             value=restored;dirty=state.getBoolean("dirty");saved=state.getString("saved")?.let {VrmAvatarRules.fromJson(JSONObject(it))}
-            loadModels {showEditor()}
+            pendingSave=state.getString("pendingSave")?.let {VrmAvatarRules.fromJson(JSONObject(it))}
+            val request=pendingSave
+            if(request==null)loadModels {showEditor()}
+            else async({VrmModelStore.get(this).entries() to store.find(request.id)}) {data->
+                // This read follows the in-flight write on the shared serial executor.
+                entries=data.first
+                if(data.second==request.copy(revision=request.revision+1)) {
+                    value=data.second;saved=data.second;dirty=false;restoredName=null
+                }
+                pendingSave=null;showEditor()
+            }
         } else if(intent.getBooleanExtra("library",false))showLibrary()
         else open(intent.getStringExtra("avatarId"))
     }
@@ -208,11 +219,16 @@ class VrmAvatarActivity: Activity() {
     }
     private fun changed(){dirty=true;controls();ui.removeCallbacks(draftTask);ui.postDelayed(draftTask,250)}
     private fun persistDraft() {
-        val draft=value ?: return;if(!dirty)return
+        val draft=value ?: return;if(!dirty||pendingSave!=null)return
         io.execute {runCatching {store.saveDraft(draft)}.onFailure {ui.post {if(!isDestroyed)status.text=w("초안 저장 실패 — 다시 저장해 주세요","下書き保存失敗・再試行してください","Draft save failed — please retry")}}}
     }
     private fun controls() {
         if(!::root.isInitialized)return
+        fun inputs(view: View) {
+            if(view is EditText||view is SeekBar){view.isEnabled=!busy;if(busy)view.clearFocus()}
+            if(view is android.view.ViewGroup)for(i in 0 until view.childCount)inputs(view.getChildAt(i))
+        }
+        inputs(root)
         root.findViewWithTag<Button>("avatar-save-new")?.isEnabled=ready&&!busy&&!invalid
         root.findViewWithTag<Button>("avatar-save")?.isEnabled=ready&&!busy&&!invalid&&saved!=null
         root.findViewWithTag<Button>("avatar-revert")?.isEnabled=!busy&&saved!=null
@@ -220,11 +236,16 @@ class VrmAvatarActivity: Activity() {
     }
     private fun save(asNew: Boolean) {
         if(!ready||invalid||busy)return
-        val old=value ?: return;val next=old.copy(id=if(asNew)UUID.randomUUID().toString()else old.id,revision=if(asNew)0 else old.revision,name=nameField!!.text.toString().trim())
+        val old=value ?: return;val next=old.copy(id=if(asNew&&old.revision>0)UUID.randomUUID().toString()else old.id,revision=if(asNew)0 else old.revision,name=nameField!!.text.toString().trim())
         if(runCatching {VrmAvatarRules.validate(next)}.isFailure){nameField!!.error=w("이름은 1–40자로 입력하세요","名前は1–40文字","Enter a name, 1–40 characters");return}
-        ui.removeCallbacks(draftTask)
-        async({store.save(next,if(asNew)null else saved?.revision)}) {committed->
-            value=committed;saved=committed;dirty=false;status.text=w("저장 완료 · 목록에서 다시 열 수 있습니다","保存済み・一覧から開けます","Saved · reopen from the library");controls()
+        ui.removeCallbacks(draftTask);pendingSave=next
+        async({runCatching {store.save(next,if(asNew)null else saved?.revision)}}) {result->
+            pendingSave=null
+            result.fold({committed->
+                value=committed;saved=committed;dirty=false;status.text=w("저장 완료 · 목록에서 다시 열 수 있습니다","保存済み・一覧から開けます","Saved · reopen from the library")
+            },{status.text=w("저장하지 못했습니다. 변경 내용은 유지됩니다. 다시 시도하세요.","保存できません。編集内容は保持されます。再試行してください。","Could not save. Your edits are preserved. Please retry.")})
+            if(active&&web==null)openWeb()
+            controls()
         }
     }
     private fun revert() {
@@ -293,8 +314,8 @@ class VrmAvatarActivity: Activity() {
     }
     @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
-    override fun onResume() {super.onResume();active=true;if(value!=null&&stage!=null&&web==null)loadModels {openWeb()}}
+    override fun onResume() {super.onResume();active=true;if(value!=null&&stage!=null&&web==null&&!busy)loadModels {openWeb()}}
     override fun onStop() {active=false;ui.removeCallbacks(draftTask);persistDraft();closeWeb();super.onStop()}
-    override fun onSaveInstanceState(out: Bundle) {value?.let {out.putString("value",VrmAvatarRules.toJson(it).toString())};saved?.let {out.putString("saved",VrmAvatarRules.toJson(it).toString())};out.putString("tab",tab);out.putBoolean("dirty",dirty);out.putString("rawHex",rawHex);out.putString("nameRaw",nameField?.text?.toString());out.putBoolean("invalid",invalid);super.onSaveInstanceState(out)}
+    override fun onSaveInstanceState(out: Bundle) {value?.let {out.putString("value",VrmAvatarRules.toJson(it).toString())};saved?.let {out.putString("saved",VrmAvatarRules.toJson(it).toString())};pendingSave?.let {out.putString("pendingSave",VrmAvatarRules.toJson(it).toString())};out.putString("tab",tab);out.putBoolean("dirty",dirty);out.putString("rawHex",rawHex);out.putString("nameRaw",nameField?.text?.toString());out.putBoolean("invalid",invalid);super.onSaveInstanceState(out)}
     override fun onDestroy(){operation++;closeWeb();ui.removeCallbacksAndMessages(null);super.onDestroy()}
 }
