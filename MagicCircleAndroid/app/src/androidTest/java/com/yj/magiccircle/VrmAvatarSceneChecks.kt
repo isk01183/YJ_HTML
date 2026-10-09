@@ -11,6 +11,28 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object VrmAvatarSceneChecks {
+    /** Separate instrumentation process reopens a fixture left by run(); never uses the personal library. */
+    fun reopen(test: Instrumentation,fixture: String) {
+        require(fixture.startsWith("avatar-scene-") && UUID.fromString(fixture.removePrefix("avatar-scene-")).toString()==fixture.removePrefix("avatar-scene-"))
+        val context=test.targetContext;val root=File(context.cacheDir,fixture)
+        val library=MediaLibrary(context,root,"classic");val scene=library.scenes().single()
+        val avatar=scene.vrm!!.avatar!!;check(avatar.revision==2 && avatar.appearance.dye.hair=="#EE2038")
+        val snapshot=VrmWallpaperStore.snapshot(File(root,"snapshots"),"vrm-slot-0")
+        check(snapshot.scene!!.vrm!!.avatar!!.revision==1 && snapshot.scene.vrm!!.avatar!!.appearance.dye.hair=="#204EFF")
+        val field=MediaLibrary::class.java.getDeclaredField("instance").apply {isAccessible=true};val previous=field.get(null);field.set(null,library)
+        var activity: ScreenEditorActivity?=null
+        try {
+            activity=test.startActivitySync(Intent(context,ScreenEditorActivity::class.java).putExtra("themeId",scene.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as ScreenEditorActivity
+            val editor=ScreenEditorActivity::class.java.getDeclaredField("editor").apply {isAccessible=true}.get(activity) as ScreenEditorView
+            val hostField=ScreenEditorView::class.java.getDeclaredField("vrmHost").apply {isAccessible=true}
+            var host: VrmSceneView?=null;var ready=false;val end=SystemClock.elapsedRealtime()+90_000
+            while(!ready&&SystemClock.elapsedRealtime()<end){test.runOnMainSync {host=hostField.get(editor) as? VrmSceneView;ready=host?.ready==true};Thread.sleep(100)}
+            check(ready){"Saved scene did not reopen after process restart"}
+            val latch=CountDownLatch(1);var raw="null"
+            test.runOnMainSync {host!!.webView!!.evaluateJavascript("window.vrmPreview.info.appearance"){raw=it;latch.countDown()}}
+            check(latch.await(20,TimeUnit.SECONDS));check(VrmAvatarRules.readAppearance(JSONObject(raw))==avatar.appearance)
+        } finally {test.runOnMainSync {activity?.finish()};test.waitForIdleSync();field.set(null,previous)}
+    }
     fun run(test: Instrumentation) {
         check(android.os.Build.PRODUCT.startsWith("sdk_"))
         val add=ScreenEditorActivity::class.java.getDeclaredMethod("addAvatar",VrmAvatarDefinition::class.java).apply {isAccessible=true}
@@ -93,6 +115,7 @@ object VrmAvatarSceneChecks {
             val output=File(context.getExternalFilesDir(null),"avatar-scene-${UUID.randomUUID()}.png")
             VrmHairChecks.capture(test,host!!.webView!!,output)
             android.util.Log.i("VrmChecks","AVATAR_SCENE_CAPTURE ${output.absolutePath}")
+            android.util.Log.i("VrmChecks","AVATAR_SCENE_FIXTURE ${root.name}")
         } finally {main {host?.close();activity?.finish()};test.waitForIdleSync();modelField.set(null,models);mediaField.set(null,priorMedia)}
     }
 }
