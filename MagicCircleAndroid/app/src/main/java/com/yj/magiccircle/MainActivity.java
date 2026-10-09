@@ -134,6 +134,13 @@ public final class MainActivity extends Activity {
                 startActivity(new Intent(this, ScreenEditorActivity.class).putExtra("scenePurpose", purpose.toUpperCase(Locale.ROOT)));
             return;
         }
+        if ("scene-preview".equals(action) && hasExactQuery(uri, "theme")) {
+            String id = uri.getQueryParameter("theme");
+            ScreenScene scene = library.scene(id);
+            if (!libraryBusy && scene != null && scene.getVrm() != null)
+                startActivity(new Intent(this, ScreenEditorActivity.class).putExtra("themeId", id).putExtra("previewScene", true));
+            return;
+        }
         if ("edit".equals(action) && hasExactQuery(uri, "theme")) {
             String id = uri.getQueryParameter("theme");
             if (!libraryBusy && (ThemeSelection.isValid(id) || library.find(id) != null || library.scene(id) != null || library.editorDraft(id) != null))

@@ -330,6 +330,12 @@ object VrmPreviewChecks {
             check(runCatching {reopened.rename(a.id,"should not persist")}.isFailure)
             check(index.readBytes().contentEquals(before) && reopened.selected()!!.name=="My character")
             obstacle.deleteRecursively()
+            val missing=File(folder,"models/${a.id}.vrm")
+            check(missing.renameTo(File(folder,"missing-model-test.vrm")))
+            check(reopened.entries().size==2) {"One missing output invalidated the whole character library"}
+            reopened.select(b.id)
+            check(reopened.openModel(b.id)!!.use {it.readBytes()}.contentEquals(v0))
+            check(reopened.openModel(a.id)==null)
         } finally {root.deleteRecursively()}
     }
 

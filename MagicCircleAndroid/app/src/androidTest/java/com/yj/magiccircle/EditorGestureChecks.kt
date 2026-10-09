@@ -130,6 +130,22 @@ object EditorGestureChecks {
             near(avatar.width,.8f,"Character pinch");near(avatar.angle,90f,"Character rotation")
             check(view.currentDraft().scene!!.layers==scene.layers && view.selectedLayer==null)
             t.send(MotionEvent.ACTION_CANCEL,Finger(19,cx,cy+80),Finger(7,cx,cy-80))
+            view.setRenderingEnabled(false)
+            reset(original.copy(scene=scene.copy(purpose=ScenePurpose.WALLPAPER,vrm=VrmSceneLayer("a".repeat(64)))))
+            view.selectedVrm=true
+            t.send(MotionEvent.ACTION_DOWN,Finger(7,cx-40,cy))
+            t.send(MotionEvent.ACTION_POINTER_DOWN,Finger(7,cx-40,cy),Finger(19,cx+40,cy),index=1)
+            t.send(MotionEvent.ACTION_MOVE,Finger(19,cx,cy+80),Finger(7,cx,cy-80))
+            val model=view.currentDraft().scene!!.vrm!!
+            near(model.placement.scale,1.5f,"VRM pinch capped")
+            check(view.currentDraft().scene!!.layers==scene.layers && view.selectedLayer==null)
+            t.send(MotionEvent.ACTION_MOVE,Finger(19,cx+w,cy+80),Finger(7,cx+w,cy-80))
+            near(view.currentDraft().scene!!.vrm!!.placement.screenX(),.85f,"VRM drag capped")
+            view.selectedLayer="other"
+            val beforeSwitch=view.currentDraft()
+            t.send(MotionEvent.ACTION_MOVE,Finger(19,cx+2*w,cy+80),Finger(7,cx+2*w,cy-80))
+            check(view.currentDraft()==beforeSwitch) {"VRM gesture redirected into another layer"}
+            t.send(MotionEvent.ACTION_CANCEL,Finger(19,cx,cy+80),Finger(7,cx,cy-80))
             reset()
             t.send(MotionEvent.ACTION_DOWN,Finger(7,cx,cy))
             t.send(MotionEvent.ACTION_CANCEL,Finger(7,cx,cy))

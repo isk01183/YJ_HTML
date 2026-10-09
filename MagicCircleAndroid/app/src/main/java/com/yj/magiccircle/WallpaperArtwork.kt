@@ -33,6 +33,7 @@ class WallpaperArtwork(val themeId: String, context: Context? = null,sceneOverri
     private val library = context?.let {MediaLibrary.get(it)}
     private val snapshot = if(themeId.matches(Regex("upload-slot-[0-2]"))) UploadedWallpaperStore.snapshot(checkNotNull(context),themeId) else null
     private val scene = sceneOverride ?: snapshot?.scene ?: if(SceneRules.isSceneId(themeId))checkNotNull(library?.scene(themeId))else null
+    init {require(scene?.vrm==null) {"VRM scenes require the live composition renderer"}}
     private val lease = if(snapshot==null) library?.leaseMedia(scene?.layers?.map {it.mediaId} ?: if(MediaValidation.isId(themeId))listOf(themeId)else emptyList())else null
     private val layered = scene?.let {s->LayeredSceneRenderer(s,{id->snapshot?.open(id) ?: checkNotNull(library).open(id,false)},LayeredSceneRenderer.budget(checkNotNull(context)))}
     private val media = when {

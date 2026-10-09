@@ -168,7 +168,7 @@ function render(){
 }
 window.setGalleryState=state=>{
     scenes=(Array.isArray(state.scenes)?state.scenes:[]).filter(s=>/^scene-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s.id)&&['WALLPAPER','CHARGING'].includes(s.purpose))
-        .map(s=>({...s,name:String(s.name),url:'https://appassets.androidplatform.net/scene-thumbnails/'+s.id+'?v='+encodeURIComponent(JSON.stringify([s.layers,s.character||null]))}));
+        .map(s=>({...s,name:String(s.name),url:s.vrm?null:'https://appassets.androidplatform.net/scene-thumbnails/'+s.id+'?v='+encodeURIComponent(JSON.stringify([s.layers,s.character||null]))}));
     drafts=Array.isArray(state.drafts)?state.drafts:[];
     durationMs=[1000,3000,5000,7000].includes(state.durationMs)?state.durationMs:7000;
     delete document.getElementById('hero-art').dataset.renderedTheme;
@@ -200,7 +200,9 @@ function renderScreens(){
     const container=document.getElementById('wallpaper-grid');container.replaceChildren();
     wallpaperThemes().forEach(theme=>{
         const card=document.createElement('div');card.className='card wallpaper-card';
-        const image=document.createElement('img');image.alt='';image.loading='lazy';image.src=artUrl(theme.id);
+        const image=document.createElement(theme.vrm?'span':'img');
+        if(theme.vrm){image.textContent=text('vrmScene');image.className='name';}
+        else {image.alt='';image.loading='lazy';image.src=artUrl(theme.id);}
         const art=document.createElement('div');art.className='art';art.appendChild(image);
         const label=document.createElement('span');label.className='name';label.textContent=translatedTheme(theme.id).name;
         const apply=document.createElement('button');apply.type='button';apply.className='apply-wallpaper';apply.dataset.wallpaperTheme=theme.id;apply.textContent=text('wallpaperUse');apply.disabled=!native||busy;
@@ -211,6 +213,8 @@ function renderScreens(){
             material.textContent=text('hideEditorMaterial');material.disabled=!native||busy||!readable;material.onclick=()=>hideEditorMaterial(theme.id);card.appendChild(material);
         }
         if(scenes.some(s=>s.id===theme.id)) {
+            if(theme.vrm) {const preview=document.createElement('button');preview.textContent=text('previewTitle');preview.className='apply-wallpaper';preview.disabled=!native||busy;
+                preview.onclick=()=>{if(native&&!busy)location.href='magiccircle://scene-preview?theme='+encodeURIComponent(theme.id);};card.appendChild(preview);}
             const edit=document.createElement('button');edit.textContent=text('editScene');edit.className='apply-wallpaper';edit.onclick=()=>editTheme(theme.id);edit.disabled=!native||busy;card.appendChild(edit);
             const remove=document.createElement('button');remove.textContent=text('deleteDesign');remove.className='apply-wallpaper';remove.disabled=!native||busy;remove.onclick=()=>{if(native&&!busy)location.href='magiccircle://delete?theme='+encodeURIComponent(theme.id);};card.appendChild(remove);
         }

@@ -28,6 +28,8 @@ class ScreenEditorActivity: Activity() {
     private var initial: EditorDraft?=null
     private var previewDialog: android.app.Dialog?=null
     private var pendingCharacterId: String?=null
+    private var foreground=false
+    private var vrmNames=emptyMap<String,String>()
     private val ui=Handler(Looper.getMainLooper())
     private val language get()=WebViews.selectedLanguage(this)
     private fun w(k: String,j: String,e: String)=words(language,k,j,e)
@@ -66,11 +68,13 @@ class ScreenEditorActivity: Activity() {
         button(actions,w("미리보기","プレビュー","Preview")){preview()}
         button(actions,w("저장","保存","Save")){save()}
         setContentView(root)
-        editor.onError={status.text=w("이미지를 준비하지 못했습니다. 크기 또는 파일을 확인하세요.","画像を読み込めません。サイズを確認してください。","Cannot prepare image. Check its size or file.")}
+        editor.onError={status.text=w("이미지 또는 캐릭터를 불러오지 못했습니다. 파일을 확인하거나 캐릭터를 다시 선택하세요.","画像またはキャラクターを読み込めません。ファイルを確認するか再選択してください。","Cannot load image or character. Check files or choose the character again.")}
         editor.setDraft(draft)
         editor.setOnDraftChanged { dirty=true;ui.removeCallbacks(saveDraft);ui.postDelayed(saveDraft,250) }
         editor.onSelectionChanged={renderTools()}
         renderTools()
+        if(draft.scene?.vrm!=null)IO.execute {val names=runCatching {VrmModelStore.get(this).entries().associate {it.id to vrmLabel(it)}}.getOrDefault(emptyMap())
+            ui.post {if(!isDestroyed && !isFinishing){vrmNames=names;renderTools()}}}
         (if(state!=null)state.getString("pendingCharacterId")else intent.getStringExtra("characterId"))?.let {addCharacter(it)}
         if(Build.VERSION.SDK_INT>=33) onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){leave()}
     }
@@ -93,7 +97,9 @@ class ScreenEditorActivity: Activity() {
     @android.annotation.SuppressLint("GestureBackNavigation") // API 33+ uses the native dispatcher registered in onCreate.
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
     override fun onSaveInstanceState(out: Bundle) {ui.removeCallbacks(saveDraft);persistDraft();out.putString("key",current().key);out.putString("pendingCharacterId",pendingCharacterId);super.onSaveInstanceState(out)}
-    override fun onStop() {previewDialog?.dismiss();super.onStop();if(!isFinishing && ::editor.isInitialized) {ui.removeCallbacks(saveDraft);persistDraft()}}
+    override fun onStart() {super.onStart();foreground=true;if(::editor.isInitialized && previewDialog==null)editor.setRenderingEnabled(true)
+        if(intent.getBooleanExtra("previewScene",false)){intent.removeExtra("previewScene");ui.post {if(foreground && !isFinishing)preview()}}}
+    override fun onStop() {foreground=false;previewDialog?.dismiss();if(::editor.isInitialized)editor.setRenderingEnabled(false);super.onStop();if(!isFinishing && ::editor.isInitialized) {ui.removeCallbacks(saveDraft);persistDraft()}}
     override fun onDestroy() {previewDialog?.dismiss();ui.removeCallbacksAndMessages(null);if(::editor.isInitialized)editor.close();super.onDestroy()}
     private fun row(parent: LinearLayout)=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;parent.addView(this,LinearLayout.LayoutParams(-1,-2))}
     private fun button(parent: LinearLayout,label: String,action:()->Unit)=Button(this).apply {
@@ -114,6 +120,24 @@ class ScreenEditorActivity: Activity() {
             if(s.purpose==ScenePurpose.WALLPAPER) {
                 heading(w("캐릭터 레이어","キャラクターレイヤー","Character layer"))
                 button(tools,w("보관함에서 캐릭터 선택","一覧からキャラクターを選択","Choose saved character")){chooseCharacter()}
+                s.vrm?.let { v->
+                    button(tools,(if(editor.selectedVrm)"● " else "○ ")+(vrmNames[v.modelId] ?: "VRM · ${v.modelId.take(8)}")){editor.selectedVrm=true;renderTools()}
+                    if(editor.selectedVrm) {
+                        heading(w("정면 고정 · 이동·확대는 두 손가락으로도 가능","正面固定・指で移動と拡大","Front view · Drag and pinch to position"))
+                        slider("X %",(v.placement.screenX()*100).toInt(),15,85){n->editor.modifyVrm {it.copy(placement=it.placement.withScreenPosition(n/100f,it.placement.screenY()))}}
+                        slider("Y %",(v.placement.screenY()*100).toInt(),15,85){n->editor.modifyVrm {it.copy(placement=it.placement.withScreenPosition(it.placement.screenX(),n/100f))}}
+                        slider(w("크기 %","サイズ %","Size %"),(v.placement.scale*100).toInt(),50,150){n->editor.modifyVrm {it.copy(placement=it.placement.copy(scale=n/100f))}}
+                        button(tools,w("가운데로","中央へ","Center")){editor.modifyVrm {it.copy(placement=it.placement.withScreenPosition(.5f,.5f))};renderTools()}
+                        val options=row(tools)
+                        button(options,w("표시 / 숨김","表示 / 非表示","Show / Hide")){editor.modifyVrm {it.copy(visible=!it.visible)};renderTools()}
+                        button(options,w("눈 깜박임: ","まばたき: ","Blink: ")+(if(v.placement.blink)"ON" else "OFF")){editor.modifyVrm {it.copy(placement=it.placement.copy(blink=!it.placement.blink))};renderTools()}
+                        slider(w("겹침 순서","重なり順","Layer order"),v.beforeImage,0,s.layers.size){n->editor.modifyVrm {it.copy(beforeImage=n)}}
+                        val order=row(tools)
+                        button(order,w("이미지 뒤로","画像の背面","Behind images")){editor.modifyVrm {it.copy(beforeImage=0)};renderTools()}
+                        button(order,w("이미지 앞으로","画像の前面","Above images")){editor.modifyVrm {it.copy(beforeImage=editor.currentDraft().scene!!.layers.size)};renderTools()}
+                        button(tools,w("캐릭터 레이어 제거","キャラクターを削除","Remove character layer")){val latest=editor.currentDraft();editor.change(latest.copy(scene=latest.scene!!.copy(vrm=null)));editor.selectedVrm=false;renderTools()}
+                    }
+                }
                 s.character?.let { c->
                     button(tools,(if(editor.selectedCharacter)"● " else "○ ")+c.definition.name){editor.selectedCharacter=true;renderTools()}
                     if(editor.selectedCharacter) {
@@ -215,6 +239,28 @@ class ScreenEditorActivity: Activity() {
     }
     private fun chooseExisting() {val items=library.items();AlertDialog.Builder(this).setTitle(w("보관함에서 추가","ライブラリから追加","Add from library")).setItems(items.map {it.name}.toTypedArray()){_,i->addLayer(items[i].id)}.show()}
     private fun chooseCharacter() {
+        AlertDialog.Builder(this).setTitle(w("캐릭터 종류","キャラクターの種類","Character type"))
+            .setItems(arrayOf(w("VRM · 가져온 3D 캐릭터","VRM · 読み込んだ3Dキャラクター","VRM · Imported 3D characters"),"2.5D")){_,i->if(i==0)chooseVrm()else chooseIllustratedCharacter()}.show()
+    }
+    private fun vrmLabel(entry: VrmEntry)="${entry.name} · VRM ${if(entry.format==VrmFormat.V1)"1" else "0"} · ${entry.id.take(8)}"
+    private fun chooseVrm() {
+        busy=true
+        IO.execute {val result=runCatching {VrmModelStore.get(this).entries()};ui.post {
+            if(isDestroyed || isFinishing)return@post;busy=false
+            result.onSuccess {entries->
+                vrmNames=entries.associate {it.id to vrmLabel(it)}
+                AlertDialog.Builder(this).setTitle(w("VRM 캐릭터 선택","VRMキャラクター選択","Choose VRM character"))
+                    .setItems(entries.map(::vrmLabel).toTypedArray()){_,i->
+                        val d=editor.currentDraft();val s=d.scene ?: return@setItems
+                        val v=s.vrm?.copy(modelId=entries[i].id) ?: VrmSceneLayer(entries[i].id,beforeImage=s.layers.size)
+                        editor.change(d.copy(scene=s.copy(character=null,vrm=v)));editor.selectedVrm=true;renderTools();persistDraft()
+                    }.setPositiveButton(w("VRM 가져오기 / 관리","VRM読込 / 管理","Import / Manage VRM")){_,_->
+                        persistDraft();startActivityForResult(Intent(this,VrmPreviewActivity::class.java),82)
+                    }.setNegativeButton(w("닫기","閉じる","Close"),null).show()
+            }.onFailure {status.text=w("VRM 보관함을 읽지 못했습니다. 기존 작품은 유지됩니다.","VRM一覧を読み込めません。作品は保持されます。","Cannot read VRM library. Existing scene preserved.")}
+        }}
+    }
+    private fun chooseIllustratedCharacter() {
         busy=true
         IO.execute {val result=runCatching {CharacterStore.get(this).list()};ui.post {
             if(isDestroyed || isFinishing)return@post;busy=false
@@ -230,7 +276,7 @@ class ScreenEditorActivity: Activity() {
             if(isDestroyed || isFinishing)return@post;busy=false;pendingCharacterId=null
             result.onSuccess { c->
                 val d=editor.currentDraft();val s=d.scene ?: return@onSuccess
-                editor.change(d.copy(scene=s.copy(character=s.character?.copy(definition=c) ?: CharacterLayer(c,beforeImage=s.layers.size))))
+                editor.change(d.copy(scene=s.copy(vrm=null,character=s.character?.copy(definition=c) ?: CharacterLayer(c,beforeImage=s.layers.size))))
                 editor.selectedCharacter=true;renderTools();persistDraft()
             }.onFailure {status.text=w("캐릭터를 찾지 못했습니다. 기존 작품은 유지됩니다.","キャラクターが見つかりません。作品は保持されます。","Character unavailable. Existing scene preserved.")}
         }}
@@ -238,6 +284,7 @@ class ScreenEditorActivity: Activity() {
     private fun importFile() {persistDraft();try {startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*").putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("image/jpeg","image/png","image/gif")).putExtra(Intent.EXTRA_LOCAL_ONLY,true),81)}catch(_:Exception){status.text=w("파일 선택기를 열 수 없습니다","ファイル選択不可","File picker unavailable")}}
     @Deprecated("Platform document picker") override fun onActivityResult(requestCode: Int,resultCode: Int,data: Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode==82){chooseVrm();return}
         if(requestCode!=81 || resultCode!=RESULT_OK)return
         val uri=data?.data ?: return
         busy=true;status.text=w("이미지를 안전하게 가져오는 중…","画像を読み込み中…","Importing image…")
@@ -251,6 +298,25 @@ class ScreenEditorActivity: Activity() {
     private fun preview() {
         previewDialog?.dismiss()
         val d=current();val dialog=android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar_Fullscreen)
+        if(d.scene?.vrm!=null) {
+            val scene=d.scene
+            var lease: AutoCloseable?=null
+            try {
+                lease=library.leaseMedia(scene.layers.map {it.mediaId})
+                editor.setRenderingEnabled(false)
+                val state=TextView(this).apply {setTextColor(Color.WHITE);text=w("캐릭터 준비 중…","準備中…","Preparing character…");setPadding(dp(16),dp(28),dp(16),0)}
+                val host=VrmSceneView(this,scene,{VrmModelStore.get(this).openModel(scene.vrm!!.modelId)},{library.open(it,false)},
+                    {state.text=""},{state.text=w("미리보기를 불러오지 못했습니다. 캐릭터나 파일을 다시 선택하세요.","プレビューを読み込めません。再選択してください。","Cannot load preview. Choose the character or files again.")})
+                val frame=FrameLayout(this).apply {addView(host,FrameLayout.LayoutParams(-1,-1));addView(state,FrameLayout.LayoutParams(-1,-2,Gravity.TOP))}
+                val bar=LinearLayout(this).apply {setPadding(dp(12),dp(24),dp(12),dp(24))}
+                button(bar,w("닫기","閉じる","Close")){dialog.dismiss()}
+                frame.addView(bar,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
+                previewDialog=dialog;dialog.setContentView(frame)
+                dialog.setOnDismissListener {host.close();lease.close();if(previewDialog===dialog)previewDialog=null;if(foreground && !isFinishing)editor.setRenderingEnabled(true)}
+                dialog.show()
+            } catch(_: Exception){lease?.close();if(foreground)editor.setRenderingEnabled(true);editor.onError?.invoke()}
+            return
+        }
         if(d.scene?.purpose==ScenePurpose.WALLPAPER) {
             val host=WallpaperScenePreview(this,d.scene)
             val frame=FrameLayout(this).apply {addView(host,FrameLayout.LayoutParams(-1,-1))}

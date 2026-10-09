@@ -4,6 +4,7 @@
     const strings = {};
     const add = (key, ja, ko, en) => { strings[key] = {ja, ko, en}; };
     add('vrmWallpaper','VRMキャラクター・壁紙','VRM 캐릭터 · 배경화면','VRM characters · Wallpaper');
+    add('vrmScene','VRM・3D合成作品','VRM · 3D 합성 작품','VRM · 3D composition');
     add('characterCreate','キャラクターを作る','캐릭터 만들기','Create a character');
     add('characterHint','髪・体型・衣装・色を選び、壁紙へ。','헤어·체형·의상·색상을 꾸미고 내 배경화면에 초대하세요.','Customize hair, proportions, wardrobe and colors for your wallpaper.');
     add('createScreen','画面を作る','화면 직접 만들기','Create a screen');

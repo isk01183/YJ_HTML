@@ -12,6 +12,29 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object VrmSceneChecks {
+    fun screen(test: Instrumentation,seconds: Int) {
+        check(android.os.Build.PRODUCT.startsWith("sdk_") && android.os.Build.VERSION.SDK_INT>=29)
+        val activity=test.startActivitySync(Intent(test.targetContext,ScreenEditorActivity::class.java)
+            .putExtra("scenePurpose","WALLPAPER").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as ScreenEditorActivity
+        var editor: ScreenEditorView?=null
+        try {
+            main(test){
+                editor=ScreenEditorActivity::class.java.getDeclaredField("editor").apply {isAccessible=true}.get(activity) as ScreenEditorView
+                ScreenEditorActivity::class.java.getDeclaredMethod("chooseVrm").apply {isAccessible=true}.invoke(activity)
+            }
+            waitFor(test) {
+                fun list(v: android.view.View): android.widget.ListView? {
+                    if(v is android.widget.ListView)return v
+                    if(v is android.view.ViewGroup)for(i in 0 until v.childCount)list(v.getChildAt(i))?.let {return it}
+                    return null
+                }
+                val choices=android.view.inspector.WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull(::list)
+                if(choices==null || choices.count==0)false else {choices.performItemClick(choices.getChildAt(0),0,choices.adapter.getItemId(0));true}
+            }
+            waitFor(test){editor!!.currentDraft().scene?.vrm!=null}
+            Thread.sleep(seconds.coerceIn(5,60)*1000L)
+        } finally {main(test){activity.finish();editor?.let {MediaLibrary.get(activity).discardEditorDraft(it.currentDraft().key)}}}
+    }
     private fun main(test: Instrumentation, action: ()->Unit) {
         var failure: Throwable?=null
         test.runOnMainSync {try {action()}catch(e: Throwable){failure=e}}
@@ -47,6 +70,20 @@ object VrmSceneChecks {
         try {
             main(test){
                 val editor=ScreenEditorActivity::class.java.getDeclaredField("editor").apply {isAccessible=true}.get(activity) as ScreenEditorView
+                editor.setRenderingEnabled(false)
+                editor.setDraft(EditorDraft(scene.id,scene,emptyList()))
+                editor.selectedVrm=true
+                editor.modifyVrm {it.copy(placement=it.placement.withScreenPosition(.7f,.4f),beforeImage=1)}
+                val placed=editor.currentDraft().scene!!
+                check(placed.layers==scene.layers && kotlin.math.abs(placed.vrm!!.placement.screenX()-.7f)<.0001f)
+                check(store.selected()==original)
+                editor.change(editor.currentDraft().copy(scene=placed.copy(vrm=placed.vrm!!.copy(modelId=entries.last().id))))
+                check(editor.currentDraft().scene!!.vrm!!.placement==placed.vrm.placement)
+                editor.selectedLayer="back";check(!editor.selectedVrm)
+                editor.selectedVrm=true;check(editor.selectedLayer==null && !editor.selectedCharacter)
+                editor.change(editor.currentDraft().copy(scene=editor.currentDraft().scene!!.copy(layers=emptyList())))
+                check(editor.currentDraft().scene!!.vrm!!.beforeImage==0)
+                check(runCatching {WallpaperArtwork(scene.id,activity,scene)}.isFailure) {"A still renderer silently omitted VRM"}
                 editor.close()
             }
             for(entry in entries) {

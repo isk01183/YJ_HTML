@@ -13,19 +13,25 @@ import kotlin.math.hypot
 class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
     private lateinit var draft: EditorDraft
     private var host: ChargingSceneView?=null
+    private var vrmHost: VrmSceneView?=null
+    private var lease: AutoCloseable?=null
+    private var rendering=true
     private var listener: ((EditorDraft)->Unit)?=null
     var selectedLayer: String?=null
-        set(value) {if(field!=value)stopGesture();field=value;if(value!=null){selectedField=null;selectedCharacter=false};handles.invalidate()}
+        set(value) {if(field!=value)stopGesture();field=value;if(value!=null){selectedField=null;selectedCharacter=false;selectedVrm=false};handles.invalidate()}
     var selectedField: InfoField?=null
-        set(value) {if(field!=value)stopGesture();field=value;if(value!=null){selectedLayer=null;selectedCharacter=false};handles.invalidate()}
+        set(value) {if(field!=value)stopGesture();field=value;if(value!=null){selectedLayer=null;selectedCharacter=false;selectedVrm=false};handles.invalidate()}
     var selectedCharacter=false
-        set(value) {if(field!=value)stopGesture();field=value;if(value){selectedLayer=null;selectedField=null};handles.invalidate()}
+        set(value) {if(field!=value)stopGesture();field=value;if(value){selectedLayer=null;selectedField=null;selectedVrm=false};handles.invalidate()}
+    var selectedVrm=false
+        set(value) {if(field!=value)stopGesture();field=value;if(value){selectedLayer=null;selectedField=null;selectedCharacter=false};handles.invalidate()}
     var onSelectionChanged: (() -> Unit)?=null
     var onError: (() -> Unit)?=null
     private var downX=0f;private var downY=0f;private var originX=0f;private var originY=0f
     private var gestureLayer: String?=null
     private var gestureField: InfoField?=null
     private var gestureCharacter=false
+    private var gestureVrm=false
     private var firstPointer=-1;private var secondPointer=-1
     private var originWidth=1f;private var originAngle=0f
     private var pointerDistance=0f;private var pointerAngle=0f
@@ -43,7 +49,8 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
             val l=draft.scene?.layers?.find { it.id==selectedLayer }
             val p=information().find { it.field==selectedField }
             val a=if(selectedCharacter)draft.scene?.character else null
-            val x=l?.x ?: a?.x ?: p?.x ?: return;val y=l?.y ?: a?.y ?: p?.y ?: return
+            val v=if(selectedVrm)draft.scene?.vrm?.placement else null
+            val x=l?.x ?: a?.x ?: v?.screenX() ?: p?.x ?: return;val y=l?.y ?: a?.y ?: v?.screenY() ?: p?.y ?: return
             c.drawCircle(x*width,y*height,12f*resources.displayMetrics.density,ink)
         }
     }
@@ -68,26 +75,40 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
     fun setDraft(value: EditorDraft) {
         if(closed)return
         val old=if(::draft.isInitialized)draft else null
-        val structure= { d: EditorDraft? -> Pair(d?.scene?.layers?.map { Triple(it.id,it.mediaId,it.visible) },d?.scene?.character?.definition) }
+        val structure= { d: EditorDraft? -> Triple(d?.scene?.layers?.map { Triple(it.id,it.mediaId,it.visible) },d?.scene?.character?.definition,d?.scene?.vrm?.modelId) }
         if(old?.key!=value.key || structure(old)!=structure(value))stopGesture()
         draft=value
-        if(host==null || old?.key!=value.key || structure(old)!=structure(value) || (old?.information==null)!=(value.information==null)) {
-            host?.close();removeAllViews()
-            host=ChargingSceneView(context,value.key,value.information,value.scene)
-            addView(host,LayoutParams(-1,-1));addView(handles,LayoutParams(-1,-1))
-            val current=host!!
-            current.prepare(Runnable { if(host===current)current.showEditorFrame(previewProgress) },Runnable { if(host===current)onError?.invoke() })
-        } else { value.scene?.let { host?.updateLayers(it.layers);host?.updateCharacter(it.character) };host?.setInformation(value.information) }
+        if(!rendering)return
+        if(host==null && vrmHost==null || old?.key!=value.key || structure(old)!=structure(value) || (old?.information==null)!=(value.information==null)) {
+            releaseRenderers()
+            if(value.scene?.vrm!=null) {
+                try {
+                    val library=MediaLibrary.get(context);val model=value.scene.vrm.modelId
+                    lease=library.leaseMedia(value.scene.layers.map {it.mediaId})
+                    val current=VrmSceneView(context,value.scene,{VrmModelStore.get(context).openModel(model)},{library.open(it,false)}, {}, {releaseRenderers();onError?.invoke()})
+                    vrmHost=current;addView(current,LayoutParams(-1,-1))
+                } catch(_: Exception){lease?.close();lease=null;onError?.invoke()}
+            } else {
+                host=ChargingSceneView(context,value.key,value.information,value.scene)
+                addView(host,LayoutParams(-1,-1))
+                val current=host!!
+                current.prepare(Runnable { if(host===current)current.showEditorFrame(previewProgress) },Runnable { if(host===current)onError?.invoke() })
+            }
+            addView(handles,LayoutParams(-1,-1))
+        } else { value.scene?.let { vrmHost?.updateScene(it);host?.updateLayers(it.layers);host?.updateCharacter(it.character) };host?.setInformation(value.information) }
         handles.invalidate()
     }
     fun showEditorStage(progress: Float) {if(closed)return;previewProgress=progress.coerceIn(0f,1f);host?.showEditorFrame(previewProgress)}
     fun change(value: EditorDraft) {
         val s=value.scene
-        val safe=if(s?.character!=null)value.copy(scene=s.copy(character=s.character.copy(beforeImage=s.character.beforeImage.coerceIn(0,s.layers.size))))else value
+        val safe=if(s==null)value else value.copy(scene=s.copy(
+            character=s.character?.let {it.copy(beforeImage=it.beforeImage.coerceIn(0,s.layers.size))},
+            vrm=s.vrm?.let {it.copy(beforeImage=it.beforeImage.coerceIn(0,s.layers.size))}))
         setDraft(safe);listener?.invoke(safe)
     }
     fun modifyLayer(block: (ImageLayer)->ImageLayer) { val s=draft.scene ?: return;change(draft.copy(scene=s.copy(layers=s.layers.map {if(it.id==selectedLayer)block(it)else it}))) }
     fun modifyCharacter(block: (CharacterLayer)->CharacterLayer) {val s=draft.scene ?: return;val c=s.character ?: return;change(draft.copy(scene=s.copy(character=block(c))))}
+    fun modifyVrm(block: (VrmSceneLayer)->VrmSceneLayer) {val s=draft.scene ?: return;val v=s.vrm ?: return;change(draft.copy(scene=s.copy(vrm=block(v))))}
     fun modifyField(block: (InfoPlacement)->InfoPlacement) {
         change(draft.copy(information=information().map {if(it.field==selectedField)block(it)else it}))
     }
@@ -99,10 +120,11 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
         when(e.actionMasked) {
             MotionEvent.ACTION_DOWN->{
                 stopGesture()
-                if(selectedCharacter)gestureCharacter=draft.scene?.character?.visible==true
+                if(selectedVrm)gestureVrm=draft.scene?.vrm?.visible==true
+                else if(selectedCharacter)gestureCharacter=draft.scene?.character?.visible==true
                 else if(selectedLayer!=null)gestureLayer=draft.scene?.layers?.find {it.id==selectedLayer && it.visible}?.id
                 else gestureField=information().find {it.field==selectedField && it.visible}?.field
-                if(gestureLayer!=null || gestureField!=null || gestureCharacter) {
+                if(gestureLayer!=null || gestureField!=null || gestureCharacter || gestureVrm) {
                     rebasePointers(e);parent?.requestDisallowInterceptTouchEvent(true)
                 }
             }
@@ -115,11 +137,11 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
         return true
     }
     private fun stopGesture() {
-        gestureLayer=null;gestureField=null;gestureCharacter=false;firstPointer=-1;secondPointer=-1
+        gestureLayer=null;gestureField=null;gestureCharacter=false;gestureVrm=false;firstPointer=-1;secondPointer=-1
         parent?.requestDisallowInterceptTouchEvent(false)
     }
     private fun rebasePointers(e: MotionEvent, excluded: Int=-1) {
-        if(gestureLayer==null && gestureField==null && !gestureCharacter)return
+        if(gestureLayer==null && gestureField==null && !gestureCharacter && !gestureVrm)return
         val l=gestureArtwork()
         val p=if(gestureField!=null)information().find {it.field==gestureField && it.visible}else null
         if(l==null && p==null) {stopGesture();return}
@@ -157,13 +179,22 @@ class ScreenEditorView(context: Context): FrameLayout(context),Closeable {
         }
         val x=(originX+(px-downX)/(surfaceWidth*previewScale)).coerceIn(0f,1f)
         val y=(originY+(py-downY)/(surfaceHeight*previewScale)).coerceIn(0f,1f)
-        if(gestureCharacter)modifyCharacter {it.copy(x=x,y=y,width=size,angle=angle)}
+        if(gestureVrm)modifyVrm {it.copy(placement=it.placement.withScreenPosition(x,y).copy(scale=size).normalized())}
+        else if(gestureCharacter)modifyCharacter {it.copy(x=x,y=y,width=size,angle=angle)}
         else if(l!=null)modifyLayer {it.copy(x=x,y=y,width=size,angle=angle)}
         else modifyField {it.copy(x=x,y=y)}
     }
-    private fun gestureArtwork(): ImageLayer? = if(gestureCharacter)draft.scene?.character?.takeIf {it.visible}?.let {
+    private fun gestureArtwork(): ImageLayer? = if(gestureVrm)draft.scene?.vrm?.takeIf {it.visible}?.let {
+        ImageLayer("vrm","",it.placement.screenX(),it.placement.screenY(),it.placement.scale,0f,false,true)
+    } else if(gestureCharacter)draft.scene?.character?.takeIf {it.visible}?.let {
         ImageLayer("character","",it.x,it.y,it.width,it.angle,it.flipX,it.visible)
     } else draft.scene?.layers?.find {it.id==gestureLayer && it.visible}
     override fun performClick(): Boolean {super.performClick();return true}
-    override fun close() {if(closed)return;stopGesture();closed=true;host?.close();host=null}
+    fun setRenderingEnabled(enabled: Boolean) {
+        if(closed)return
+        rendering=enabled
+        if(!enabled)releaseRenderers() else if(::draft.isInitialized)setDraft(draft)
+    }
+    private fun releaseRenderers() {host?.close();host=null;vrmHost?.close();vrmHost=null;lease?.close();lease=null;removeAllViews()}
+    override fun close() {if(closed)return;stopGesture();closed=true;releaseRenderers()}
 }

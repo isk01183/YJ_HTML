@@ -68,7 +68,8 @@ class VrmModelStore(private val root: File) {
         val models=(0 until array.length()).map {i->
             val entry=array.getJSONObject(i);val id=entry.getString("id");validId(id)
             val name=entry.getString("name");require(name.length in 1..80)
-            val size=entry.getLong("size");require(size in 28..MAX_BYTES && model(id).length()==size)
+            // Missing output belongs to that character, not to every other entry in the index.
+            val size=entry.getLong("size");require(size in 28..MAX_BYTES)
             val p=entry.getJSONObject("placement")
             VrmEntry(id,name,VrmFormat.valueOf(entry.getString("format")),size,
                 VrmPlacement(p.optDouble("x",0.0).toFloat(),p.optDouble("y",0.0).toFloat(),p.optDouble("scale",1.0).toFloat(),p.optBoolean("blink",true)).normalized())

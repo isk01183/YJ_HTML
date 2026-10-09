@@ -175,7 +175,7 @@ final class WebViews {
             if ("https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getEncodedAuthority())
                     && uri.getFragment() == null && path != null && path.startsWith("/scene-thumbnails/")) {
                 String sceneId = path.substring("/scene-thumbnails/".length());
-                if (SceneRules.isSceneId(sceneId) && library.scene(sceneId) != null) try {
+                if (SceneRules.isSceneId(sceneId) && library.scene(sceneId) != null && library.scene(sceneId).getVrm() == null) try {
                     return new WebResourceResponse("image/png", null, 200, "OK",
                             Collections.singletonMap("Cache-Control", "no-store"),
                             new ByteArrayInputStream(WallpaperArtwork.thumbnail(sceneId, context)));
