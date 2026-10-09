@@ -49,5 +49,15 @@ object SceneStorageChecks {
         val upgraded=MediaLibrary(context,root,"classic")
         check(upgraded.isReadable() && upgraded.scene(wallpaper.id)==legacyScene && upgraded.durationMs()==3000)
         check(File(root,"media-library.v3-recovery.json").readText()==legacy)
+        val vrmScene=legacyScene.copy(vrm=VrmSceneLayer("a".repeat(64),VrmPlacement(.2f,-.1f,1.2f,false)))
+        check(SceneData.readScene(SceneData.sceneJson(vrmScene))==vrmScene)
+        check(SceneData.readScene(SceneData.sceneJson(vrmScene).apply { remove("vrm") }).vrm==null)
+        upgraded.saveEditorDraft(EditorDraft(vrmScene.id,vrmScene,null))
+        check(MediaLibrary(context,root,"classic").editorDraft(vrmScene.id)?.scene==vrmScene)
+        upgraded.saveScene(vrmScene,null)
+        val other=vrmScene.copy(id="scene-${UUID.randomUUID()}",vrm=vrmScene.vrm!!.copy(modelId="b".repeat(64)))
+        upgraded.saveScene(other,null)
+        val missingModels=MediaLibrary(context,root,"classic")
+        check(missingModels.isReadable() && missingModels.scene(vrmScene.id)==vrmScene && missingModels.scene(other.id)==other)
     }
 }

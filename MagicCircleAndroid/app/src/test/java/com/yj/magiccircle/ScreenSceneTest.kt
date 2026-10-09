@@ -34,6 +34,24 @@ class ScreenSceneTest {
         listOf("", " ", "x\ny", "x".repeat(41)).forEach { name -> rejected { SceneRules.validate(scene(emptyList()).copy(name=name),png) } }
         rejected { SceneRules.validateInformation(listOf(InfoPlacement(InfoField.BATTERY,.5f,.5f,true),InfoPlacement(InfoField.BATTERY,.1f,.1f,false))) }
     }
+    @Test fun vrmScenePreservesVersionReference() {
+        val vrm=VrmSceneLayer("a".repeat(64),VrmPlacement(.2f,-.1f,1.2f,false))
+        val s=scene(emptyList()).copy(purpose=ScenePurpose.WALLPAPER,vrm=vrm)
+        SceneRules.validate(s,emptyMap())
+        assertEquals("a".repeat(64),s.vrm!!.modelId)
+        rejected { SceneRules.validate(s.copy(purpose=ScenePurpose.CHARGING),emptyMap()) }
+        rejected { SceneRules.validate(s.copy(character=CharacterLayer(CharacterRules.defaults(media,"Character"))),emptyMap()) }
+        listOf("", "../model", "A".repeat(64), "a".repeat(63)).forEach { id ->
+            rejected { SceneRules.validate(s.copy(vrm=vrm.copy(modelId=id)),emptyMap()) }
+        }
+        listOf(VrmPlacement(Float.NaN),VrmPlacement(.36f),VrmPlacement(y=-.36f),VrmPlacement(scale=1.6f),VrmPlacement(scale=Float.POSITIVE_INFINITY)).forEach { p ->
+            rejected { SceneRules.validate(s.copy(vrm=vrm.copy(placement=p)),emptyMap()) }
+        }
+        listOf(-1,1).forEach { at -> rejected { SceneRules.validate(s.copy(vrm=vrm.copy(beforeImage=at)),emptyMap()) } }
+        val images=List(8){layer("$it")}
+        SceneRules.validate(s.copy(layers=images,vrm=vrm.copy(beforeImage=8)),mapOf(media to "image/png"))
+        rejected { SceneRules.validate(s.copy(layers=images),mapOf(media to "image/gif")) }
+    }
     @Test fun characterIsIndependentWallpaperLayer() {
         val c=CharacterLayer(CharacterRules.defaults(media,"Character"),.5f,.5f,1f,0f,false,true,0)
         val wallpaper=scene(emptyList()).copy(purpose=ScenePurpose.WALLPAPER,character=c)

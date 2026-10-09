@@ -9,7 +9,8 @@ data class ImageLayer(val id: String, val mediaId: String, val x: Float, val y: 
     val width: Float, val angle: Float, val flipX: Boolean, val visible: Boolean)
 data class CharacterLayer(val definition: CharacterDefinition, val x: Float=.5f,val y: Float=.5f,
     val width: Float=.6f,val angle: Float=0f,val flipX: Boolean=false,val visible: Boolean=true,val beforeImage: Int=0)
-data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>,val character: CharacterLayer?=null)
+data class VrmSceneLayer(val modelId: String,val placement: VrmPlacement=VrmPlacement(),val visible: Boolean=true,val beforeImage: Int=0)
+data class ScreenScene(val id: String, val name: String, val purpose: ScenePurpose, val layers: List<ImageLayer>,val character: CharacterLayer?=null,val vrm: VrmSceneLayer?=null)
 data class StageMessages(val connected: String, val charging: String, val complete: String) {
     fun at(progress: Float) = when { progress<.28f -> connected; progress<.83f -> charging; else -> complete }
 }
@@ -23,6 +24,13 @@ object SceneRules {
         require(scene.name == scene.name.trim() && scene.name.length in 1..40 && scene.name.none { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() })
         require(scene.layers.size <= 8 && scene.layers.map { it.id }.toSet().size == scene.layers.size)
         require(scene.layers.count { mimeById[it.mediaId] == "image/gif" } <= 2)
+        scene.vrm?.let {
+            require(scene.purpose==ScenePurpose.WALLPAPER && scene.character==null)
+            require(it.modelId.matches(Regex("[a-f0-9]{64}")))
+            require(it.beforeImage in 0..scene.layers.size)
+            require(it.placement.x.isFinite() && it.placement.y.isFinite() && it.placement.scale.isFinite())
+            require(it.placement==it.placement.normalized())
+        }
         scene.character?.let {
             require(scene.purpose==ScenePurpose.WALLPAPER)
             CharacterRules.validate(it.definition)
@@ -79,12 +87,17 @@ internal data class SceneData(
             .put("character",s.character?.let { c->JSONObject().put("definition",CharacterRules.toJson(c.definition))
                 .put("x",c.x.toDouble()).put("y",c.y.toDouble()).put("width",c.width.toDouble()).put("angle",c.angle.toDouble())
                 .put("flipX",c.flipX).put("visible",c.visible).put("beforeImage",c.beforeImage) } ?: JSONObject.NULL)
+            .put("vrm",s.vrm?.let { v->JSONObject().put("modelId",v.modelId).put("visible",v.visible).put("beforeImage",v.beforeImage)
+                .put("x",v.placement.x.toDouble()).put("y",v.placement.y.toDouble()).put("scale",v.placement.scale.toDouble()).put("blink",v.placement.blink) } ?: JSONObject.NULL)
         fun readScene(o: JSONObject) = ScreenScene(o.getString("id"),o.getString("name"),ScenePurpose.valueOf(o.getString("purpose")),
             o.getJSONArray("layers").objects().map { l -> ImageLayer(l.getString("id"),l.getString("mediaId"),l.getDouble("x").toFloat(),l.getDouble("y").toFloat(),
                 l.getDouble("width").toFloat(),l.getDouble("angle").toFloat(),l.getBoolean("flipX"),l.getBoolean("visible")) },
             if(!o.has("character") || o.isNull("character"))null else o.getJSONObject("character").let { c->
                 CharacterLayer(CharacterRules.fromJson(c.getJSONObject("definition")),c.getDouble("x").toFloat(),c.getDouble("y").toFloat(),
-                    c.getDouble("width").toFloat(),c.getDouble("angle").toFloat(),c.getBoolean("flipX"),c.getBoolean("visible"),c.getInt("beforeImage")) })
+                    c.getDouble("width").toFloat(),c.getDouble("angle").toFloat(),c.getBoolean("flipX"),c.getBoolean("visible"),c.getInt("beforeImage")) },
+            if(!o.has("vrm") || o.isNull("vrm"))null else o.getJSONObject("vrm").let { v->
+                VrmSceneLayer(v.getString("modelId"),VrmPlacement(v.getDouble("x").toFloat(),v.getDouble("y").toFloat(),
+                    v.getDouble("scale").toFloat(),v.getBoolean("blink")),v.getBoolean("visible"),v.getInt("beforeImage")) })
         private fun infoJson(info: List<InfoPlacement>) = JSONArray(info.map { p -> JSONObject().put("field",p.field.name).put("x",p.x.toDouble()).put("y",p.y.toDouble()).put("visible",p.visible).also { o ->
             p.messages?.let { o.put("messages",JSONObject().put("connected",it.connected).put("charging",it.charging).put("complete",it.complete)) }
         } })
