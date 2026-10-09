@@ -1,6 +1,6 @@
 # E 캐릭터의 실제 헤어 분리·결합 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** E의 얼굴·몸·의상·귀·꼬리를 보존하고 Hair02의 머리만 결합한 실제 VRM을 만들어, 동일한 촬영 조건에서 머리 교환을 증명한다.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `../specs/2026-10-09-character-parts-v121-design-ko.md`, 특히 3–7절. 이전 준비 계획 `2026-10-09-character-hair-readiness-v121.md`의 후속이다.
 
-**상태:** 구현 전 검토용. 사용자가 VRM 가져오기 성공을 확인하고 다음 단계 진행을 요청했다. 이번 문서를 확인받은 뒤 기존 직접 구현(Native) 방식으로 실행한다. 이 문서 작성은 헤어 교환 구현 완료나 새 APK 출시가 아니다.
+**상태:** 2026-10-09 사용자 승인 후 세 작업의 로컬 구현·폰/태블릿 가상 기기 검증·독립 코드 검토 완료. 실제 헤어 결합 증명이며 새 APK 기능 출시는 아니다. 결과와 남은 범위는 `../../VRM_HAIR_PREPARATION_KO.md`에 기록했다.
 
 ## 먼저 이해할 결과
 
@@ -68,13 +68,13 @@ flowchart TD
 - `hairAssemblyMap(base: Uint8Array, donor: Uint8Array)`를 비교 모듈에서 export한다. 반환: `{status:'candidate'|'unsupported'|'rejected', blockers:string[], baseHair:PrimitiveRef[], donorHair:PrimitiveRef[], commonNodes:Array<{base:number,donor:number}>, baseHairNodes:number[], donorHairNodes:number[], baseHairSprings:number[], donorHairSprings:number[]}`.
 - 매핑이 모호하거나 보호 데이터가 달라지면 빈 교환 맵과 구체적인 blocker를 반환한다. `candidate`는 데이터 단계 후보이지 렌더 합격이 아니다.
 
-- [ ] 합성 fixture로 `renumberedEquivalentRigIsCandidate`, `textureDisplayNameDoesNotChangeAppearance`, `changedProtectedBindingIsRejected`, `hairInsideBodyDoesNotOwnClothes`, `mixedHairAccessorySpringIsRejected`, `unknownMaterialStaysUnsupported`를 먼저 추가한다. 표시 이름 변경만 허용하고 이미지 바이트/sampler 변화는 거절함을 단언한다. 실제 개인 모델 바이트는 fixture에 넣지 않는다.
-- [ ] `node --test tools/inspect-hair-source.test.mjs tools/compare-hair-source.test.mjs`에서 새 기대 동작의 실패를 확인한다.
-- [ ] 실제 관측한 새 헤어 재질명만 추가한다. 단순 `Hair` 부분문자열·재질 번호만으로 분류하지 않는다. 변형 파일에도 모든 범위/스킨/수치 검사를 수행한다.
-- [ ] 보호 primitive의 실제 참조 정점·UV·normal·morph·재질·원본 이미지 바이트·가중치와 유효 관절의 경로/상위 변환/inverse-bind를 비교한다. 가중치 0인 슬롯의 다른 번호가 외형 변화로 오인되지 않게 하되 인덱스 범위 자체는 항상 검증한다.
-- [ ] 머리만 사용하는 뼈·상위 가지·spring을 수집한다. 공통 humanoid 뼈/보호 가중치/보호 spring/표정/충돌체가 공유하면 명시적 동일 매핑을 요구하고, 해결되지 않으면 거절한다. firstPerson mesh 참조와 expression material/node 번호도 정규화한다.
-- [ ] 위 검사와 전체 `npm test`를 통과시킨다. 실자료 E↔Hair02의 보호 영역, 공통 뼈, 헤어 spring, 충돌체 대응 결과를 로컬에 기록한다. 단순 이름 허용으로 `candidate`를 강제하지 않는다.
-- [ ] 지정 소스·테스트만 확인/커밋한다. 원본과 기존 사용자 변경사항은 제외한다.
+- [x] 합성 fixture로 `renumberedEquivalentRigIsCandidate`, `textureDisplayNameDoesNotChangeAppearance`, `changedProtectedBindingIsRejected`, `hairInsideBodyDoesNotOwnClothes`, `mixedHairAccessorySpringIsRejected`, `unknownMaterialStaysUnsupported`를 먼저 추가한다. 표시 이름 변경만 허용하고 이미지 바이트/sampler 변화는 거절함을 단언한다. 실제 개인 모델 바이트는 fixture에 넣지 않는다.
+- [x] `node --test tools/inspect-hair-source.test.mjs tools/compare-hair-source.test.mjs`에서 새 기대 동작의 실패를 확인한다.
+- [x] 실제 관측한 새 헤어 재질명만 추가한다. 단순 `Hair` 부분문자열·재질 번호만으로 분류하지 않는다. 변형 파일에도 모든 범위/스킨/수치 검사를 수행한다.
+- [x] 보호 primitive의 실제 참조 정점·UV·normal·morph·재질·원본 이미지 바이트·가중치와 유효 관절의 경로/상위 변환/inverse-bind를 비교한다. 가중치 0인 슬롯의 다른 번호가 외형 변화로 오인되지 않게 하되 인덱스 범위 자체는 항상 검증한다.
+- [x] 머리만 사용하는 뼈·상위 가지·spring을 수집한다. 공통 humanoid 뼈/보호 가중치/보호 spring/표정/충돌체가 공유하면 명시적 동일 매핑을 요구하고, 해결되지 않으면 거절한다. firstPerson mesh 참조와 expression material/node 번호도 정규화한다.
+- [x] 위 검사와 전체 `npm test`를 통과시킨다. 실자료 E↔Hair02의 보호 영역, 공통 뼈, 헤어 spring, 충돌체 대응 결과를 로컬에 기록한다. 단순 이름 허용으로 `candidate`를 강제하지 않는다.
+- [x] 지정 소스·테스트만 확인/커밋한다. 원본과 기존 사용자 변경사항은 제외한다.
 
 ## Task 2: E 보호 영역 + Hair02 머리로 단일 VRM 조립
 
@@ -85,14 +85,14 @@ flowchart TD
 - Task 1의 `hairAssemblyMap`이 `candidate`가 아니면 예외로 중단한다. 동일 파일은 새 스타일로 만들지 않는다.
 - CLI: `node tools/assemble-hair.mjs <absolute-base.vrm> <absolute-donor.vrm> <absolute-new-output.vrm>`. 대상과 동일 이름의 보고 파일이 하나라도 존재하면 덮어쓰지 않는다. 성공 0, 입력/호환/출력 실패 1. 실패한 결과를 보관함이나 사용 가능한 파츠로 등록하지 않는다.
 
-- [ ] `assemblyUsesBaseBodyAndOnlyDonorHair` 테스트를 먼저 작성한다. 보호 지문은 base와 동일하고 헤어 지문은 donor와 동일하며, output 바이트는 donor 전체와 다름을 단언한다. E의 Body 내부 뒤머리와 별도 헤어가 모두 사라지는 fixture를 포함한다.
-- [ ] `rewritesAllSkinSpringExpressionReferences`, `preservesProtectedAccessoryPhysics`, `texturesKeepOriginalBytes`, `refusesOverwriteAndLeavesInputsUntouched`, `invalidOrOversizedOutputIsNotPublished`를 추가한다. CLI의 기존 출력 sentinel과 입력 SHA가 실패 후 그대로인지 검사한다.
-- [ ] `node --test tools/assemble-hair.test.mjs`에서 기능 부재의 실패를 확인한다.
-- [ ] 보호 자료는 base에서, 교환 헤어 primitive/재질/이미지/관절/바인드/헤어 spring은 donor에서 가져온다. 공통 뼈는 검증된 맵으로 연결한다. 원본 hierarchy/좌표를 임의 스케일·리타깃으로 보정하지 않는다. 모호하면 중단한다.
-- [ ] 하나의 JSON+BIN GLB를 만든다. 정점·indices·accessor·bufferView·skin·node·texture·image·sampler·VRM extension 참조를 모두 재매핑한다. 기존 헤어에만 필요한 미사용 이미지/버퍼는 출력에서 제외해 두 완성 모델을 합쳐 넣지 않는다. 이미지 재인코딩·다운샘플링은 하지 않는다. base의 메타데이터/이용 조건을 보존하고 donor 출처는 별도 provenance에 기록한다.
-- [ ] 출력 전체를 기존 검사기로 다시 읽고 모든 참조/한도를 검사한다. 보호 영역과 donor 헤어의 지문을 다시 비교한 뒤에만 새 경로로 게시한다. 생성 중 실패는 기존 파일에 영향을 주지 않는다.
-- [ ] 전체 `npm test` 통과 후 실자료를 **새 로컬 출력**으로 조립한다. 입력 두 개와 vroid 두 개의 SHA 보존을 확인한다. 데이터 검사 결과와 육안 검증 미완료를 구분한다.
-- [ ] 지정 소스·합성 테스트만 확인/커밋한다. 실제 합성 VRM/provenance/썸네일은 공개하지 않는다.
+- [x] `assemblyUsesBaseBodyAndOnlyDonorHair` 테스트를 먼저 작성한다. 보호 지문은 base와 동일하고 헤어 지문은 donor와 동일하며, output 바이트는 donor 전체와 다름을 단언한다. E의 Body 내부 뒤머리와 별도 헤어가 모두 사라지는 fixture를 포함한다.
+- [x] `rewritesAllSkinSpringExpressionReferences`, `preservesProtectedAccessoryPhysics`, `texturesKeepOriginalBytes`, `refusesOverwriteAndLeavesInputsUntouched`, `invalidOrOversizedOutputIsNotPublished`를 추가한다. CLI의 기존 출력 sentinel과 입력 SHA가 실패 후 그대로인지 검사한다.
+- [x] `node --test tools/assemble-hair.test.mjs`에서 기능 부재의 실패를 확인한다.
+- [x] 보호 자료는 base에서, 교환 헤어 primitive/재질/이미지/관절/바인드/헤어 spring은 donor에서 가져온다. 공통 뼈는 검증된 맵으로 연결한다. 원본 hierarchy/좌표를 임의 스케일·리타깃으로 보정하지 않는다. 모호하면 중단한다.
+- [x] 하나의 JSON+BIN GLB를 만든다. 정점·indices·accessor·bufferView·skin·node·texture·image·sampler·VRM extension 참조를 모두 재매핑한다. 기존 헤어에만 필요한 미사용 이미지/버퍼는 출력에서 제외해 두 완성 모델을 합쳐 넣지 않는다. 이미지 재인코딩·다운샘플링은 하지 않는다. base의 메타데이터/이용 조건을 보존하고 donor 출처는 별도 provenance에 기록한다.
+- [x] 출력 전체를 기존 검사기로 다시 읽고 모든 참조/한도를 검사한다. 보호 영역과 donor 헤어의 지문을 다시 비교한 뒤에만 새 경로로 게시한다. 생성 중 실패는 기존 파일에 영향을 주지 않는다.
+- [x] 전체 `npm test` 통과 후 실자료를 **새 로컬 출력**으로 조립한다. 입력 두 개와 vroid 두 개의 SHA 보존을 확인한다. 데이터 검사 결과와 육안 검증 미완료를 구분한다.
+- [x] 지정 소스·합성 테스트만 확인/커밋한다. 실제 합성 VRM/provenance/썸네일은 공개하지 않는다.
 
 ## Task 3: 고정 구도에서 실제 결합 결과 검증
 
@@ -102,13 +102,13 @@ flowchart TD
 - `window.vrmPreview.reviewView({yaw:number,target:[number,number,number],distance:number,blink:number})`: 불러오기가 완료된 검토 화면에서만 사용한다. 유한 수치 및 distance 범위를 검증하며 기본 동작은 바꾸지 않는다. 이 입력은 앱의 비신뢰 원격 인터페이스로 노출하지 않는다.
 - `VrmHairChecks.run(test: Instrumentation,baseId:String,assembledId:String)`를 `checks=vrm-hair`로 등록한다. 명시된 두 로컬 보관 ID만 사용하고 현재 보관함 선택/배경 적용본은 변경하지 않는다.
 
-- [ ] 고정 카메라 설정의 잘못된 수치 거절/동일 입력 동일 구도 및 기본 렌더 경로 불변을 검사하는 실패 테스트를 먼저 추가한다. 전신 자동맞춤의 모델별 bounds로 촬영 거리가 달라지는 경로를 사용하지 않는다.
-- [ ] `reviewView`와 검사 실행기를 구현한다. 기준 E의 좌표/거리를 두 모델에 동일 적용하고 yaw 0/90/180/270도, 중립·양눈 깜박임을 확인한다. 정지 캡처와 별도로 실제 spring 갱신 상태도 확인한다.
-- [ ] `npm test`, `npm run build`, `gradlew.bat --offline testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`를 실행한다. 로그에서 실제 성공 여부를 확인한다.
-- [ ] 확인한 API 36 폰/태블릿 에뮬레이터에만 설치한다. SAF로 새 결합 결과를 가져오고 `adb -s <serial> shell am instrument -w -r -e checks vrm-hair -e model <base-id> -e alternate <assembled-id> com.yj.magiccircle.test/com.yj.magiccircle.V113Instrumentation`을 실행한다. `vrm-hair OK`와 `INSTRUMENTATION_CODE: -1`을 모두 요구한다.
-- [ ] 정면·좌우·후면에서 얼굴/옷/귀/꼬리 보존, 기존 뒤머리 잔존, 두피 구멍, 목·어깨 간섭, 중복 물리, 표정 깨짐을 실제 캡처로 검토한다. 실패하면 결과를 편집 가능한 헤어로 등록하지 않는다.
-- [ ] 기존 `checks=vrm-memory`로 E↔결합 결과 4회 전환을 확인한다. 원본 이미지 해상도, 첫 프레임, 해제 후 추적 bitmap/texture 자원 정리를 확인한다. 카운터를 실제 프로세스 RAM 측정이라고 표현하지 않는다.
-- [ ] 원본 해시·보관함 선택·배경 적용본 보존과 Git diff를 확인한다. 제품 코드가 변경되었으면 `graphify update .`를 AST-only로 실행한다. 실제 결과 그림과 미확인 사항을 보고하고 관련 소스·검사·절차 문서만 커밋한다.
+- [x] 고정 카메라 설정의 잘못된 수치 거절/동일 입력 동일 구도 및 기본 렌더 경로 불변을 검사하는 실패 테스트를 먼저 추가한다. 전신 자동맞춤의 모델별 bounds로 촬영 거리가 달라지는 경로를 사용하지 않는다.
+- [x] `reviewView`와 검사 실행기를 구현한다. 기준 E의 좌표/거리를 두 모델에 동일 적용하고 yaw 0/90/180/270도, 중립·양눈 깜박임을 확인한다. 정지 캡처와 별도로 실제 spring 갱신 상태도 확인한다.
+- [x] `npm test`, `npm run build`, `gradlew.bat --offline testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`를 실행한다. 로그에서 실제 성공 여부를 확인한다.
+- [x] 확인한 API 36 폰/태블릿 에뮬레이터에만 설치한다. SAF로 새 결합 결과를 가져오고 `adb -s <serial> shell am instrument -w -r -e checks vrm-hair -e model <base-id> -e alternate <assembled-id> com.yj.magiccircle.test/com.yj.magiccircle.V113Instrumentation`을 실행한다. `vrm-hair OK`와 `INSTRUMENTATION_CODE: -1`을 모두 요구한다.
+- [x] 정면·좌우·후면에서 얼굴/옷/귀/꼬리 보존, 기존 뒤머리 잔존, 두피 구멍, 목·어깨 간섭, 중복 물리, 표정 깨짐을 실제 캡처로 검토한다. 실패하면 결과를 편집 가능한 헤어로 등록하지 않는다.
+- [x] 기존 `checks=vrm-memory`로 E↔결합 결과 4회 전환을 확인한다. 원본 이미지 해상도, 첫 프레임, 해제 후 추적 bitmap/texture 자원 정리를 확인한다. 카운터를 실제 프로세스 RAM 측정이라고 표현하지 않는다.
+- [x] 원본 해시·보관함 선택·배경 적용본 보존과 Git diff를 확인한다. 제품 코드가 변경되었으면 `graphify update .`를 AST-only로 실행한다. 실제 결과 그림과 미확인 사항을 보고하고 관련 소스·검사·절차 문서만 커밋한다.
 
 ## 합격 이후의 모바일 통합 경계
 
@@ -125,7 +125,7 @@ flowchart TD
 - 이전 설계의 파츠 선행 원칙과 원본 보존을 유지했다. 색상/저장/화면 연결을 구현 완료로 앞당겨 표시하지 않는다.
 - 세 작업은 분류·결합·렌더라는 순차 의존 관계이며, 각 인터페이스와 검사 범위를 명시했다. 실행 방식은 기존 Native를 유지하고 마지막 변경 전체를 독립 검토한다.
 - Review Focus 5개 모두 담당 테스트가 있다. 외형 합격은 정적 지문만으로 대체하지 않는다.
-- **사용자 확인 필요:** 이 문서의 범위는 E 몸체에 Hair02 머리를 실제로 결합하여 비교 화면을 만드는 것부터다. 확인 후 구현을 시작한다.
+- **승인된 범위 완료:** E 몸체에 Hair02 머리를 실제로 결합하여 동일 구도 비교 화면을 만들었다. 모바일 파츠 편집은 후속 범위다.
 
 ## 참고한 공식 자료
 
