@@ -171,8 +171,19 @@ export function readHairSource(input) {
       }
     }
   }
+  let pngHeaderPixels=0;
+  for(const image of json.images) {
+    const view=json.bufferViews[image.bufferView], offset=view.byteOffset??0;
+    // Header estimate only; the Android importer still validates decoded images.
+    if(image.mimeType!=='image/png'||view.byteLength<24||bin.subarray(offset,offset+8).toString('hex')!=='89504e470d0a1a0a'||bin.toString('ascii',offset+12,offset+16)!=='IHDR') {pngHeaderPixels=null;break;}
+    const w=bin.readUInt32BE(offset+16),h=bin.readUInt32BE(offset+20);
+    if(!w||!h||w>4096||h>4096) {pngHeaderPixels=null;break;}
+    pngHeaderPixels+=w*h;
+  }
+  const androidPixelLimit=40*1024*1024;
+  const textureBudget={pngHeaderPixels,androidPixelLimit,status:pngHeaderPixels===null?'unknown':pngHeaderPixels>androidPixelLimit?'exceeds':'within'};
   const report={schemaVersion:1,sha256:digest(bytes),status:reasons.length?'unsupported':'inspected',reasons,hair,protected:protectedParts,
-    dependencies:{nodes:json.nodes.length,humanoidBones:Object.keys(humanoid).length,skins:json.skins.map(s=>({joints:s.joints.map(n=>paths[n])})),springs:(spring.springs??[]).length,colliders:(spring.colliders??[]).length}};
+    dependencies:{textureBudget,nodes:json.nodes.length,humanoidBones:Object.keys(humanoid).length,skins:json.skins.map(s=>({joints:s.joints.map(n=>paths[n])})),springs:(spring.springs??[]).length,colliders:(spring.colliders??[]).length}};
   return {report,json,bin,accessor,paths,parents};
 }
 

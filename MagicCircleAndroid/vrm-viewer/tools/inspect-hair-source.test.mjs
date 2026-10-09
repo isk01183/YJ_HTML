@@ -68,3 +68,16 @@ test('CLI reads only the supplied file and never prints its binary or metadata',
     assert.equal(spawnSync(process.execPath,[cli,join(dir,'missing.vrm')]).status,1);
   } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test('textureBudgetIncludesAllImagesNotJustMaterialReferences',()=>{
+  const f=fixture(),offset=f.bin.length,header=Buffer.alloc(24);
+  Buffer.from([137,80,78,71,13,10,26,10]).copy(header);header.writeUInt32BE(13,8);
+  header.write('IHDR',12);header.writeUInt32BE(4096,16);header.writeUInt32BE(4096,20);
+  f.bin=Buffer.concat([f.bin,header]);f.json.buffers[0].byteLength=f.bin.length;
+  f.json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:24});
+  f.json.images=Array.from({length:3},()=>({mimeType:'image/png',bufferView:f.json.bufferViews.length-1}));
+  const r=inspectHairSource(glb(f));
+  assert.deepEqual(r.dependencies.textureBudget,{pngHeaderPixels:50331648,androidPixelLimit:41943040,status:'exceeds'});
+  f.json.images[0].mimeType='image/jpeg';
+  assert.equal(inspectHairSource(glb(f)).dependencies.textureBudget.status,'unknown');
+});
