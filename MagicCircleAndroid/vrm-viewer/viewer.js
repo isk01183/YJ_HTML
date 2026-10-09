@@ -12,6 +12,7 @@ const wallpaper=params.get('wallpaper')==='1';
 const composition=params.get('composition')==='1';
 document.documentElement.classList.toggle('composition',composition);
 document.body.classList.toggle('wallpaper',wallpaper);
+document.body.classList.toggle('avatar-editor',params.get('editor')==='1');
 const lang = ['ko','ja','en'].includes(params.get('lang')) ? params.get('lang') : 'ko';
 const w = (ko, ja, en) => ({ko,ja,en})[lang];
 document.documentElement.lang = lang;
@@ -85,6 +86,17 @@ function release() {
   vrm = null;
 }
 window.vrmPreview = {pause, resume, dispose, configure, appearance, info};
+window.vrmPreview.thumbnail=()=>{
+  if(info.state!=='ready'||disposed)return null;
+  const position=camera.position.clone(),target=controls.target.clone(),oldView=view;
+  try {
+    view='face';frameView();renderFrame(renderer,scene,camera);
+    const canvas=document.createElement('canvas');canvas.width=192;canvas.height=224;
+    const source=renderer.domElement,size=Math.min(source.width,source.height),x=(source.width-size)/2,y=(source.height-size)/2;
+    canvas.getContext('2d').drawImage(source,x,y,size,size,0,0,192,224);
+    return canvas.toDataURL('image/png');
+  } finally {view=oldView;camera.position.copy(position);controls.target.copy(target);controls.update();renderFrame(renderer,scene,camera);}
+};
 // Only the instrumented local test host supplies this marker; normal preview/wallpaper exposes no review controls.
 if('VrmReview' in window) {
   window.vrmPreview.reviewAnchor=()=>{

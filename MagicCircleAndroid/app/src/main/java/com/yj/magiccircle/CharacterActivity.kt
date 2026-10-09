@@ -91,6 +91,9 @@ class CharacterActivity: Activity() {
         button(root,w("VRM 캐릭터 · 배경화면","VRMキャラクター・壁紙","VRM characters · Wallpaper"),"vrm-preview") {
             startActivity(Intent(this,VrmPreviewActivity::class.java))
         }
+        button(root,w("저장한 VRM 캐릭터","保存したVRMキャラクター","Saved VRM characters"),"vrm-avatars") {
+            startActivity(Intent(this,VrmAvatarActivity::class.java).putExtra("library",true))
+        }
         val scroll=ScrollView(this);val list=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};scroll.addView(list);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         async({store.list() to store.drafts()}) { (entries,drafts) ->
             if(drafts.isNotEmpty()) {

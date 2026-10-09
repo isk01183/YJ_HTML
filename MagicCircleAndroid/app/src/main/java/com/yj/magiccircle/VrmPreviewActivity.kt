@@ -65,6 +65,7 @@ class VrmPreviewActivity: Activity() {
         modelButton=button(tools,w("캐릭터 선택","キャラクター","Characters"),"vrm-models",false){selectModel()}
         renameButton=button(tools,w("이름 변경","名前変更","Rename"),"vrm-rename",false){rename()}
         settingsButton=button(tools,w("위치·크기","位置・サイズ","Placement"),"vrm-settings",false){settings()}
+        button(tools,w("캐릭터 꾸미기","キャラクター編集","Customize character"),"vrm-customize",false){if(!busy){disposeWebView();pendingReload=true;startActivity(Intent(this,VrmAvatarActivity::class.java))}}
         applyButton=button(tools,w("배경화면 적용","壁紙に設定","Set wallpaper"),"vrm-apply",false){applyWallpaper()}
         status=label(w("VRM 0.x / 1.0 · 최대 64MiB · 이 기기에만 보관","VRM 0.x / 1.0 · 最大64MiB · 端末内保存","VRM 0.x / 1.0 · Up to 64 MiB · On-device only")).apply {
             tag="vrm-status";accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE

@@ -21,6 +21,7 @@
         <activity android:name=".ScreenEditorActivity" android:exported="false" />
         <activity android:name=".CharacterActivity" android:exported="false" />
         <activity android:name=".VrmPreviewActivity" android:exported="false" />
+        <activity android:name=".VrmAvatarActivity" android:exported="false" />
         <service
             android:name=".ChargingAccessibilityService"
             android:exported="true"
