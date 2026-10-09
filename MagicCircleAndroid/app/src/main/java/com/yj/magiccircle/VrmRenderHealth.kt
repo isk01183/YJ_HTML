@@ -29,7 +29,7 @@ internal class VrmRenderHealth {
     }
     fun onFailure(kind: VrmFailure): Long? {
         healthy=0;wasReady=false
-        if(kind==VrmFailure.MODEL || kind==VrmFailure.PAGE || kind==VrmFailure.MEDIA || retries>=2)return null
+        if(kind==VrmFailure.MODEL || kind==VrmFailure.PAGE || kind==VrmFailure.MEDIA || kind==VrmFailure.MEMORY || retries>=2)return null
         return if(retries++==0)1000L else 3000L
     }
     fun reset(nowMs: Long) {retries=0;newAttempt(nowMs)}

@@ -81,9 +81,9 @@ test('textureBudgetIncludesAllImagesNotJustMaterialReferences',()=>{
   header.write('IHDR',12);header.writeUInt32BE(4096,16);header.writeUInt32BE(4096,20);
   f.bin=Buffer.concat([f.bin,header]);f.json.buffers[0].byteLength=f.bin.length;
   f.json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:24});
-  f.json.images=Array.from({length:3},()=>({mimeType:'image/png',bufferView:f.json.bufferViews.length-1}));
+  f.json.images=Array.from({length:5},()=>({mimeType:'image/png',bufferView:f.json.bufferViews.length-1}));
   const r=inspectHairSource(glb(f));
-  assert.deepEqual(r.dependencies.textureBudget,{pngHeaderPixels:50331648,androidPixelLimit:41943040,status:'exceeds'});
+  assert.deepEqual(r.dependencies.textureBudget,{pngHeaderPixels:83886080,androidPixelLimit:67108864,status:'exceeds'});
   f.json.images[0].mimeType='image/jpeg';
   assert.equal(inspectHairSource(glb(f)).dependencies.textureBudget.status,'unknown');
 });

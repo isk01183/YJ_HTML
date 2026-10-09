@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { fitDistance, placementFrame } from './camera.js';
 import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-state.js';
+import { ModelMemory, renderFrame } from './model-memory.js';
 
 const params = new URLSearchParams(location.search);
 const wallpaper=params.get('wallpaper')==='1';
@@ -23,16 +24,25 @@ $('pose').textContent = w('T 포즈','Tポーズ','T pose');
 $('motion').textContent = w('눈 깜박임','まばたき','Blink');
 $('details').textContent = w('파일은 이 기기에만 저장됩니다. 적용은 시스템 화면에서 확인하세요.','端末内だけに保存。壁紙の適用はシステム画面で確認してください。','Stored only on this device. Confirm wallpaper in the system preview.');
 
-let renderer, controls, vrm, camera, scene;
-let disposed = false, hostActive = false, frame = 0, last = 0, elapsed = 0;
+let renderer, controls, vrm, camera, scene, memory;
+let modelScenes=[];
+let disposed = false, released = false, hostActive = false, frame = 0, last = 0, elapsed = 0;
 let placement=normalizePlacement();
 let tPose = false, blinking = true, view = 'full';
 let bounds, bodyHeight = 1.6;
 const info = {state:'empty', triangles:0, materials:0, frames:0,metaVersion:null,failure:null};
+Object.defineProperty(info,'gpuTextures',{enumerable:true,get:()=>renderer?.info.memory.textures || 0});
 function fail(message,kind='MODEL') {
   info.state = 'error'; info.failure=kind; status.textContent = message;
   document.querySelectorAll('button').forEach(button => button.disabled = true);
-  pause();
+  pause(); release();
+}
+function reportError(error) {
+  console.error('VRM preview failed',error.message);
+  if(disposed || released)return;
+  if(error.kind==='MEMORY')fail(w('원본 텍스처를 표시할 메모리가 부족합니다. 다른 앱을 닫고 다시 시도하세요. 화질은 변경하지 않았습니다.','元のテクスチャを表示するメモリが不足しています。他のアプリを閉じて再試行してください。画質は変更していません。','Not enough memory for the original textures. Close other apps and retry. Texture quality has not been changed.'),'MEMORY');
+  else if(error.kind==='CONTEXT')fail(w('그래픽 보기가 중단되었습니다. 다시 시도하세요.','描画が中断されました。再試行してください。','Graphics interrupted. Please retry.'),'CONTEXT');
+  else fail(w('이 모델을 표시하지 못했습니다. VRM 파일과 Android System WebView를 확인하세요.','表示できません。VRMファイルとAndroid System WebViewをご確認ください。','Could not display model. Check the VRM file and Android System WebView.'));
 }
 function syncLoop() {
   if(shouldRender(hostActive,!document.hidden,info.state==='ready',disposed)) {
@@ -48,8 +58,15 @@ function configure(value) {
 }
 function dispose() {
   if (disposed) return;
-  disposed = true; pause(); controls?.dispose();
+  disposed = true; pause(); release();
+}
+function release() {
+  if(released)return;
+  released=true;controls?.dispose();
+  for(const modelScene of modelScenes) {modelScene.removeFromParent();VRMUtils.deepDispose(modelScene);}
+  modelScenes=[];
   if (scene) VRMUtils.deepDispose(scene);
+  memory?.dispose();
   renderer?.dispose(); renderer?.forceContextLoss();
   vrm = null;
 }
@@ -58,7 +75,7 @@ addEventListener('pagehide', dispose);
 document.addEventListener('visibilitychange',syncLoop);
 
 function resize() {
-  if (!renderer || disposed) return;
+  if (!renderer || disposed || released) return;
   const width = stage.clientWidth, height = stage.clientHeight;
   if (!width || !height) return;
   // Render resolution and 30 fps cap keep a single preview bounded on mobile.
@@ -111,7 +128,9 @@ function tick(time) {
     vrm.expressionManager?.setValue('blink', blink);
     vrm.update(delta);
   }
-  controls.update(); renderer.render(scene, camera); info.frames++;
+  controls.update();
+  try {renderFrame(renderer,scene,camera);info.frames++;}
+  catch(error) {reportError(error);}
 }
 
 async function init() {
@@ -122,6 +141,13 @@ async function init() {
   status.textContent = w('모델과 MToon 재질을 불러오는 중…','モデルとMToon材質を読み込み中…','Loading model and MToon materials…');
   info.state = 'loading';
   try {
+    let budgetBytes;
+    try {
+      const response=await fetch(new URL('memory.json',location.href),{cache:'no-store'});
+      if(response.ok)budgetBytes=(await response.json()).budgetBytes;
+    } catch { /* A missing native budget must never fall back to unbounded decoding. */ }
+    if(disposed)return;
+    memory=new ModelMemory(budgetBytes,info);
     renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, powerPreference:'low-power'});
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
@@ -129,7 +155,7 @@ async function init() {
     stage.appendChild(renderer.domElement);
     renderer.domElement.addEventListener('webglcontextlost', event => {
       event.preventDefault();
-      if (!disposed) fail(w('그래픽 보기가 중단되었습니다. 다시 시도하세요.','描画が中断されました。再試行してください。','Graphics interrupted. Please retry.'),'CONTEXT');
+      if (!disposed && !released) fail(w('그래픽 보기가 중단되었습니다. 다시 시도하세요.','描画が中断されました。再試行してください。','Graphics interrupted. Please retry.'),'CONTEXT');
     });
     scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff,0xb3acaa,1.0));
@@ -149,11 +175,14 @@ async function init() {
       throw new Error('External model resource blocked');
     });
     const loader = new GLTFLoader(manager);
+    loader.register(parser => memory.plugin(parser,renderer.capabilities.maxTextureSize));
     loader.register(parser => new VRMLoaderPlugin(parser));
     const gltf = await loader.loadAsync(modelUrl);
-    if (disposed) { VRMUtils.deepDispose(gltf.scene); return; }
+    if (disposed || released) {for(const modelScene of gltf.scenes)VRMUtils.deepDispose(modelScene);return;}
+    modelScenes=gltf.scenes;
+    memory.check(gltf);
     vrm = gltf.userData.vrm;
-    if (!vrm || !['0','1'].includes(vrm.meta.metaVersion)) {VRMUtils.deepDispose(gltf.scene);throw new Error('Unsupported VRM');}
+    if (!vrm || !['0','1'].includes(vrm.meta.metaVersion))throw new Error('Unsupported VRM');
     info.metaVersion=vrm.meta.metaVersion;
     VRMUtils.rotateVRM0(vrm);
     VRMUtils.removeUnnecessaryVertices(vrm.scene);
@@ -172,6 +201,9 @@ async function init() {
       const floor = new THREE.Mesh(new THREE.CircleGeometry(.42,64),new THREE.MeshBasicMaterial({color:0x707c8e,transparent:true,opacity:.08,depthWrite:false}));
       floor.rotation.x = -Math.PI/2; floor.position.y = bounds.min.y - .006; scene.add(floor);
     }
+    renderFrame(renderer,scene,camera,true);
+    if(disposed || released)return;
+    info.frames++;
     info.state = 'ready'; status.textContent = '';
     document.querySelectorAll('button').forEach(button => button.disabled = false);
     $('full').onclick = () => {view = 'full'; frameView();};
@@ -181,8 +213,7 @@ async function init() {
     $('motion').setAttribute('aria-pressed',String(blinking));
     syncLoop();
   } catch (error) {
-    console.error('VRM preview failed', error.message);
-    if(!disposed)fail(w('이 모델을 표시하지 못했습니다. VRM 파일과 Android System WebView를 확인하세요.','表示できません。VRMファイルとAndroid System WebViewをご確認ください。','Could not display model. Check the VRM file and Android System WebView.'));
+    reportError(error);
   }
 }
 init();

@@ -278,8 +278,8 @@ object VrmPreviewChecks {
             }
             reject(imageFixture(4097),"oversized compressed texture")
             reject(imageFixture(1,1,65),"too many images")
-            reject(imageFixture(4096,2048,6),"total texture pixels over bound")
-            reject(imageFixture(4096,2048,5,true),"texture limit plus one pixel")
+            reject(imageFixture(4096,2048,9),"total texture pixels over structural bound")
+            reject(imageFixture(4096,2048,8,true),"structural texture limit plus one pixel")
             var bytesRead=0L
             val huge=object: InputStream() {
                 override fun read(): Int {bytesRead++;return 0}
@@ -291,7 +291,7 @@ object VrmPreviewChecks {
             val unreadable=object: InputStream() {override fun read(): Int=throw IOException("Provider failed")}
             check(runCatching {import(unreadable)}.isFailure)
             check(savedBytes().contentEquals(original)) {"Provider failure replaced saved model"}
-            import(ByteArrayInputStream(imageFixture(4096,2048,5)))
+            import(ByteArrayInputStream(imageFixture(4096,2048,8)))
             val v0=glb(documentV0())
             import(ByteArrayInputStream(v0))
             check(savedBytes().contentEquals(v0)) {"VRM0 not saved intact"}

@@ -1,6 +1,7 @@
 package com.yj.magiccircle
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.webkit.*
@@ -8,7 +9,7 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
-enum class VrmFailure { RENDERER, CONTEXT, PAGE, MODEL, MEDIA, TIMEOUT }
+enum class VrmFailure { RENDERER, CONTEXT, PAGE, MODEL, MEDIA, MEMORY, TIMEOUT }
 
 /** One local resource policy for both the Activity and each wallpaper engine. */
 internal object VrmWebView {
@@ -34,6 +35,12 @@ internal object VrmWebView {
                     "/vrm-preview/index.html"->response(200,"text/html",context.assets.open("vrm-preview/index.html"))
                     "/vrm-preview/viewer.js"->response(200,"application/javascript",context.assets.open("vrm-preview/viewer.js"))
                     "/vrm-preview/viewer.css"->response(200,"text/css",context.assets.open("vrm-preview/viewer.css"))
+                    "/vrm-preview/memory.json"->{
+                        val manager=context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                        val memory=ActivityManager.MemoryInfo().also {manager.getMemoryInfo(it)}
+                        val budget=VrmMemoryPolicy.budget(memory.totalMem,memory.availMem,memory.threshold,memory.lowMemory,manager.isLowRamDevice)
+                        response(200,"application/json",ByteArrayInputStream(JSONObject().put("budgetBytes",budget).toString().toByteArray(Charsets.UTF_8)))
+                    }
                     "/vrm-preview/model.vrm"->openModel()?.let {response(200,"model/gltf-binary",it)} ?: blocked()
                     else->blocked()
                 }}catch(_: Exception){blocked()}

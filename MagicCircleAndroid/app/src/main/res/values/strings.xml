@@ -53,4 +53,5 @@
     <string name="vrm_wallpaper_description">Your privately imported VRM character, with original materials and blinking.</string>
     <string name="vrm_wallpaper_failed">Wallpaper stopped. Open the app to retry or select a character.</string>
     <string name="vrm_wallpaper_retrying">Restoring character…</string>
+    <string name="vrm_memory_low">Not enough memory for original-quality textures. Close other apps and retry from this app. Original files are preserved.</string>
 </resources>

@@ -53,4 +53,5 @@
     <string name="vrm_wallpaper_description">取り込んだVRMの元の外観とまばたきを表示します。</string>
     <string name="vrm_wallpaper_failed">壁紙が停止しました。アプリで再試行するかキャラクターを選んでください。</string>
     <string name="vrm_wallpaper_retrying">キャラクターを復元中…</string>
+    <string name="vrm_memory_low">元の画質で表示するメモリが不足しています。他のアプリを閉じて、このアプリから再試行してください。元ファイルは保持されます。</string>
 </resources>

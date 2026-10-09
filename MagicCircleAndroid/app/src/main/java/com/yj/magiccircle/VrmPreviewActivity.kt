@@ -223,7 +223,9 @@ class VrmPreviewActivity: Activity() {
                 if(web!==view || closed || failed)return@evaluateJavascript
                 val info=runCatching {JSONObject(value)}.getOrNull()
                 val state=info?.optString("state")
-                if(state=="error" || (entry!=null && health.sample(state=="ready",info?.optLong("frames",0) ?: 0,now())!=null))showWebError()
+                if(state=="error" || (entry!=null && health.sample(state=="ready",info?.optLong("frames",0) ?: 0,now())!=null)) {
+                    disposeWebView();showWebError(info?.optString("failure")=="MEMORY")
+                }
                 else {ready=state=="ready" && (info?.optLong("frames",0) ?: 0)>0;controls()}
             }
             ui.postDelayed(this,500)
@@ -243,9 +245,12 @@ class VrmPreviewActivity: Activity() {
         if(!active)view.onPause() else ui.post(poll)
         controls()
     }
-    private fun showWebError() {
+    private fun showWebError(memory: Boolean=false) {
         failed=true;ready=false;ui.removeCallbacks(poll);controls()
-        status.text=w("3D 보기가 중단되었습니다. 다시 열거나 다른 모델을 선택하세요.","3D表示が停止しました。再試行するか別のモデルを選んでください。","The 3D viewer stopped. Try again or choose another model.")
+        status.text=if(memory)w("원본 화질로 표시할 메모리가 부족합니다. 다른 앱을 닫고 다시 시도하세요. 원본 파일은 보존됩니다.",
+            "元の画質で表示するメモリが不足しています。他のアプリを閉じて再試行してください。元ファイルは保持されます。",
+            "Not enough memory for original-quality textures. Close other apps and retry. The original file is preserved.")
+        else w("3D 보기가 중단되었습니다. 다시 열거나 다른 모델을 선택하세요.","3D表示が停止しました。再試行するか別のモデルを選んでください。","The 3D viewer stopped. Try again or choose another model.")
         retryButton.visibility=View.VISIBLE
     }
     private fun reloadModel(){pendingReload=false;showViewer()}

@@ -28,7 +28,8 @@ data class VrmEntry(val id: String,val name: String,val format: VrmFormat,val si
 class VrmModelStore(private val root: File) {
     companion object {
         const val MAX_BYTES=64L*1024*1024
-        const val MAX_TEXTURE_PIXELS=40L*1024*1024
+        // Structural import ceiling; the viewer separately checks a live CPU/GPU memory budget before decoding.
+        const val MAX_TEXTURE_PIXELS=64L*1024*1024
         internal fun verifyOutput(id: String,input: InputStream) {
             // The ID is the hash of the fully validated import; also detects same-size file corruption.
             val digest=MessageDigest.getInstance("SHA-256");val bytes=ByteArray(32*1024);var total=0L
@@ -314,9 +315,17 @@ class VrmModelStore(private val root: File) {
             val view=viewAt(number(image,"bufferView"));val imageSize=number(view,"byteLength")
             require(imageSize<=16L*1024*1024) {"Embedded image too large"}
             data.seek(binStart+number(view,"byteOffset",0))
-            val encoded=ByteArray(imageSize.toInt());data.readFully(encoded)
             val options=BitmapFactory.Options().apply {inJustDecodeBounds=true}
-            BitmapFactory.decodeByteArray(encoded,0,encoded.size,options)
+            val imageStream=object: InputStream() {
+                private var remaining=imageSize
+                override fun read(): Int = if(remaining==0L)-1 else data.read().also {if(it>=0)remaining--}
+                override fun read(bytes: ByteArray,offset: Int,length: Int): Int {
+                    if(length==0)return 0
+                    if(remaining==0L)return -1
+                    return data.read(bytes,offset,minOf(length.toLong(),remaining).toInt()).also {if(it>0)remaining-=it}
+                }
+            }
+            BitmapFactory.decodeStream(imageStream,null,options)
             require(options.outMimeType==image.getString("mimeType")) {"Image MIME mismatch"}
             require(options.outWidth in 1..4096 && options.outHeight in 1..4096) {"Texture exceeds 4096 pixels"}
             pixels+=options.outWidth.toLong()*options.outHeight

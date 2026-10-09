@@ -187,7 +187,8 @@ export function readHairSource(input) {
     if(!w||!h||w>4096||h>4096) {pngHeaderPixels=null;break;}
     pngHeaderPixels+=w*h;
   }
-  const androidPixelLimit=40*1024*1024;
+  // Import ceiling only: the renderer additionally checks current CPU/GPU memory before decoding.
+  const androidPixelLimit=64*1024*1024;
   const textureBudget={pngHeaderPixels,androidPixelLimit,status:pngHeaderPixels===null?'unknown':pngHeaderPixels>androidPixelLimit?'exceeds':'within'};
   const report={schemaVersion:1,sha256:digest(bytes),status:reasons.length?'unsupported':'inspected',reasons,hair,protected:protectedParts,
     dependencies:{textureBudget,nodes:json.nodes.length,humanoidBones:Object.keys(humanoid).length,skins:json.skins.map(s=>({joints:s.joints.map(n=>paths[n])})),springs:(spring.springs??[]).length,colliders:(spring.colliders??[]).length}};

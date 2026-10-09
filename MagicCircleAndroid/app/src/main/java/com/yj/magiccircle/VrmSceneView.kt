@@ -61,7 +61,7 @@ internal class VrmSceneView(context: Context,scene: ScreenScene,private val open
                 if(closed || webView!==view || revision!=token)return@evaluateJavascript
                 val info=runCatching {JSONObject(value)}.getOrNull()
                 if(info?.optString("state")=="error") {
-                    fail(if(info.optString("failure")=="CONTEXT")VrmFailure.CONTEXT else VrmFailure.MODEL)
+                    fail(when(info.optString("failure")){"CONTEXT"->VrmFailure.CONTEXT;"MEMORY"->VrmFailure.MEMORY;else->VrmFailure.MODEL})
                 } else {
                     val frames=info?.optLong("frames",0) ?: 0
                     val displayed=configured && info?.optString("state")=="ready" && frames>requiredFrame

@@ -73,7 +73,7 @@ abstract class VrmWallpaperService: WallpaperService() {
                     state=info?.optString("state","loading") ?: "loading"
                     frames=info?.optLong("frames",0) ?: 0
                     if(state=="error") {
-                        fail(if(info?.optString("failure")=="CONTEXT")VrmFailure.CONTEXT else VrmFailure.MODEL)
+                        fail(when(info?.optString("failure")){"CONTEXT"->VrmFailure.CONTEXT;"MEMORY"->VrmFailure.MEMORY;else->VrmFailure.MODEL})
                     } else record("sample")
                 }
                 ui.postDelayed(this,1000)
@@ -165,7 +165,7 @@ abstract class VrmWallpaperService: WallpaperService() {
             runCatching {
                 val screen=createOutput()
                 screen.setContentView(TextView(screen.context).apply {
-                    text=getString(if(terminal)R.string.vrm_wallpaper_failed else R.string.vrm_wallpaper_retrying)
+                    text=getString(if(state=="MEMORY")R.string.vrm_memory_low else if(terminal)R.string.vrm_wallpaper_failed else R.string.vrm_wallpaper_retrying)
                     textSize=16f;gravity=android.view.Gravity.CENTER;setTextColor(0xff343b50.toInt());setPadding(32,32,32,32)
                 })
                 screen.show();screen.window?.setLayout(-1,-1)
