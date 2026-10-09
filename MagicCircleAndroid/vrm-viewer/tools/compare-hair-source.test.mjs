@@ -5,8 +5,48 @@ import {mkdtempSync,writeFileSync,readFileSync,readdirSync,rmSync} from 'node:fs
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {fixture,glb,setFloat} from './hair-source.fixture.mjs';
-import {compareHairSources} from './compare-hair-source.mjs';
+import {fixture,hairRigFixture,glb,setFloat} from './hair-source.fixture.mjs';
+import * as comparison from './compare-hair-source.mjs';
+const {compareHairSources}=comparison;
+
+test('private hair rig changes are allowed but common head and accessory springs are protected',()=>{
+  const f=hairRigFixture(),base=glb(f);f.json.nodes[5].translation=[0,.2,0];
+  f.json.extensions.VRMC_springBone.springs[0].joints[0].stiffness=2;
+  assert.equal(compareHairSources(base,glb(f)).status,'candidate');
+  const r=comparison.hairAssemblyMap(base,glb(f));
+  assert.equal(r.status,'candidate');assert.deepEqual(r.baseHairNodes,[5,6]);
+  assert.deepEqual(r.donorHairSprings,[0]);assert.ok(r.commonNodes.some(n=>n.base===1&&n.donor===1));
+  f.json.nodes[1].translation=[0,1.1,0];assert.equal(compareHairSources(base,glb(f)).status,'rejected');
+});
+test('mixedHairAccessorySpringIsRejected',()=>{
+  const f=hairRigFixture(),base=glb(f);f.json.extensions.VRMC_springBone.springs[0].joints.unshift({node:1});
+  assert.notEqual(compareHairSources(base,glb(f)).status,'candidate');
+});
+
+test('textureDisplayNameDoesNotChangeAppearance but sampler and pixels do',()=>{
+  const f=fixture(),offset=f.bin.length;f.bin=Buffer.concat([f.bin,Buffer.from([1,2,3,4])]);
+  f.json.buffers[0].byteLength=f.bin.length;f.json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:4});
+  f.json.images=[{bufferView:f.json.bufferViews.length-1,mimeType:'image/png'}];
+  f.json.textures=[{name:'export_16',source:0}];f.json.materials[0].pbrMetallicRoughness.baseColorTexture={index:0};
+  const base=glb(f);f.json.textures[0].name='export_15';
+  assert.equal(compareHairSources(base,glb(f)).status,'identical');
+  f.json.samplers=[{wrapS:33071}];f.json.textures[0].sampler=0;
+  assert.equal(compareHairSources(base,glb(f)).status,'rejected');
+});
+
+test('hairAssemblyMap exists and rejects protected changes',()=>{
+  assert.equal(typeof comparison.hairAssemblyMap,'function');
+  const f=fixture(),base=glb(f);setFloat(f,f.position,0,.25);
+  const r=comparison.hairAssemblyMap(base,glb(f));assert.equal(r.status,'rejected');
+  assert.deepEqual(r.commonNodes,[]);
+});
+
+test('new exact Hair02 material is recognized without accepting unknown names',()=>{
+  const f=fixture(),base=glb(f);f.json.materials[2].name='N00_000_Hair_00_HAIR (Instance)';
+  setFloat(f,f.position,9,.4);
+  assert.equal(compareHairSources(base,glb(f)).status,'candidate');
+  f.json.materials[2].name='RandomHair';assert.equal(compareHairSources(base,glb(f)).status,'unsupported');
+});
 
 test('identicalIsNotANewHair',()=>{
   const bytes=glb(fixture()),r=compareHairSources(bytes,bytes);

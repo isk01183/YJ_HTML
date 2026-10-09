@@ -4,7 +4,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const MAX_BYTES=64*1024*1024;
-const hairNames=new Set(['N00_000_00_HairBack_00_HAIR (Instance)',...['01','02','03'].map(n=>`N00_000_Hair_00_HAIR_${n} (Instance)`)]);
+const hairNames=new Set(['N00_000_00_HairBack_00_HAIR (Instance)','N00_000_Hair_00_HAIR (Instance)',...['01','02','03'].map(n=>`N00_000_Hair_00_HAIR_${n} (Instance)`)]);
 const protectedNames=new Set([
   'N00_000_00_FaceMouth_00_FACE','N00_000_00_EyeIris_00_EYE','N00_000_00_EyeHighlight_00_EYE',
   'N00_000_00_Face_00_SKIN','N00_000_00_EyeWhite_00_EYE','N00_000_00_FaceBrow_00_FACE',

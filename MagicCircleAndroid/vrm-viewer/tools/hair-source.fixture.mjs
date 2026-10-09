@@ -59,3 +59,18 @@ export function setFloat(f, accessor, component, value) {
   const a=f.json.accessors[accessor], view=f.json.bufferViews[a.bufferView];
   f.bin.writeFloatLE(value,(view.byteOffset ?? 0)+(a.byteOffset ?? 0)+component*4);
 }
+
+export function hairRigFixture() {
+  const f=fixture(),j=f.json;
+  j.nodes[1].children=[5];j.nodes.push({name:'hair-root',children:[6],translation:[0,.1,0]},{name:'hair-tip',translation:[0,-.2,0]});
+  const offset=f.bin.length,matrices=Buffer.alloc(3*64);
+  for(let n=0;n<3;n++)for(const k of [0,5,10,15])matrices.writeFloatLE(1,n*64+k*4);
+  f.bin=Buffer.concat([f.bin,matrices]);j.buffers[0].byteLength=f.bin.length;
+  j.bufferViews.push({buffer:0,byteOffset:offset,byteLength:matrices.length});
+  j.accessors[f.inverseBind]={bufferView:j.bufferViews.length-1,componentType:5126,type:'MAT4',count:3};
+  j.skins[0].joints=[1,5,6];
+  const a=j.accessors[j.meshes[0].primitives[0].attributes.JOINTS_0],v=j.bufferViews[a.bufferView];
+  for(let vertex=3;vertex<6;vertex++)f.bin.writeUInt16LE(1,v.byteOffset+vertex*8);
+  j.extensions.VRMC_springBone={specVersion:'1.0',springs:[{joints:[{node:5,stiffness:1},{node:6,stiffness:1}]}]};
+  return f;
+}
