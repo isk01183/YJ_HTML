@@ -7,6 +7,8 @@ import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-stat
 
 const params = new URLSearchParams(location.search);
 const wallpaper=params.get('wallpaper')==='1';
+const composition=params.get('composition')==='1';
+document.documentElement.classList.toggle('composition',composition);
 document.body.classList.toggle('wallpaper',wallpaper);
 const lang = ['ko','ja','en'].includes(params.get('lang')) ? params.get('lang') : 'ko';
 const w = (ko, ja, en) => ({ko,ja,en})[lang];
@@ -166,8 +168,10 @@ async function init() {
     });
     info.materials = materials.size;
     scene.add(vrm.scene); pose();
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(.42,64),new THREE.MeshBasicMaterial({color:0x707c8e,transparent:true,opacity:.08,depthWrite:false}));
-    floor.rotation.x = -Math.PI/2; floor.position.y = bounds.min.y - .006; scene.add(floor);
+    if(!composition) {
+      const floor = new THREE.Mesh(new THREE.CircleGeometry(.42,64),new THREE.MeshBasicMaterial({color:0x707c8e,transparent:true,opacity:.08,depthWrite:false}));
+      floor.rotation.x = -Math.PI/2; floor.position.y = bounds.min.y - .006; scene.add(floor);
+    }
     info.state = 'ready'; status.textContent = '';
     document.querySelectorAll('button').forEach(button => button.disabled = false);
     $('full').onclick = () => {view = 'full'; frameView();};

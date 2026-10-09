@@ -31,6 +31,7 @@ class V113Instrumentation : android.app.Instrumentation() {
             }
             options?.getString("checks")?.let { name ->
                 when(name) {
+                    "vrm-scene" -> VrmSceneChecks.run(this,options?.getString("seconds")?.toIntOrNull() ?: 0)
                     "vrm-preview" -> VrmPreviewChecks.run(targetContext)
                     "vrm-wallpaper" -> VrmWallpaperChecks.run(targetContext)
                     "vrm-wallpaper-live" -> VrmWallpaperChecks.live(this,options?.getString("seconds")?.toIntOrNull() ?: 0)

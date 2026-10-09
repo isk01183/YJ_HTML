@@ -8,15 +8,16 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
-enum class VrmFailure { RENDERER, CONTEXT, PAGE, MODEL, TIMEOUT }
+enum class VrmFailure { RENDERER, CONTEXT, PAGE, MODEL, MEDIA, TIMEOUT }
 
 /** One local resource policy for both the Activity and each wallpaper engine. */
 internal object VrmWebView {
     @SuppressLint("SetJavaScriptEnabled")
     @Suppress("DEPRECATION")
     fun create(context: Context,openModel: ()->InputStream?,onFailure: (VrmFailure)->Unit,
+               transparent: Boolean=false,
                onPageFinished: (WebView)->Unit): WebView = WebView(context).apply {
-        setBackgroundColor(0xffeee9f3.toInt())
+        setBackgroundColor(if(transparent)android.graphics.Color.TRANSPARENT else 0xffeee9f3.toInt())
         settings.apply {
             javaScriptEnabled=true;domStorageEnabled=false;allowContentAccess=false;allowFileAccess=false
             allowFileAccessFromFileURLs=false;allowUniversalAccessFromFileURLs=false
@@ -53,9 +54,10 @@ internal object VrmWebView {
             }
         }
     }
-    fun url(language: String,hasModel: Boolean,wallpaper: Boolean)=Uri.parse("https://appassets.androidplatform.net/vrm-preview/index.html").buildUpon()
+    fun url(language: String,hasModel: Boolean,wallpaper: Boolean,composition: Boolean=false)=Uri.parse("https://appassets.androidplatform.net/vrm-preview/index.html").buildUpon()
         .appendQueryParameter("lang",language).appendQueryParameter("model",if(hasModel)"1"else "0")
-        .appendQueryParameter("wallpaper",if(wallpaper)"1"else "0").build().toString()
+        .appendQueryParameter("wallpaper",if(wallpaper)"1"else "0")
+        .appendQueryParameter("composition",if(composition)"1"else "0").build().toString()
     fun configure(view: WebView,placement: VrmPlacement) {
         val p=placement.normalized()
         val json=JSONObject().put("x",p.x).put("y",p.y).put("scale",p.scale).put("blink",p.blink)

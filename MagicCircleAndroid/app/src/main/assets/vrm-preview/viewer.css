@@ -16,4 +16,5 @@ button[aria-pressed=true] {background:#53677a;color:white;border-color:#53677a}
 button:focus-visible {outline:3px solid #55a6d9}
 #details {text-align:center;font-size:10px;line-height:1.5;color:#65717b;margin:7px 4px 0}
 .wallpaper footer,.wallpaper .caption {display:none}
+.composition,.composition body {background:transparent}
 @media (orientation:landscape) and (max-height:500px) {.caption {padding:4px 20px}.caption p {display:none} footer {padding:4px} #details {margin:3px}}

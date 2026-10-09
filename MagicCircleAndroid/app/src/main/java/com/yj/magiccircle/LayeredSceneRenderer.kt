@@ -16,6 +16,7 @@ internal class LayeredSceneRenderer(scene: ScreenScene, private val openMedia: (
     private val characterMatrix=Matrix()
     private data class Cached(val image: MediaWallpaperRenderer, val matrix: Matrix=Matrix(), val inverse: Matrix=Matrix())
     private val images=linkedMapOf<String,Cached>()
+    private val media=linkedMapOf<String,MediaWallpaperRenderer>()
     private val point=FloatArray(2)
     private var width=0
     private var height=0
@@ -31,7 +32,7 @@ internal class LayeredSceneRenderer(scene: ScreenScene, private val openMedia: (
             val visible=layers.filter { it.visible }
             val share=budgetBytes/maxOf(1,layers.size)
             for(l in visible) if(!images.containsKey(l.id)) {
-                val image=MediaWallpaperRenderer(share) { openMedia(l.mediaId) }
+                val image=media.getOrPut(l.mediaId) {MediaWallpaperRenderer(share) { openMedia(l.mediaId) }}
                 images[l.id]=Cached(image)
                 image.prepare(width,height)
             }
@@ -77,6 +78,15 @@ internal class LayeredSceneRenderer(scene: ScreenScene, private val openMedia: (
                 val save=canvas.save();canvas.concat(characterMatrix);avatar?.draw(canvas,elapsedMs,animated);canvas.restoreToCount(save)
             }
             val l=layers.getOrNull(i) ?: continue
+            drawImages(canvas,elapsedMs,animated,i,i+1,false)
+        }
+    }
+    fun drawImages(canvas: Canvas,elapsedMs: Long,animated: Boolean,from: Int,until: Int,clear: Boolean) {
+        require(from in 0..layers.size && until in from..layers.size)
+        if(closed)return
+        if(clear)canvas.drawColor(Color.BLACK)
+        for(i in from until until) {
+            val l=layers[i]
             if(l.visible) images[l.id]?.let { c ->
             val save=canvas.save(); canvas.concat(c.matrix)
             c.image.draw(canvas,elapsedMs,animated,true)
@@ -93,5 +103,5 @@ internal class LayeredSceneRenderer(scene: ScreenScene, private val openMedia: (
         }
         return null
     }
-    override fun close() { if(closed) return; closed=true; images.values.forEach { it.image.close() }; images.clear();avatar?.close();avatar=null }
+    override fun close() { if(closed) return; closed=true; media.values.forEach { it.close() }; media.clear(); images.clear();avatar?.close();avatar=null }
 }

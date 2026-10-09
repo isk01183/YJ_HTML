@@ -4,6 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VrmRenderHealthTest {
+    @Test fun damagedMediaDoesNotRetry() { assertNull(VrmRenderHealth().onFailure(VrmFailure.MEDIA)) }
     @Test fun timeoutCountsOnlyVisibleTime() {
         val h=VrmRenderHealth();h.newAttempt(0);h.setVisible(true,0)
         assertNull(h.sample(false,0,44999));h.setVisible(false,44999)
