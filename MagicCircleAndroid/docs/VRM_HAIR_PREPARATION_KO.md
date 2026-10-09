@@ -1,5 +1,50 @@
 # 헤어 파츠 준비: 원본을 지키며 머리만 바꾸기
 
+## 2026-10-09 실제 헤어 결합 결과
+
+**E의 얼굴·몸·옷·토끼 귀·꼬리 + Hair02의 머리**로 단일 VRM을 새로 조립했다. Hair02 완성 캐릭터를 대신 선택한 것이 아니다. 아래의 이전 v1.21 준비 기록과 구분한다. 이번 결과는 로컬 결합 증명이며 모바일 파츠 선택·개별 염색·편집 캐릭터 저장 기능의 출시는 아니다.
+
+| 확인 항목 | 결과 |
+| --- | --- |
+| 보호 부위 | 21개 primitive의 참조 정점·UV·법선·표정·가중치·재질·이미지 지문 불변 |
+| 보호 뼈/물리 | 공통 변환·바인드, 보호 spring 35개, collider 28개 유지 |
+| 교체 머리 | 기존 Body 뒤머리 + 별도 머리 제거, Hair02 머리·전용 뼈·spring 결합 |
+| 원본 보존 | E/Hair02의 VRM 2개 및 vroid 2개 SHA-256 불변 |
+| 결합 파일 | 20,145,728 bytes, SHA-256 `c1853aa3c22b5c3b58ba8f819c4b2c4e7bd318aeeefaa9739f7c9f3bb205a708` |
+| 텍스처 | PNG 재인코딩/축소 없음, 선언 이미지 54,067,328픽셀; 동일 이미지 바이트만 중복 제거 |
+| 자동 검사 | Node 76개, Android 단위 62개; 오프라인 lint/debug/test APK 빌드 성공 |
+| 가상 기기 | API 36 휴대전화 1440×3120, 태블릿 2560×1600 |
+| 렌더 증거 | 기기별 원본/결합 각각 전신·상반신 4방향 + 눈감기, 총 18장 |
+| 물리 | 실제 spring 관절 128→133, 중복 없음·수치 유효·머리 회전 자극에 갱신됨 |
+| 반복 검사 | 두 기기 모두 `vrm-hair OK`, 별도 `vrm-memory OK`와 `INSTRUMENTATION_CODE: -1` |
+| 자원 해제 | 네 번 전환 후 매회 추적 liveBitmaps/gpuTextures/activeDecodes 모두 0 |
+| 사용자 상태 | 기존 선택 Hair02 복원; 배경 슬롯·태블릿 pending 및 시스템 홈/잠금 배경 ID 유지 |
+
+육안 확인한 정면·좌우·후면·눈감기에서 기존 뒤머리 중복, 뚜렷한 두피 구멍, 목·어깨 관통, 귀·꼬리 소실은 보이지 않았다. 정지 구도의 합격이 모든 자세에서의 충돌 방지를 보증하지는 않는다. 실제 삼성 휴대전화/태블릿의 장시간 테스트는 이번 단계에 포함하지 않았다.
+
+개인 결과는 저장소 밖 `C:/Users/jtn28/OneDrive/Documents/ChatGPT/New project/design-studies/v122-hair-assembly/`에 있다.
+
+- `E-with-Hair02-proof-01.vrm`: 결합 결과. 같은 이름의 `.vrm.json`은 출처 해시와 검사 결과다.
+- `phone/`, `tablet/`: 원본과 결합 결과의 실제 앱 창 촬영 및 `review.json` 카메라/물리 기록.
+- 개인 모델·텍스처·화면은 Git/공개 APK에 추가하지 않았다. 배포 버전은 v1.21 그대로다.
+
+개발자 실행:
+
+```powershell
+node tools/assemble-hair.mjs 'C:/절대경로/AvatarSample_E.vrm' 'C:/절대경로/AvatarSample_E_Hair02.vrm' 'C:/새경로/E-with-Hair02.vrm'
+```
+
+검사 후보가 아니거나 기존 출력/보고 파일이 있으면 실패한다. 출력도 다시 파싱해 보호 부위와 기증 머리의 지문을 확인한 뒤 게시한다. 이번 조립기는 확인된 E 계열과 PNG만 지원하며, 불명확한 형식은 축소·추측 없이 거절한다. 원래 머리의 공통 Head/Neck/Shoulder 뼈는 보존하고, 공통 바인드가 동일한 Hair02 skin에 E 보호 정점 가중치를 다시 연결한다.
+
+```powershell
+adb -s <가상기기> shell am instrument -w -r -e checks vrm-hair -e model <E-ID> -e alternate <결합-ID> -e pixels 54067328 com.yj.magiccircle.test/com.yj.magiccircle.V113Instrumentation
+adb -s <가상기기> shell am instrument -w -r -e checks vrm-memory -e model <E-ID> -e alternate <결합-ID> -e pixels 54067328 com.yj.magiccircle.test/com.yj.magiccircle.V113Instrumentation
+```
+
+고정 구도는 E에서 한 번 결정하여 결합 결과에도 동일 적용한다. 검토 카메라는 테스트 호스트가 제공한 표식이 있을 때만 노출된다. Android CLI와 UiAutomation 촬영이 충돌하여, [PixelCopy의 앱 창 캡처](https://developer.android.com/reference/android/view/PixelCopy)로 변경했다. 화면 픽셀을 실제로 복사하며 가짜 렌더나 목업으로 대체하지 않는다. 메모리 674,571,840 bytes는 결합 모델의 보수적 **추정값**으로 실제 프로세스 RAM 측정치가 아니다.
+
+다음 제품 단계: 검증된 헤어 선택 → 머리/홍채 독립 팔레트·RGB·HEX → 별도 캐릭터 저장 → 이미지와 배경 합성에 같은 결과 전달. 아직 없는 얼굴·눈·입 모양을 작동하는 선택지처럼 표시하지 않는다.
+
 ## 지금 준비된 것과 아직 아닌 것
 
 로컬 검사 도구가 완성 VRM 두 개를 읽어 머리 외의 얼굴·옷·뼈·표정이 함께 바뀌었는지 검사한다. 도구는 파일을 수정하거나 업로드하지 않는다. 검사 결과 `candidate`는 **실제 결합 시험 후보**이며, 머리 교환·모바일 렌더·물리 검증에 합격했다는 뜻이 아니다.

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
-import { fitDistance, placementFrame } from './camera.js';
+import { fitDistance, placementFrame, reviewCamera } from './camera.js';
 import { shouldRender, normalizePlacement, relaxedArmAngle } from './viewer-state.js';
 import { ModelMemory, renderFrame } from './model-memory.js';
 
@@ -71,6 +71,42 @@ function release() {
   vrm = null;
 }
 window.vrmPreview = {pause, resume, dispose, configure, info};
+// Only the instrumented local test host supplies this marker; normal preview/wallpaper exposes no review controls.
+if('VrmReview' in window) {
+  window.vrmPreview.reviewAnchor=()=>{
+    if(info.state!=='ready')throw new Error('Review model not ready');
+    const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+    const head=vrm.humanoid.getRawBoneNode('head').getWorldPosition(new THREE.Vector3());
+    return {body:{target:center.toArray(),distance:fitDistance(size.x,size.y,size.z,camera.aspect,camera.fov)},
+      face:{target:head.toArray(),distance:fitDistance(bodyHeight*.37,bodyHeight*.42,.1,camera.aspect,camera.fov)}};
+  };
+  window.vrmPreview.reviewView=value=>{
+    const fixed=reviewCamera(value);
+    if(info.state!=='ready'||disposed)throw new Error('Review model not ready');
+    pause();controls.enabled=false;controls.enableDamping=false;controls.minDistance=.1;controls.maxDistance=20;
+    camera.position.fromArray(fixed.position);controls.target.fromArray(fixed.target);controls.update();
+    vrm.expressionManager?.setValue('blink',fixed.blink);vrm.update(0);
+    renderFrame(renderer,scene,camera);info.frames++;
+    return {position:camera.position.toArray(),target:controls.target.toArray(),blink:vrm.expressionManager?.getValue('blink')};
+  };
+  window.vrmPreview.reviewMotion=()=>{
+    if(info.state!=='ready'||disposed)throw new Error('Review model not ready');
+    pause();const joints=[...(vrm.springBoneManager?.joints??[])];
+    const before=joints.map(j=>j.bone.quaternion.clone()),head=vrm.humanoid.getNormalizedBoneNode('head'),rotation=head.quaternion.clone();
+    let finite=true;const moved=new Set();
+    try {
+      head.quaternion.setFromEuler(new THREE.Euler(.16,.1,.08));
+      for(let step=0;step<30;step++) {
+        vrm.update(1/30);
+        joints.forEach((j,i)=>{
+          if(!j.bone.matrixWorld.elements.every(Number.isFinite)||!j.bone.quaternion.toArray().every(Number.isFinite))finite=false;
+          if(j.bone.quaternion.angleTo(before[i])>1e-5)moved.add(j.bone.name);
+        });
+      }
+    } finally {head.quaternion.copy(rotation);vrm.update(0);vrm.springBoneManager?.reset();}
+    return {jointCount:joints.length,uniqueBones:new Set(joints.map(j=>j.bone)).size,finite,moved:[...moved]};
+  };
+}
 addEventListener('pagehide', dispose);
 document.addEventListener('visibilitychange',syncLoop);
 

@@ -1,6 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fitDistance, placementFrame } from './camera.js';
+import { fitDistance, placementFrame, reviewCamera } from './camera.js';
+
+test('review camera uses only explicit values, never model bounds',()=>{
+  const input={yaw:90,target:[0,1.4,0],distance:2,blink:1};
+  const first=reviewCamera(input);
+  assert.deepEqual(first,reviewCamera({...input}));
+  assert.deepEqual(first.target,[0,1.4,0]);assert.equal(first.position[0],2);
+  assert.ok(Math.abs(first.position[2])<1e-12);assert.equal(first.blink,1);
+  assert.deepEqual(input.target,[0,1.4,0]);
+});
+test('review camera rejects nonfinite and unsafe values without changing normal placement',()=>{
+  const valid={yaw:0,target:[0,1,0],distance:2,blink:0},ordinary=placementFrame(1,2,.2,.45,30,{});
+  for(const invalid of [{yaw:NaN},{target:[0,Infinity,0]},{target:[0,1]},{distance:0},{distance:100},{blink:2}])
+    assert.throws(()=>reviewCamera({...valid,...invalid}));
+  assert.deepEqual(placementFrame(1,2,.2,.45,30,{}),ordinary);
+});
 
 test('portrait and landscape framing both contain the complete model', () => {
   for (const aspect of [0.45, 1, 1.8]) {

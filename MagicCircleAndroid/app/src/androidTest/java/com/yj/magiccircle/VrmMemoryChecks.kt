@@ -15,11 +15,13 @@ import java.util.concurrent.atomic.AtomicReference
 
 object VrmMemoryChecks {
     /** Model IDs are the existing SAF imports of E and Hair02, in that order. */
-    fun run(test: Instrumentation, modelId: String?, alternateId: String?) {
+    fun run(test: Instrumentation, modelId: String?, alternateId: String?, alternatePixels: Long=54_067_392L,
+            review: ((WebView,Boolean)->Unit)?=null) {
         check(Build.PRODUCT.startsWith("sdk_")) {"VRM memory checks are emulator-only"}
         val store=VrmModelStore.get(test.targetContext)
         val originalEntries=store.entries();val originalSelection=store.selected()
-        val models=listOf(modelId to 58_523_840L,alternateId to 54_067_392L).map { (id,pixels)->
+        check(alternatePixels in 1..64L*1024*1024)
+        val models=listOf(modelId to 58_523_840L,alternateId to alternatePixels).map { (id,pixels)->
             val entry=originalEntries.singleOrNull {it.id==id}
             check(entry!=null) {"Pass model and alternate IDs for the existing E and Hair02 SAF imports"}
             entry to pixels
@@ -78,6 +80,7 @@ object VrmMemoryChecks {
                             view.evaluateJavascript("window.vrmPreview?.resume()",null)
                         }
                         activity.setContentView(web!!)
+                        if(review!=null)web!!.addJavascriptInterface(Any(),"VrmReview")
                         web!!.loadUrl(VrmWebView.url("en",true,false))
                     }
                     val deadline=SystemClock.elapsedRealtime()+120_000
@@ -98,6 +101,7 @@ object VrmMemoryChecks {
                     check(state.getInt("activeDecodes")==0 && state.getInt("gpuTextures")>0) {"Model did not finish uploading textures: $state"}
                     check(state.getLong("estimatedBytes") in 1..state.getLong("budgetBytes")) {"Model exceeded its memory budget: $state"}
                     Log.i("VrmChecks","MEMORY_READY round=${round+1} name=${entry.name} info=$state")
+                    if(round==0)review?.invoke(checkNotNull(web),entry.id==modelId)
                     val disposed=js("window.vrmPreview.dispose();window.vrmPreview.info")
                     check(disposed.getInt("liveBitmaps")==0 && disposed.getInt("activeDecodes")==0 && disposed.getInt("gpuTextures")==0) {
                         "Disposed model retained texture resources: $disposed"
