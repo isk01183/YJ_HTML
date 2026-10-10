@@ -111,9 +111,12 @@ internal object VrmWallpaperStore {
     fun stage(context: Context,request: String,modelId: String,placement: VrmPlacement)=stageReserved(context,request,modelId) {slot,generation->
         publish(root(context),slot,Snapshot(generation,modelId,placement.normalized()))
     }
-    fun stage(context: Context,request: String,scene: ScreenScene)=stageReserved(context,request,checkNotNull(scene.vrm).modelId) {slot,generation->
-        val library=MediaLibrary.get(context)
-        library.leaseMedia(scene.layers.map {it.mediaId}).use {compose(root(context),slot,generation,scene){library.open(it,false)}}
+    fun stage(context: Context,request: String,scene: ScreenScene): String {
+        scene.vrm?.avatar?.appearance?.let {VrmHairPartStore.get(context).resolve(it)}
+        return stageReserved(context,request,checkNotNull(scene.vrm).modelId) {slot,generation->
+            val library=MediaLibrary.get(context)
+            library.leaseMedia(scene.layers.map {it.mediaId}).use {compose(root(context),slot,generation,scene){library.open(it,false)}}
+        }
     }
     private fun stageReserved(context: Context,request: String,modelId: String,prepare: (String,String)->Unit): String {
         val p=synchronized(this) {

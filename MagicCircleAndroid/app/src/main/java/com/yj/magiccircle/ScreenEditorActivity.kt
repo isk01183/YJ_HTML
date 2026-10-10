@@ -268,6 +268,7 @@ class ScreenEditorActivity: Activity() {
         IO.execute {val result=runCatching {
             val models=VrmModelStore.get(this);check(models.entries().any {it.id==avatar.appearance.modelId})
             checkNotNull(models.openModel(avatar.appearance.modelId)).use {VrmModelStore.verifyOutput(avatar.appearance.modelId,it)}
+            VrmHairPartStore.get(this).resolve(avatar.appearance)
         };ui.post {
             if(isDestroyed || isFinishing)return@post;busy=false;pendingAvatar=null
             result.onSuccess {

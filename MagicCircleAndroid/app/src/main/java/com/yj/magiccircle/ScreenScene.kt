@@ -68,11 +68,11 @@ internal data class SceneData(
     fun references(id: String) = scenes.values.any { s -> s.layers.any { it.mediaId == id } } ||
         drafts.values.any { d -> d.scene?.layers?.any { it.mediaId == id } == true }
     fun withScene(scene: ScreenScene, info: List<InfoPlacement>?) = copy(
-        scenes = scenes + (scene.id to scene.copy(layers=scene.layers.toList())),
+        scenes = scenes + (scene.id to snapshot(scene)),
         layouts = if (info == null) layouts - scene.id else layouts + (scene.id to info.toList()), drafts=drafts-scene.id)
     fun withoutScene(id: String) = copy(scenes=scenes-id,layouts=layouts-id,drafts=drafts-id)
     fun withLayout(id: String, info: List<InfoPlacement>?) = copy(layouts=if(info==null) layouts-id else layouts+(id to info.toList()))
-    fun withDraft(d: EditorDraft) = copy(drafts=drafts+(d.key to d.copy(scene=d.scene?.copy(layers=d.scene.layers.toList()), information=d.information?.toList())))
+    fun withDraft(d: EditorDraft) = copy(drafts=drafts+(d.key to d.copy(scene=d.scene?.let(::snapshot), information=d.information?.toList())))
     fun withoutDraft(id: String) = copy(drafts=drafts-id)
     fun withDuration(ms: Int) = copy(duration=ChargingTransition.durationMs(ms).toInt())
     fun json(): JSONObject = JSONObject().put("scenes",JSONArray(scenes.values.map { sceneJson(it) }))
@@ -82,6 +82,9 @@ internal data class SceneData(
             .put("information",d.information?.let { infoJson(it) } ?: JSONObject.NULL) }))
         .put("duration",duration)
     companion object {
+        private fun snapshot(scene: ScreenScene)=scene.copy(layers=scene.layers.toList(),vrm=scene.vrm?.let {v->
+            v.copy(avatar=v.avatar?.let {a->a.copy(appearance=a.appearance.copy(parts=a.appearance.parts.toMap()))})
+        })
         @JvmStatic fun sceneJson(s: ScreenScene): JSONObject = JSONObject().put("id",s.id).put("name",s.name).put("purpose",s.purpose.name)
             .put("layers",JSONArray(s.layers.map { l -> JSONObject().put("id",l.id).put("mediaId",l.mediaId)
                 .put("x",l.x.toDouble()).put("y",l.y.toDouble()).put("width",l.width.toDouble()).put("angle",l.angle.toDouble()).put("flipX",l.flipX).put("visible",l.visible) }))

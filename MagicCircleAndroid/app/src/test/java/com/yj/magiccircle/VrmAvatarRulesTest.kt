@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VrmAvatarRulesTest {
+    @Test fun sceneCopiesPartSelection() {
+        val parts=mutableMapOf("hair" to "b".repeat(64))
+        val avatar=value().copy(revision=1,appearance=value().appearance.copy(profileVersion=2,modelId="a".repeat(64),parts=parts))
+        val scene=ScreenScene("scene-${avatar.id}","Snapshot",ScenePurpose.WALLPAPER,emptyList(),vrm=VrmSceneLayer(avatar.appearance.modelId,avatar=avatar))
+        val data=SceneData().withScene(scene,null).withDraft(EditorDraft(scene.id,scene,null))
+        parts["hair"]="c".repeat(64)
+        assertEquals("b".repeat(64),data.scenes.getValue(scene.id).vrm!!.avatar!!.appearance.parts["hair"])
+        assertEquals("b".repeat(64),data.drafts.getValue(scene.id).scene!!.vrm!!.avatar!!.appearance.parts["hair"])
+    }
     private fun value()=VrmAvatarDefinition("12345678-1234-4234-8234-123456789abc",0,"별빛",VrmAvatarRules.original())
     private fun rejected(block: ()->Unit){try {block();fail("Invalid avatar accepted")}catch(_: IllegalArgumentException){}}
     @Test fun hairMappingRejectsDonorWholeModel() {

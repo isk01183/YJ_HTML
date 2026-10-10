@@ -28,6 +28,7 @@ internal class VrmSceneView(context: Context,initialScene: ScreenScene,private v
     private var imageEpoch=0
     private var revision=0
     private var modelChecked=false
+    private var partReceipt: VrmHairReceipt?=null
     private var pageReady=false
     private var requiredFrame=0L
     private var configured=false
@@ -92,6 +93,7 @@ internal class VrmSceneView(context: Context,initialScene: ScreenScene,private v
             var failure=VrmFailure.MODEL
             try {
                 checkNotNull(openModel()).use {VrmModelStore.verifyOutput(value.vrm!!.modelId,it)}
+                val receipt=value.vrm!!.avatar?.appearance?.let {VrmHairPartStore.get(context).resolve(it)}
                 failure=VrmFailure.MEDIA
                 result=LayeredSceneRenderer(value,openMedia,LayeredSceneRenderer.budget(context))
                 result.prepare(w,h)
@@ -99,7 +101,7 @@ internal class VrmSceneView(context: Context,initialScene: ScreenScene,private v
                 ui.post {
                     if(closed || imageEpoch!=token)prepared.close()
                     else {
-                        prepared.updateLayers(scene.layers);renderer=prepared;modelChecked=true
+                        prepared.updateLayers(scene.layers);renderer=prepared;partReceipt=receipt;modelChecked=true
                         refreshWeb();redraw();if(!scene.vrm!!.visible)markReady()
                     }
                 }
@@ -110,6 +112,11 @@ internal class VrmSceneView(context: Context,initialScene: ScreenScene,private v
     fun updateScene(value: ScreenScene) {
         check(!closed)
         require(value.vrm?.modelId==scene.vrm!!.modelId && value.character==null && value.purpose==ScenePurpose.WALLPAPER)
+        value.vrm?.avatar?.appearance?.let {a->
+            VrmAvatarRules.validate(a)
+            if(a.profileVersion==2)require(partReceipt?.appearance(a.dye)==a ||
+                !modelChecked && scene.vrm!!.avatar?.appearance?.copy(dye=a.dye)==a)
+        }
         require(value.layers.map {it.id to it.mediaId}==scene.layers.map {it.id to it.mediaId})
         val visibilityChanged=value.layers.map {it.visible}!=scene.layers.map {it.visible}
         scene=value;revision++;ready=false;configured=false
@@ -122,7 +129,7 @@ internal class VrmSceneView(context: Context,initialScene: ScreenScene,private v
         if(closed || !modelChecked)return
         val visible=scene.vrm!!.visible
         if(visible && webView==null) {
-            val view=VrmWebView.create(context,openModel,{fail(it)},transparent=true,initialAppearance={scene.vrm!!.avatar?.appearance}) {v->
+            val view=VrmWebView.create(context,openModel,{fail(it)},transparent=true,initialAppearance={scene.vrm!!.avatar?.appearance},initialPartReceipt={partReceipt}) {v->
                 if(!closed && webView===v){pageReady=true;configure();setActive(active)}
             }
             webView=view;addView(view,1,LayoutParams(-1,-1))
