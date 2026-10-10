@@ -280,7 +280,7 @@ class ScreenEditorActivity: Activity() {
     private fun vrmLabel(entry: VrmEntry)="${entry.name} · VRM ${if(entry.format==VrmFormat.V1)"1" else "0"} · ${entry.id.take(8)}"
     private fun chooseVrm() {
         busy=true
-        IO.execute {val result=runCatching {VrmModelStore.get(this).entries()};ui.post {
+        IO.execute {val result=runCatching {VrmModelStore.get(this).entries().filterNot {it.derived}};ui.post {
             if(isDestroyed || isFinishing)return@post;busy=false
             result.onSuccess {entries->
                 vrmNames=entries.associate {it.id to vrmLabel(it)}

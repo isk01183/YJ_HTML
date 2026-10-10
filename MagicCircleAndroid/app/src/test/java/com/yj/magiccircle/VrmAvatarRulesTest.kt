@@ -31,4 +31,14 @@ class VrmAvatarRulesTest {
         rejected {VrmAvatarRules.validate(v.copy(revision=-1))}
         rejected {VrmAvatarRules.validate(v.copy(id="../../bad"))}
     }
+    @Test fun v2RequiresPartAndKeepsIndependentColors() {
+        val before=value().appearance.copy(dye=VrmDye("#12ABEF","#123456"))
+        val next=before.copy(profileVersion=2,hairId="e-hair02",modelId="a".repeat(64),parts=mapOf("hair" to "b".repeat(64)))
+        VrmAvatarRules.validate(next);assertEquals(before.dye,next.dye)
+        rejected {VrmAvatarRules.validate(next.copy(parts=emptyMap()))}
+        rejected {VrmAvatarRules.validate(next.copy(parts=mapOf("eyes" to "b".repeat(64))))}
+        rejected {VrmAvatarRules.validate(next.copy(modelId="../bad"))}
+        rejected {VrmAvatarRules.validate(before.copy(parts=next.parts))}
+        VrmAvatarRules.validate(before)
+    }
 }

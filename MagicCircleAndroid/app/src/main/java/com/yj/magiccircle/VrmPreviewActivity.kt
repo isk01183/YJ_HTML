@@ -102,9 +102,10 @@ class VrmPreviewActivity: Activity() {
     private fun describe(value: VrmEntry)=value.name+" · "+value.id.take(8)+" · VRM "+(if(value.format==VrmFormat.V0)"0.x" else "1.0")+" · "+String.format(java.util.Locale.ROOT,"%.1f",value.sizeBytes/1048576.0)+" MiB"
     private fun selectModel() {
         if(busy)return
+        val visible=entries.filterNot {it.derived}
         AlertDialog.Builder(this).setTitle(w("캐릭터 선택","キャラクター選択","Choose character"))
-            .setSingleChoiceItems(entries.map(::describe).toTypedArray(),entries.indexOfFirst {it.id==entry?.id}) {dialog,index->
-                val id=entries[index].id;dialog.dismiss()
+            .setSingleChoiceItems(visible.map(::describe).toTypedArray(),visible.indexOfFirst {it.id==entry?.id}) {dialog,index->
+                val id=visible[index].id;dialog.dismiss()
                 async({store.select(id);store.entries() to store.selected()}) {data->entries=data.first;entry=data.second;showViewer()}
             }.setNegativeButton(android.R.string.cancel,null).show()
     }

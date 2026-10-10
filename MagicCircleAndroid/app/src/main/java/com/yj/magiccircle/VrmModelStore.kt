@@ -73,7 +73,7 @@ internal fun validateVrmJson(text: String) {
         require(depth==0)
     }
 }
-data class VrmEntry(val id: String,val name: String,val format: VrmFormat,val sizeBytes: Long,val placement: VrmPlacement)
+data class VrmEntry(val id: String,val name: String,val format: VrmFormat,val sizeBytes: Long,val placement: VrmPlacement,val derived: Boolean=false)
 
 /** Private, embedded VRM models. Originals are never modified. */
 class VrmModelStore(private val root: File) {
@@ -135,7 +135,7 @@ class VrmModelStore(private val root: File) {
             val size=entry.getLong("size");require(size in 28..MAX_BYTES)
             val p=entry.getJSONObject("placement")
             VrmEntry(id,name,VrmFormat.valueOf(entry.getString("format")),size,
-                VrmPlacement(p.optDouble("x",0.0).toFloat(),p.optDouble("y",0.0).toFloat(),p.optDouble("scale",1.0).toFloat(),p.optBoolean("blink",true)).normalized())
+                VrmPlacement(p.optDouble("x",0.0).toFloat(),p.optDouble("y",0.0).toFloat(),p.optDouble("scale",1.0).toFloat(),p.optBoolean("blink",true)).normalized(),entry.optBoolean("derived",false))
         }
         require(models.map {it.id}.toSet().size==models.size)
         val selected=if(json.isNull("selected"))null else json.getString("selected")
@@ -150,16 +150,20 @@ class VrmModelStore(private val root: File) {
     private fun write(library: Library) {
         val entries=JSONArray()
         for(entry in library.models)entries.put(JSONObject().put("id",entry.id).put("name",entry.name)
-            .put("format",entry.format.name).put("size",entry.sizeBytes).put("placement",JSONObject()
+            .put("format",entry.format.name).put("size",entry.sizeBytes).put("derived",entry.derived).put("placement",JSONObject()
                 .put("x",entry.placement.x).put("y",entry.placement.y).put("scale",entry.placement.scale).put("blink",entry.placement.blink)))
         val bytes=JSONObject().put("version",1).put("models",entries).put("selected",library.selected ?: JSONObject.NULL).toString().toByteArray()
         require(bytes.size<=1024*1024 && library.models.size<=1024)
         val atomic=index;val out=atomic.startWrite()
-        try {out.write(bytes);atomic.finishWrite(out)}catch(e: Exception){atomic.failWrite(out);throw e}
+        try {out.write(bytes);out.fd.sync();atomic.finishWrite(out);check(atomic.readFully().contentEquals(bytes))}catch(e: Exception){atomic.failWrite(out);throw e}
     }
 
     @Synchronized fun importModel(input: InputStream,displayName: String="test.vrm"): VrmEntry = copyModel(input,displayName,read())
-    private fun copyModel(input: InputStream,displayName: String,library: Library): VrmEntry {
+    @Synchronized fun registerDerived(input: InputStream,displayName: String): VrmEntry {
+        val library=read();require(library.selected!=null){"Import a base model first"}
+        return copyModel(input,displayName,library,true)
+    }
+    private fun copyModel(input: InputStream,displayName: String,library: Library,derived: Boolean=false): VrmEntry {
         if(!root.isDirectory && !root.mkdirs())throw IOException("Cannot create private model directory")
         val temp=File.createTempFile("import-",".tmp",root)
         try {
@@ -183,13 +187,13 @@ class VrmModelStore(private val root: File) {
             val id=digest.digest().joinToString(""){"%02x".format(it)}
             val existing=library.models.find {it.id==id}
             val name=displayName.filter {it>=' '}.trim().take(80).ifBlank {"test.vrm"}
-            val entry=existing ?: VrmEntry(id,name,format,temp.length(),VrmPlacement())
+            val entry=existing ?: VrmEntry(id,name,format,temp.length(),VrmPlacement(),derived)
             val file=model(id)
             if(!file.parentFile!!.isDirectory && !file.parentFile!!.mkdirs())throw IOException("Cannot create model storage")
             if(!file.exists())Os.rename(temp.path,file.path)
-            else require(file.length()==entry.sizeBytes) {"Stored model is damaged"}
+            else {require(file.length()==entry.sizeBytes) {"Stored model is damaged"};file.inputStream().use {verifyOutput(id,it)}}
             checkInterrupted()
-            write(Library(if(existing==null)library.models+entry else library.models,id))
+            write(Library(if(existing==null)library.models+entry else library.models,if(derived)library.selected else id))
             return entry
         } catch(e: Exception) {throw IOException("VRM import failed; previous model preserved",e)}
         finally {temp.delete()}
