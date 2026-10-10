@@ -1,12 +1,11 @@
 import {createHash} from 'node:crypto';
 import {readHairSource} from './inspect-hair-source.mjs';
-import {compareHairSources,hairOwnership,signatures} from './compare-hair-source.mjs';
+import {compareHairSources,hairOwnership,signatures,stable} from './compare-hair-source.mjs';
 
 const MAX=64*1024*1024, WIDTH={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16};
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const clone=x=>structuredClone(x);
 const check=(ok,message)=>{if(!ok)throw new Error(message);};
-const stable=x=>Array.isArray(x)?`[${x.map(stable).join(',')}]`:x&&typeof x==='object'?`{${Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+stable(x[k])).join(',')}}`:JSON.stringify(x);
 const digest=x=>sha(stable(x));
 const hex=x=>typeof x==='string'&&/^[0-9a-f]{64}$/.test(x);
 const hairNames=new Set(['N00_000_00_HairBack_00_HAIR (Instance)','N00_000_Hair_00_HAIR (Instance)',...['01','02','03'].map(n=>`N00_000_Hair_00_HAIR_${n} (Instance)`)]);
@@ -15,7 +14,7 @@ const at=(a,i)=>{check(Number.isSafeInteger(i)&&i>=0&&i<a.length,'Part reference
 
 function fingerprints(source) {
   const s=signatures(source);check(!s.issues.length,s.issues.join('; '));
-  const shapes=[...s.shapes].sort(([a],[b])=>a.localeCompare(b));
+  const shapes=[...s.shapes].sort(([a],[b])=>a<b?-1:a>b?1:0);
   return {protectedDigest:digest({world:s.world,shapes:shapes.filter(([k])=>!s.hair.has(k))}),
     hairDigest:digest({rig:s.privateRig,shapes:shapes.filter(([k])=>s.hair.has(k))})};
 }

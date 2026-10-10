@@ -22,6 +22,57 @@ import java.nio.charset.CodingErrorAction
 import java.security.MessageDigest
 
 enum class VrmFormat { V0, V1 }
+
+internal fun validateVrmJson(text: String) {
+    // JsonReader still accepts some JavaScript-incompatible strings/literals in strict mode.
+    val jsonNumber=Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
+    var pos=0
+    while(pos<text.length) {
+        val c=text[pos++]
+        if(c in "{}[],: \t\r\n")continue
+        if(c=='"') {
+            var terminated=false
+            while(pos<text.length) {
+                val ch=text[pos++]
+                require(ch>=' ') {"Unescaped JSON control character"}
+                if(ch=='"') {terminated=true;break}
+                if(ch=='\\') {
+                    require(pos<text.length)
+                    val escape=text[pos++]
+                    if(escape=='u') {
+                        require(pos+4<=text.length && (pos until pos+4).all {text[it] in "0123456789abcdefABCDEF"}) {"Invalid Unicode escape"}
+                        pos+=4
+                    } else require(escape in "\"\\/bfnrt") {"Invalid JSON escape"}
+                }
+            }
+            require(terminated) {"Unterminated JSON string"}
+        } else {
+            val start=pos-1
+            while(pos<text.length && text[pos] !in "{}[],: \t\r\n\"")pos++
+            val token=text.substring(start,pos)
+            require(token=="true" || token=="false" || token=="null" || jsonNumber.matches(token)) {"Invalid JSON literal"}
+        }
+    }
+    // Enforce JSON syntax and nesting before the permissive recursive org.json parser.
+    JsonReader(StringReader(text)).use {reader->
+        reader.isLenient=false
+        var depth=0
+        while(reader.peek()!=JsonToken.END_DOCUMENT) {
+            when(reader.peek()) {
+                JsonToken.BEGIN_ARRAY->{require(++depth<=64);reader.beginArray()}
+                JsonToken.BEGIN_OBJECT->{require(++depth<=64);reader.beginObject()}
+                JsonToken.END_ARRAY->{depth--;reader.endArray()}
+                JsonToken.END_OBJECT->{depth--;reader.endObject()}
+                JsonToken.NAME->reader.nextName()
+                JsonToken.STRING,JsonToken.NUMBER->reader.nextString()
+                JsonToken.BOOLEAN->reader.nextBoolean()
+                JsonToken.NULL->reader.nextNull()
+                else->error("Invalid JSON")
+            }
+        }
+        require(depth==0)
+    }
+}
 data class VrmEntry(val id: String,val name: String,val format: VrmFormat,val sizeBytes: Long,val placement: VrmPlacement)
 
 /** Private, embedded VRM models. Originals are never modified. */
@@ -167,54 +218,7 @@ class VrmModelStore(private val root: File) {
         val bytes=ByteArray(jsonSize.toInt());data.readFully(bytes)
         val text=Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString()
-        // JsonReader still accepts some JavaScript-incompatible strings/literals in strict mode.
-        val jsonNumber=Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
-        var pos=0
-        while(pos<text.length) {
-            val c=text[pos++]
-            if(c in "{}[],: \t\r\n")continue
-            if(c=='"') {
-                var terminated=false
-                while(pos<text.length) {
-                    val ch=text[pos++]
-                    require(ch>=' ') {"Unescaped JSON control character"}
-                    if(ch=='"') {terminated=true;break}
-                    if(ch=='\\') {
-                        require(pos<text.length)
-                        val escape=text[pos++]
-                        if(escape=='u') {
-                            require(pos+4<=text.length && (pos until pos+4).all {text[it] in "0123456789abcdefABCDEF"}) {"Invalid Unicode escape"}
-                            pos+=4
-                        } else require(escape in "\"\\/bfnrt") {"Invalid JSON escape"}
-                    }
-                }
-                require(terminated) {"Unterminated JSON string"}
-            } else {
-                val start=pos-1
-                while(pos<text.length && text[pos] !in "{}[],: \t\r\n\"")pos++
-                val token=text.substring(start,pos)
-                require(token=="true" || token=="false" || token=="null" || jsonNumber.matches(token)) {"Invalid JSON literal"}
-            }
-        }
-        // Enforce JSON syntax and nesting before the permissive recursive org.json parser.
-        JsonReader(StringReader(text)).use {reader->
-            reader.isLenient=false
-            var depth=0
-            while(reader.peek()!=JsonToken.END_DOCUMENT) {
-                when(reader.peek()) {
-                    JsonToken.BEGIN_ARRAY->{require(++depth<=64);reader.beginArray()}
-                    JsonToken.BEGIN_OBJECT->{require(++depth<=64);reader.beginObject()}
-                    JsonToken.END_ARRAY->{depth--;reader.endArray()}
-                    JsonToken.END_OBJECT->{depth--;reader.endObject()}
-                    JsonToken.NAME->reader.nextName()
-                    JsonToken.STRING,JsonToken.NUMBER->reader.nextString()
-                    JsonToken.BOOLEAN->reader.nextBoolean()
-                    JsonToken.NULL->reader.nextNull()
-                    else->error("Invalid JSON")
-                }
-            }
-            require(depth==0)
-        }
+        validateVrmJson(text)
         val tokener=JSONTokener(text)
         val json=tokener.nextValue() as? JSONObject ?: throw IOException("Missing glTF document")
         require(tokener.nextClean()=='\u0000') {"Trailing JSON data"}

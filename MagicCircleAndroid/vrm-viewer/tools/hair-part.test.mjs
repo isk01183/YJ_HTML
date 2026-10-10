@@ -3,12 +3,16 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {hairRigFixture,glb,setFloat} from './hair-source.fixture.mjs';
 import {readHairSource} from './inspect-hair-source.mjs';
-import {signatures} from './compare-hair-source.mjs';
+import {signatures,stable} from './compare-hair-source.mjs';
 import {extractHairPart,inspectHairPart,composeHairPart} from './hair-part.mjs';
 
 import {partFixturePair} from './hair-part.fixture.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const sig=b=>signatures(readHairSource(b));
+
+test('fingerprint numbers use exact IEEE tokens independent of runtime decimal rounding',()=>{
+  assert.equal(stable([-0,0,1,-0.0000029802322387695312]),'[#0000000000000000,#0000000000000000,#3ff0000000000000,#bec9000000000000]');
+});
 
 test('bodyEmbeddedHairRoundTrip: part contains no protected geometry and preserves original image bytes',()=>{
   const [f]=partFixturePair(),base=glb(f),part=extractHairPart(base,base),info=inspectHairPart(part.json,part.bin);

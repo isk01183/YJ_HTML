@@ -31,6 +31,8 @@ class V113Instrumentation : android.app.Instrumentation() {
             }
             options?.getString("checks")?.let { name ->
                 when(name) {
+                    "vrm-hair-assembly" -> VrmHairAssemblyChecks.run(this)
+                    "vrm-hair-actual" -> VrmHairAssemblyChecks.actual(this)
                     "vrm-avatar-storage" -> VrmAvatarStorageChecks.run(targetContext)
                     "vrm-avatar-save" -> VrmAvatarSaveChecks.run(this,checkNotNull(options?.getString("mode")))
                     "vrm-dye" -> VrmDyeChecks.run(this)

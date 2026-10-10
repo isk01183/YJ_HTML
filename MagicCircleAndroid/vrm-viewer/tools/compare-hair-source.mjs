@@ -3,7 +3,8 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readHairSource,readLocalModel} from './inspect-hair-source.mjs';
 
-function stable(value) {
+export function stable(value) {
+  if(typeof value==='number') {if(!Number.isFinite(value))throw new Error('Nonfinite fingerprint');const b=Buffer.alloc(8);b.writeDoubleBE(value===0?0:value);return '#'+b.toString('hex');}
   if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
   if(value && typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stable(value[k])).join(',')+'}';
   return JSON.stringify(value);
@@ -98,7 +99,7 @@ export function signatures(source) {
     const a=j.accessors[index], data=accessor(index), width=data.length/a.count, result=createHash('sha256');
     for(const vertex of vertices) {
       const tuple=Array.from(data.subarray(vertex*width,(vertex+1)*width));
-      result.update(JSON.stringify(weights?tuple.map((n,k)=>weights[vertex*4+k]===0?null:nodePath(skin.joints[n])):tuple));
+      result.update(stable(weights?tuple.map((n,k)=>weights[vertex*4+k]===0?null:nodePath(skin.joints[n])):tuple));
     }
     return result.digest('hex');
   }
@@ -114,7 +115,7 @@ export function signatures(source) {
       const joints=accessor(p.attributes.JOINTS_0),weights=accessor(p.attributes.WEIGHTS_0);
       for(const v of new Set(accessor(p.indices)))for(let k=0;k<4;k++)if(weights[v*4+k]>0)used.add(joints[v*4+k]);
     });
-    const bindings=skin?[...used].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,(i+1)*16))]).sort(([a],[b])=>a.localeCompare(b)):null;
+    const bindings=skin?[...used].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,(i+1)*16))]).sort(([a],[b])=>a<b?-1:a>b?1:0):null;
     const binding=skin?Object.fromEntries(bindings):null;
     const settings={...rest,children:(children??[]).filter(n=>!removed.has(n)).map(nodePath),binding,skeleton:skin?.skeleton===undefined?null:nodePath(skin.skeleton)};
     if(!removed.has(ni))rig[nodePath(ni)]=settings;
@@ -131,7 +132,7 @@ export function signatures(source) {
       const {indices,attributes:ignoredAttributes,targets,material:ignoredMaterial,...primitiveSettings}=p;
       const positive=new Set(),jointValues=accessor(p.attributes.JOINTS_0),weightValues=accessor(p.attributes.WEIGHTS_0);
       for(const v of new Set(vertices))for(let k=0;k<4;k++)if(weightValues[v*4+k]>0)positive.add(jointValues[v*4+k]);
-      const primitiveBinding=[...positive].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,i*16+16))]).sort(([a],[b])=>a.localeCompare(b));
+      const primitiveBinding=[...positive].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,i*16+16))]).sort(([a],[b])=>a<b?-1:a>b?1:0);
       shapes.set(key,hash({attributes,morph,primitiveBinding,material:material(j.materials[p.material]),meshSettings,primitiveSettings}));
       if(hairRefs.has(`${mi}:${pi}`))hair.add(key);
     });

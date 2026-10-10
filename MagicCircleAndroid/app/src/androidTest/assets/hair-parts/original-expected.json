@@ -1,10 +1,10 @@
 {
-  "partId": "404817d5ad543da5858019fb9fc48abc76c973624219304ee62d7373884441e2",
+  "partId": "98332760a8410a25a5038a68890d60ef722628ae95833dd71d243a56bbf50cdc",
   "styleId": "e-original",
   "baseModelId": "b4258b1b3b0f59f7bdb33d09a9eca6d63fc2e409de1d46cc71c9b05dc7de02fb",
   "sourceModelId": "b4258b1b3b0f59f7bdb33d09a9eca6d63fc2e409de1d46cc71c9b05dc7de02fb",
-  "protectedDigest": "6085033f9cb472e7f658ebf1937dffaa264b98ffa4d112505587ceea492d6eb9",
-  "hairDigest": "ddbdd02c7e5fce916808df14e894e4800c8c51c9af3ccc3f6263da543a893341",
+  "protectedDigest": "0eb13355e7da58a7ba9bf7b1391da579d56bc5ae81f87642b456e8d55b114f5c",
+  "hairDigest": "7701dd0b29a25fcb9da8ac90c742a7e9f399da2b1b5706bd2b20f02b16510d22",
   "protectedPrimitiveCount": 0,
   "anchors": [
     "Body",

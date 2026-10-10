@@ -1,10 +1,10 @@
 {
-  "partId": "b317373ca7d7fda7bab48f0e2e18fa5b44a34e14c6ddcfebbf44a69da83ded5f",
+  "partId": "5184f8e375935eb31c26db90a563d02c7b8ab1f76c570197767b2ef226dfa32a",
   "styleId": "e-hair02",
   "baseModelId": "b4258b1b3b0f59f7bdb33d09a9eca6d63fc2e409de1d46cc71c9b05dc7de02fb",
   "sourceModelId": "b25b50e319a30c7379011a5b834cc578a78738c31a132fb34b65833c8046a8da",
-  "protectedDigest": "6085033f9cb472e7f658ebf1937dffaa264b98ffa4d112505587ceea492d6eb9",
-  "hairDigest": "7df5cc3be7565c545ad5b251fbe87fae2a831064808042c7c7e020e4e5847118",
+  "protectedDigest": "0eb13355e7da58a7ba9bf7b1391da579d56bc5ae81f87642b456e8d55b114f5c",
+  "hairDigest": "2daff4bfe1dc0aa617c814bff81049f446c7e00846e0a3632cb173a469718e6b",
   "protectedPrimitiveCount": 0,
   "anchors": [
     "hips/head"
