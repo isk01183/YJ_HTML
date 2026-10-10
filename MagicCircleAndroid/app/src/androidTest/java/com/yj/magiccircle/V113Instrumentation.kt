@@ -34,6 +34,7 @@ class V113Instrumentation : android.app.Instrumentation() {
                     "vrm-hair-assembly" -> VrmHairAssemblyChecks.run(this)
                     "vrm-hair-storage" -> VrmHairPartStoreChecks.run(this)
                     "vrm-hair-editor" -> VrmHairPartEditorChecks.run(this,options?.getString("swaps")?.toInt() ?: 20)
+                    "vrm-hair-lifecycle" -> VrmHairLifecycleChecks.run(this,checkNotNull(options?.getString("mode")))
                     "vrm-hair-actual" -> VrmHairAssemblyChecks.actual(this)
                     "vrm-avatar-storage" -> VrmAvatarStorageChecks.run(targetContext)
                     "vrm-avatar-save" -> VrmAvatarSaveChecks.run(this,checkNotNull(options?.getString("mode")))

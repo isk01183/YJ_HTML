@@ -379,8 +379,13 @@ class VrmAvatarActivity: Activity() {
     }
     @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
-    override fun onResume() {super.onResume();active=true;if(value!=null&&stage!=null&&web==null&&!busy)loadModels {openWeb()}}
-    override fun onStop() {active=false;candidate=null;thumbnail=null;if(pendingSave==null){operation++;busy=false};ui.removeCallbacks(draftTask);persistDraft();closeWeb();super.onStop()}
+    override fun onResume() {super.onResume();active=true;if(value!=null&&stage!=null&&web==null&&!busy)loadModels {renderTools();openWeb()}}
+    override fun onStop() {
+        active=false;candidate=null;thumbnail=null
+        // Initial open/library preparation must finish: there is no editor to resume yet.
+        if(pendingSave==null&&stage!=null){operation++;busy=false}
+        ui.removeCallbacks(draftTask);persistDraft();closeWeb();super.onStop()
+    }
     override fun onSaveInstanceState(out: Bundle) {value?.let {out.putString("value",VrmAvatarRules.toJson(it).toString())};saved?.let {out.putString("saved",VrmAvatarRules.toJson(it).toString())};pendingSave?.let {out.putString("pendingSave",VrmAvatarRules.toJson(it).toString())};out.putString("tab",tab);out.putBoolean("dirty",dirty);out.putString("rawHex",rawHex);out.putString("nameRaw",nameField?.text?.toString());out.putBoolean("invalid",invalid);super.onSaveInstanceState(out)}
     override fun onDestroy(){operation++;closeWeb();ui.removeCallbacksAndMessages(null);super.onDestroy()}
 }
