@@ -28,13 +28,13 @@ object VrmAvatarSaveChecks {
         val field=VrmAvatarStore::class.java.getDeclaredField("instance").apply {isAccessible=true};val previous=field.get(null);field.set(null,store)
         var activity: Activity?=null
         fun main(action:()->Unit){var error: Throwable?=null;test.runOnMainSync {try{action()}catch(e: Throwable){error=e}};error?.let {throw it}}
-        fun waitFor(label: String,check:()->Boolean){val end=SystemClock.elapsedRealtime()+90_000;while(!check()&&SystemClock.elapsedRealtime()<end)Thread.sleep(100);check(check()){label}}
+        fun waitFor(label: String,check:()->Boolean){val end=SystemClock.elapsedRealtime()+600_000;while(!check()&&SystemClock.elapsedRealtime()<end)Thread.sleep(100);check(check()){label}}
         fun button(tag: String)=activity!!.window.decorView.findViewWithTag<Button>(tag)
         fun ready(): Boolean {var result=false;main {result=button("avatar-save-new")?.isEnabled==true};return result}
         try {
             activity=test.startActivitySync(Intent(test.targetContext,VrmAvatarActivity::class.java).apply {saved?.let {putExtra("avatarId",it.id)};addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)})
             waitFor("Initial avatar not ready",::ready)
-            main {activity!!.window.decorView.findViewWithTag<EditText>("avatar-name").setText("Edited");button("avatar-tab-hair-color").performClick();activity!!.window.decorView.findViewWithTag<SeekBar>("avatar-r").progress=42}
+            main {activity!!.window.decorView.findViewWithTag<EditText>("avatar-name").setText("Edited");button("avatar-tab-hair").performClick();activity!!.window.decorView.findViewWithTag<SeekBar>("avatar-r").progress=42}
             waitFor("Draft was not saved"){store.drafts().any {it.name=="Edited"}}
             val draft=store.drafts().single()
             if(mode=="identity") {

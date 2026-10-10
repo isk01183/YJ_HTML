@@ -2,8 +2,22 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Texture} from 'three';
 import {MToonMaterial} from '@pixiv/three-vrm';
-import {bindAvatarDye,normalizeDye,avatarProfile,irisProtection} from './avatar-dye.js';
+import {bindAvatarDye,normalizeDye,avatarProfile,irisProtection,normalizeAppearance} from './avatar-dye.js';
 const BASE='ef6513de66aee3ab78b105e53b2e72c5d92834fc2a49c542221c08ec9f0811d0';
+test('v2 accepts only matching native part proof and keeps independent dye',()=>{
+  const receipt={modelId:'a'.repeat(64),baseModelId:BASE,partId:'b'.repeat(64),styleId:'e-original',assemblerVersion:1,protectedDigest:'c'.repeat(64),hairDigest:'d'.repeat(64)};
+  const value={profileVersion:2,baseModelId:BASE,hairId:'e-original',modelId:receipt.modelId,parts:{hair:receipt.partId},hair:'#12ABEF',iris:'#123456'};
+  assert.deepEqual(normalizeAppearance(value,receipt),value);
+  assert.throws(()=>normalizeAppearance(value));
+  for(const changed of [{...receipt,modelId:'e'.repeat(64)},{...receipt,partId:'e'.repeat(64)},{...receipt,styleId:'e-hair02'},{...receipt,assemblerVersion:2}])assert.throws(()=>normalizeAppearance(value,changed));
+  assert.throws(()=>normalizeAppearance({...value,parts:{...value.parts,eyes:receipt.partId}},receipt));
+  const donor='f4df98833a830f84c6f8bcdb90701e86420bc2fe369e7936fff1cf3b0971573e';
+  assert.throws(()=>normalizeAppearance({...value,modelId:donor},{...receipt,modelId:donor}));
+  const profile=avatarProfile(receipt.modelId,receipt);assert.deepEqual(profile.hair,avatarProfile(BASE).hair);
+  const {vrm}=fixture();bindAvatarDye(vrm,profile).set(value);
+  assert.equal(normalizeAppearance(value,receipt).iris,value.iris);
+  assert.equal(normalizeAppearance({profileVersion:1,baseModelId:BASE,hairId:'e-original',modelId:BASE,hair:null,iris:null}).hair,null);
+});
 function fixture(){
   const profile=avatarProfile(BASE);
   const all=[...profile.hair,profile.iris,'Body','EyeWhite','EyeHighlight','CatEars','Tail','Clothes'].map(name=>{

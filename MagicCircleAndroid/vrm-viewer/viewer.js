@@ -29,9 +29,10 @@ $('details').textContent = w('파일은 이 기기에만 저장됩니다. 적용
 let renderer, controls, vrm, camera, scene, memory;
 let modelScenes=[];
 let avatar=null,avatarEpoch=0,dyeBinding=null,dyeModelId=null;
+let partReceipt=null,proofReady=false,pendingAppearance=null;
 let disposed = false, released = false, hostActive = false, frame = 0, last = 0, elapsed = 0;
 let placement=normalizePlacement();
-let tPose = false, blinking = true, view = 'full';
+let tPose = false, blinking = true, view = params.get('editor')==='1'?'face':'full';
 let bounds, bodyHeight = 1.6;
 const info = {state:'empty', triangles:0, materials:0, frames:0,metaVersion:null,failure:null};
 Object.defineProperty(info,'gpuTextures',{enumerable:true,get:()=>renderer?.info.memory.textures || 0});
@@ -60,13 +61,14 @@ function configure(value) {
   if(vrm)frameView();
 }
 function appearance(value) {
-  const next=normalizeAppearance(value);
+  if(!proofReady){pendingAppearance=value;avatarEpoch++;return;}
+  const next=normalizeAppearance(value,partReceipt);
   if(vrm&&next&&dyeModelId&&dyeModelId!==next.modelId)throw new Error('Avatar model switch requires reload');
   avatar=next;avatarEpoch++;
   if(vrm)try {applyAppearance();}catch(error){reportError(error);throw error;}
 }
 function applyAppearance() {
-  if(avatar&&!dyeBinding){dyeBinding=bindAvatarDye(vrm,avatarProfile(avatar.modelId));dyeModelId=avatar.modelId;}
+  if(avatar&&!dyeBinding){dyeBinding=bindAvatarDye(vrm,avatarProfile(avatar.modelId,avatar.profileVersion===2?partReceipt:null));dyeModelId=avatar.modelId;}
   dyeBinding?.set(avatar??{hair:null,iris:null});
   info.appearance=avatar;
 }
@@ -90,12 +92,12 @@ window.vrmPreview.thumbnail=()=>{
   if(info.state!=='ready'||disposed)return null;
   const position=camera.position.clone(),target=controls.target.clone(),oldView=view;
   try {
-    view='face';frameView();renderFrame(renderer,scene,camera);
+    dyeBinding?.set({hair:null,iris:null});view='face';frameView();renderFrame(renderer,scene,camera);
     const canvas=document.createElement('canvas');canvas.width=192;canvas.height=224;
-    const source=renderer.domElement,size=Math.min(source.width,source.height),x=(source.width-size)/2,y=(source.height-size)/2;
-    canvas.getContext('2d').drawImage(source,x,y,size,size,0,0,192,224);
+    const source=renderer.domElement,h=Math.min(source.height,source.width*224/192),width=h*192/224;
+    canvas.getContext('2d').drawImage(source,(source.width-width)/2,(source.height-h)/2,width,h,0,0,192,224);
     return canvas.toDataURL('image/png');
-  } finally {view=oldView;camera.position.copy(position);controls.target.copy(target);controls.update();renderFrame(renderer,scene,camera);}
+  } finally {dyeBinding?.set(avatar??{hair:null,iris:null});view=oldView;camera.position.copy(position);controls.target.copy(target);controls.update();renderFrame(renderer,scene,camera);}
 };
 // Only the instrumented local test host supplies this marker; normal preview/wallpaper exposes no review controls.
 if('VrmReview' in window) {
@@ -207,7 +209,10 @@ async function init() {
     const initialResponse=await fetch(new URL('appearance.json',location.href),{cache:'no-store'});
     if(!initialResponse.ok)throw new Error('Missing local appearance');
     const initialAppearance=await initialResponse.json();
-    if(initialEpoch===avatarEpoch)avatar=normalizeAppearance(initialAppearance);
+    const proof=await fetch(new URL('part-profile.json',location.href),{cache:'no-store'});
+    if(!proof.ok)throw new Error('Missing local part proof');
+    partReceipt=await proof.json();proofReady=true;
+    avatar=normalizeAppearance(initialEpoch===avatarEpoch?initialAppearance:pendingAppearance,partReceipt);pendingAppearance=null;
     let budgetBytes;
     try {
       const response=await fetch(new URL('memory.json',location.href),{cache:'no-store'});

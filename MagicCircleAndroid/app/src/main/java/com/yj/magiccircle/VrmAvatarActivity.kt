@@ -30,6 +30,15 @@ class VrmAvatarActivity: Activity() {
     private var saved: VrmAvatarDefinition?=null
     private var pendingSave: VrmAvatarDefinition?=null
     private var entries=emptyList<VrmEntry>()
+    private var parts=emptyList<VrmHairPart>()
+    private var receipts=emptyMap<String,VrmHairReceipt>()
+    private var candidate: VrmAvatarAppearance?=null
+    private var thumbnail: VrmAvatarAppearance?=null
+    private var renderTarget: VrmAvatarAppearance?=null
+    private val failedThumbnails=mutableSetOf<String>()
+    private var partsFailed=false
+    private var capturing=false
+    private var generateThumbnails=true
     private var tab="hair"
     private var dirty=false
     private var active=false
@@ -52,7 +61,7 @@ class VrmAvatarActivity: Activity() {
         this.text=text;this.tag=tag;isAllCaps=false;textSize=12f;minHeight=dp(48)
         setTextColor(0xff354052.toInt());backgroundTintList=android.content.res.ColorStateList.valueOf(0xffe5e0d6.toInt())
         parent.addView(this,if(parent.orientation==LinearLayout.HORIZONTAL)LinearLayout.LayoutParams(0,-2,1f)else LinearLayout.LayoutParams(-1,-2))
-        setOnClickListener {if(!busy)action()}
+        setOnClickListener {if(!busy&&candidate==null&&thumbnail==null)action()}
     }
     private fun shell() {
         closeWeb();tools=null;stage=null;nameField=null
@@ -60,6 +69,7 @@ class VrmAvatarActivity: Activity() {
         root.setOnApplyWindowInsetsListener {v,i->@Suppress("DEPRECATION")
             v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i}
         status=label("",12f).apply {tag="avatar-status";accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE}
+        root.addView(status)
         setContentView(root)
     }
     override fun onCreate(state: Bundle?) {
@@ -79,7 +89,7 @@ class VrmAvatarActivity: Activity() {
                 if(data.second==request.copy(revision=request.revision+1)) {
                     value=data.second;saved=data.second;dirty=false;restoredName=null
                 }
-                pendingSave=null;showEditor()
+                pendingSave=null;loadModels {showEditor()}
             }
         } else if(intent.getBooleanExtra("library",false))showLibrary()
         else open(intent.getStringExtra("avatarId"))
@@ -91,21 +101,34 @@ class VrmAvatarActivity: Activity() {
             busy=false;result.fold(done){status.text=w("처리하지 못했습니다. 기존 자료는 유지됩니다. 다시 열어 주세요.","処理できません。既存データは保持されます。開き直してください。","Could not complete. Existing data is preserved. Reopen and retry.")};controls()
         }}
     }
-    private fun loadModels(done:()->Unit)=async({VrmModelStore.get(this).entries()}){entries=it;done()}
+    private fun assemblyBudget(): Long {
+        val manager=getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+        val memory=android.app.ActivityManager.MemoryInfo().also {manager.getMemoryInfo(it)}
+        return minOf(128L*1024*1024,Runtime.getRuntime().maxMemory()/2,VrmMemoryPolicy.budget(memory.totalMem,memory.availMem,memory.threshold,memory.lowMemory,manager.isLowRamDevice))
+    }
+    private fun loadModels(done:()->Unit) {
+        status.text=w("헤어 자료 확인 중… 처음 준비할 때는 몇 분 걸릴 수 있습니다.","ヘアを確認中…初回は数分かかる場合があります。","Checking hair assets… first preparation may take a few minutes.")
+        async({
+            val result=runCatching {val store=VrmHairPartStore.get(this);val found=store.prepare(assemblyBudget());found to found.associate {it.id to store.compose(it.id,assemblyBudget())}}
+            VrmModelStore.get(this).entries() to result
+        }) {data->
+            entries=data.first;partsFailed=data.second.isFailure
+            parts=data.second.getOrNull()?.first ?: emptyList();receipts=data.second.getOrNull()?.second ?: emptyMap();done()
+        }
+    }
     private fun open(id: String?) {
         async({Triple(VrmModelStore.get(this).entries(),id?.let {store.find(it)},id?.let {store.draft(it)})}) {data->
             entries=data.first;saved=data.second
             if(id!=null&&data.second==null&&data.third==null){status.text=w("캐릭터를 찾을 수 없습니다.","キャラクターが見つかりません。","Character not found.");return@async}
             value=data.third ?: saved ?: VrmAvatarDefinition(UUID.randomUUID().toString(),0,w("나의 캐릭터","私のキャラクター","My character"),VrmAvatarRules.original())
-            dirty=data.third!=null;shell();showEditor()
+            dirty=data.third!=null;loadModels {showEditor()}
         }
     }
     private fun showLibrary() {
-        value=null;saved=null;dirty=false;shell()
+        operation++;candidate=null;thumbnail=null;value=null;saved=null;dirty=false;shell()
         root.addView(label(w("저장한 VRM 캐릭터","保存したVRMキャラクター","Saved VRM characters"),23f))
         val bar=row(root);button(bar,w("← 뒤로","← 戻る","← Back"),"avatar-back"){finish()}
         button(bar,w("＋ 새 캐릭터","＋ 新規","＋ New"),"avatar-new"){open(null)}
-        root.addView(status)
         val list=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
         root.addView(ScrollView(this).apply {addView(list)},LinearLayout.LayoutParams(-1,0,1f))
         async({store.list() to store.drafts()}) {data->
@@ -120,17 +143,18 @@ class VrmAvatarActivity: Activity() {
         val top=row(root)
         button(top,w("← 목록","← 一覧","← Library"),"avatar-back"){leave()}
         button(top,w("VRM 등록","VRM読込","Import VRM"),"avatar-import"){persistDraft();closeWeb();startActivity(Intent(this,VrmPreviewActivity::class.java))}
-        root.addView(label(w("캐릭터 꾸미기","キャラクター編集","Character atelier"),23f));root.addView(status)
+        root.addView(label(w("캐릭터 꾸미기","キャラクター編集","Character atelier"),23f))
         val workspace=LinearLayout(this);val wide=resources.configuration.screenWidthDp>=700
         workspace.orientation=if(wide)LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         root.addView(workspace,LinearLayout.LayoutParams(-1,0,1f))
         stage=FrameLayout(this).also {workspace.addView(it,if(wide)LinearLayout.LayoutParams(0,-1,1f)else LinearLayout.LayoutParams(-1,0,1.1f))}
         val side=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
-        workspace.addView(side,if(wide)LinearLayout.LayoutParams(dp(360),-1)else LinearLayout.LayoutParams(-1,0,1f))
+        workspace.addView(side,if(wide)LinearLayout.LayoutParams(dp(if(resources.configuration.screenWidthDp>=1000)540 else 360),-1)else LinearLayout.LayoutParams(-1,0,1f))
         val tabs=row(side)
         button(tabs,w("헤어","ヘア","Hair"),"avatar-tab-hair"){switchTab("hair")}
-        button(tabs,w("머리색","髪色","Hair color"),"avatar-tab-hair-color"){switchTab("hair-color")}
-        button(tabs,w("눈 색상","瞳の色","Eye color"),"avatar-tab-iris-color"){switchTab("iris-color")}
+        button(tabs,w("눈","目","Eyes"),"avatar-tab-iris-color"){switchTab("iris-color")}
+        button(tabs,w("입","口","Mouth"),"avatar-tab-mouth"){switchTab("mouth")}
+        button(tabs,w("얼굴형","顔型","Face"),"avatar-tab-face"){switchTab("face")}
         tools=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(8),0,dp(8),0)}
         side.addView(ScrollView(this).apply {addView(tools)},LinearLayout.LayoutParams(-1,0,1f))
         nameField=EditText(this).apply {tag="avatar-name";setSingleLine();setText(restoredName ?: current.name);setTextColor(0xff354052.toInt());setHintTextColor(0xff65717b.toInt());hint=w("캐릭터 이름","名前","Character name");contentDescription=hint;filters=arrayOf(android.text.InputFilter.LengthFilter(40))}
@@ -155,32 +179,48 @@ class VrmAvatarActivity: Activity() {
         }
         renderTools();openWeb();controls()
     }
-    private fun switchTab(next: String) {if(invalid){status.text=w("올바른 색상을 입력하거나 원본으로 복원하세요.","正しい色を入力するか元に戻してください。","Enter a valid color or restore original.");return};tab=next;rawHex=null;renderTools()}
-    private fun thumbFile(id: String)=File(cacheDir,"avatar-thumb-$id.png")
+    private fun switchTab(next: String) {if(invalid){status.text=w("올바른 색상을 입력하거나 원본으로 복원하세요.","正しい色を入力するか元に戻してください。","Enter a valid color or restore original.");return};tab=if(next=="hair-color")"hair"else next;rawHex=null;renderTools()}
+    private fun thumbFile(id: String)=File(cacheDir,"avatar-part-thumb-v1-${VrmAvatarRules.BASE}-$id.png")
     private fun renderTools() {
         val panel=tools ?: return;panel.removeAllViews();val current=value ?: return
         if(tab=="hair") {
             panel.addView(label(w("검증된 E 모델 전용 · 원본 의상·몸은 유지","検証済みEモデル専用・衣装と体を保持","Verified E models only · body and outfit unchanged"),12f))
-            val cards=row(panel)
-            VrmAvatarRules.hairIds.forEachIndexed {index,id->
-                val column=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};cards.addView(column,LinearLayout.LayoutParams(0,-2,1f))
-                val file=thumbFile(VrmAvatarRules.modelId(id))
-                if(file.isFile)column.addView(ImageView(this).apply {setImageBitmap(BitmapFactory.decodeFile(file.path));contentDescription="${w("헤어","ヘア","Hair")} ${index+1}"},LinearLayout.LayoutParams(-1,dp(104)))
-                val available=entries.any {it.id==VrmAvatarRules.modelId(id)}
-                button(column,(if(current.appearance.hairId==id)"✓ " else "")+(if(index==0)w("E 기본","E 基本","E original")else"Hair 02"),"avatar-hair-$id"){selectHair(id)}.isEnabled=available
-                if(!available)column.addView(label(if(index==0)"AvatarSample_E.vrm" else "E-with-Hair02-proof-01.vrm",11f))
+            val horizontal=resources.configuration.screenWidthDp>=1000
+            val area=LinearLayout(this).apply {orientation=if(horizontal)LinearLayout.HORIZONTAL else LinearLayout.VERTICAL};panel.addView(area)
+            val gallery=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};area.addView(gallery,if(horizontal)LinearLayout.LayoutParams(0,-2,1f)else LinearLayout.LayoutParams(-1,-2))
+            val cards=row(gallery)
+            parts.forEach {part->
+                val selected=current.appearance.parts["hair"]==part.id||(current.appearance.profileVersion==1&&current.appearance.hairId==part.styleId)
+                val name=if(part.styleId=="e-original")w("E 기본","E 基本","E original")else"Hair 02"
+                val column=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL;setPadding(dp(3),dp(3),dp(3),dp(3));background=android.graphics.drawable.GradientDrawable().apply {setColor(0xffebe6dd.toInt());setStroke(dp(if(selected)2 else 1),if(selected)0xffba8b3b.toInt()else 0xffc7c4bd.toInt());cornerRadius=dp(8).toFloat()}}
+                cards.addView(column,LinearLayout.LayoutParams(0,-2,1f).apply {setMargins(dp(3),dp(3),dp(3),dp(3))})
+                val file=thumbFile(part.id)
+                if(file.isFile)column.addView(ImageView(this).apply {tag="avatar-photo-${part.id}";setImageBitmap(BitmapFactory.decodeFile(file.path));contentDescription=name;scaleType=ImageView.ScaleType.CENTER_CROP;setOnClickListener {selectHairPart(part.id)}},LinearLayout.LayoutParams(-1,dp(130)))
+                else column.addView(label(w("사진 준비 중","写真準備中","Preparing portrait"),12f),LinearLayout.LayoutParams(-1,dp(130)))
+                button(column,(if(selected)"✓ " else "")+name,"avatar-hair-${part.styleId}"){}.apply {
+                    isSelected=selected;contentDescription=name+if(selected)w(" · 선택됨","・選択中"," · selected")else""
+                    setOnClickListener {selectHairPart(part.id)}
+                }
             }
-            panel.addView(label(w("없는 헤어는 위 파일을 VRM 등록에서 불러오세요. 썸네일은 해당 헤어를 처음 미리본 뒤 이 기기에서 생성됩니다.","未登録の髪は上のファイルを読み込んでください。サムネイルは初回表示後に端末で生成します。","Import the named file for missing hair. Thumbnails are generated locally after the first preview of each style."),12f))
-        } else colorTools(panel)
+            if(parts.size<2)gallery.addView(label(if(partsFailed)w("파츠 검증 실패. 기존 외형은 유지됩니다. 다시 열어 확인하세요.","パーツ検証失敗。元の外見は保持されます。","Part validation failed. Existing appearance is preserved. Reopen to retry.")else w("VRM 등록: AvatarSample_E.vrm + AvatarSample_E_Hair02.vrm\n새 VRM은 호환성 확인 후 목록에 추가합니다.","VRM読込：E + Hair02。新しいVRMは互換性確認後に追加。","Import AvatarSample_E.vrm + AvatarSample_E_Hair02.vrm. Future VRMs need compatibility review."),12f))
+            val colors=LinearLayout(this).apply {orientation=LinearLayout.VERTICAL};area.addView(colors,if(horizontal)LinearLayout.LayoutParams(0,-2,1f)else LinearLayout.LayoutParams(-1,-2));colorTools(colors)
+        } else {
+            panel.addView(label(w("모양 교체용 파츠 준비 중 · 현재 외형 유지","形状パーツ準備中・現在の外見を保持","Shape parts not supplied yet · current appearance retained"),14f))
+            if(tab=="iris-color")colorTools(panel)
+        }
+        controls()
     }
-    private fun selectHair(id: String) {
-        val old=value ?: return
-        if(entries.none {it.id==VrmAvatarRules.modelId(id)})return
-        value=old.copy(appearance=old.appearance.copy(hairId=id,modelId=VrmAvatarRules.modelId(id)))
-        changed();renderTools();openWeb()
+    private fun selectHairPart(partId: String) {
+        if(invalid||pendingSave!=null||parts.none {it.id==partId}||!active)return
+        val old=value ?: return;thumbnail=null;candidate=null;closeWeb()
+        generateThumbnails=false
+        status.text=w("선택한 헤어 준비 중…","選択したヘアを準備中…","Preparing selected hair…")
+        async({runCatching {VrmHairPartStore.get(this).compose(partId,assemblyBudget())}}) {result->
+            result.fold({receipt->candidate=receipt.appearance(old.appearance.dye);openWeb()}, {openWeb();status.text=w("헤어를 적용하지 못했습니다. 이전 외형을 유지합니다.","ヘアを適用できません。元の外見を保持します。","Hair could not be applied. Previous appearance retained.")})
+        }
     }
     private fun colorTools(panel: LinearLayout) {
-        val hair=tab=="hair-color";val dye=value!!.appearance.dye
+        val hair=tab=="hair"||tab=="hair-color";val dye=value!!.appearance.dye
         val selected=if(hair)dye.hair else dye.iris
         panel.addView(label(if(hair)w("머리카락만 염색","髪だけ染色","Hair only")else w("홍채만 염색 · 동공·흰자 유지","虹彩だけ染色・瞳孔と白目を保持","Iris only · pupil and eye whites preserved"),15f))
         val palette=listOf("#191C23","#F4EBDD","#EE2038","#204EFF","#AC73DB","#CF9B70","#69AD91","#ED91B9")
@@ -214,7 +254,9 @@ class VrmAvatarActivity: Activity() {
     }
     private fun setDye(color: String?) {
         val old=value ?: return;val dye=old.appearance.dye
-        value=old.copy(appearance=old.appearance.copy(dye=if(tab=="hair-color")dye.copy(hair=color)else dye.copy(iris=color)))
+        if(busy||candidate!=null||thumbnail!=null)return
+        value=old.copy(appearance=old.appearance.copy(dye=if(tab=="hair"||tab=="hair-color")dye.copy(hair=color)else dye.copy(iris=color)))
+        renderTarget=value!!.appearance
         web?.let {VrmWebView.appearance(it,value!!.appearance)};changed();controls()
     }
     private fun changed(){dirty=true;controls();ui.removeCallbacks(draftTask);ui.postDelayed(draftTask,250)}
@@ -224,14 +266,16 @@ class VrmAvatarActivity: Activity() {
     }
     private fun controls() {
         if(!::root.isInitialized)return
+        val locked=busy||candidate!=null||thumbnail!=null
         fun inputs(view: View) {
-            if(view is EditText||view is SeekBar){view.isEnabled=!busy;if(busy)view.clearFocus()}
+            if(view is EditText||view is SeekBar){view.isEnabled=!locked;if(locked)view.clearFocus()}
+            if(view is Button && view.tag?.toString()?.startsWith("avatar-hair-")==true)view.isEnabled=pendingSave==null&&!invalid
             if(view is android.view.ViewGroup)for(i in 0 until view.childCount)inputs(view.getChildAt(i))
         }
         inputs(root)
         root.findViewWithTag<Button>("avatar-save-new")?.isEnabled=ready&&!busy&&!invalid
         root.findViewWithTag<Button>("avatar-save")?.isEnabled=ready&&!busy&&!invalid&&saved!=null
-        root.findViewWithTag<Button>("avatar-revert")?.isEnabled=!busy&&saved!=null
+        root.findViewWithTag<Button>("avatar-revert")?.isEnabled=!locked&&saved!=null
         root.findViewWithTag<Button>("avatar-wallpaper")?.isEnabled=ready&&!busy&&!invalid&&!dirty&&saved!=null
     }
     private fun save(asNew: Boolean) {
@@ -254,15 +298,16 @@ class VrmAvatarActivity: Activity() {
     }
     private fun openWeb() {
         closeWeb();val current=value ?: return;val container=stage ?: return
-        if(entries.none {it.id==current.appearance.modelId}) {status.text=w("필요한 VRM 파일을 먼저 등록하세요.","必要なVRMファイルを読み込んでください。","Import the required VRM file first.");controls();return}
-        val token=epoch;status.text=w("원본 화질로 불러오는 중…","元の画質で読込中…","Loading original-quality textures…")
+        val target=candidate ?: thumbnail ?: current.appearance;renderTarget=target
+        if(entries.none {it.id==target.modelId}) {if(candidate!=null||thumbnail!=null)fail(VrmFailure.MODEL)else {status.text=w("필요한 VRM 파일을 먼저 등록하세요.","必要なVRMファイルを読み込んでください。","Import the required VRM file first.");controls()};return}
+        val token=epoch;status.text=if(thumbnail!=null)w("실제 헤어 사진 준비 중…","ヘア写真を準備中…","Preparing real hair portraits…")else w("원본 화질로 불러오는 중…","元の画質で読込中…","Loading original-quality textures…")
         io.execute {
-            val checked=runCatching {checkNotNull(VrmModelStore.get(this).openModel(current.appearance.modelId)).use {VrmModelStore.verifyOutput(current.appearance.modelId,it)}}
+            val checked=runCatching {checkNotNull(VrmModelStore.get(this).openModel(target.modelId)).use {VrmModelStore.verifyOutput(target.modelId,it)};VrmHairPartStore.get(this).resolve(target)}
             ui.post {
                 if(isDestroyed||isFinishing||token!=epoch||!active)return@post
                 if(checked.isFailure){fail(VrmFailure.MODEL);return@post}
-                val view=VrmWebView.create(this,{VrmModelStore.get(this).openModel(current.appearance.modelId)},{kind->if(token==epoch)fail(kind)},initialAppearance={current.appearance}) {v->
-                    if(web===v&&token==epoch){value?.let {VrmWebView.appearance(v,it.appearance)};v.evaluateJavascript("window.vrmPreview?.resume()",null)}
+                val view=VrmWebView.create(this,{VrmModelStore.get(this).openModel(target.modelId)},{kind->if(token==epoch)fail(kind)},initialAppearance={target},initialPartReceipt={checked.getOrNull()}) {v->
+                    if(web===v&&token==epoch){renderTarget?.let {VrmWebView.appearance(v,it)};v.evaluateJavascript("window.vrmPreview?.resume()",null)}
                 }
                 web=view;view.tag="avatar-web";container.addView(view,FrameLayout.LayoutParams(-1,-1))
                 health.newAttempt(SystemClock.elapsedRealtime());health.setVisible(true,SystemClock.elapsedRealtime())
@@ -279,27 +324,47 @@ class VrmAvatarActivity: Activity() {
                 if(token!=epoch||web!==view||!active)return@evaluateJavascript
                 val info=runCatching {JSONObject(raw)}.getOrNull()
                 if(info?.optString("state")=="error"){fail(if(info.optString("failure")=="MEMORY")VrmFailure.MEMORY else VrmFailure.MODEL);return@evaluateJavascript}
-                val matching=info?.optJSONObject("appearance")?.let {runCatching {VrmAvatarRules.readAppearance(it)==value?.appearance}.getOrDefault(false)}==true
+                val matching=info?.optJSONObject("appearance")?.let {runCatching {VrmAvatarRules.readAppearance(it)==renderTarget}.getOrDefault(false)}==true
                 val displayed=info?.optString("state")=="ready"&&info.optLong("frames")>1&&matching
                 health.sample(displayed,info?.optLong("frames") ?: 0,SystemClock.elapsedRealtime())?.let {fail(it);return@evaluateJavascript}
-                if(displayed&&!ready){ready=true;status.text=w("머리와 눈 색상은 각각 따로 저장됩니다","髪と瞳の色は個別に保存されます","Hair and eye colors are saved independently");captureThumbnail(view,token);controls()}
+                if(displayed&&!ready&&!capturing){
+                    candidate?.let {next->value=value!!.copy(appearance=next);candidate=null;changed();renderTools()}
+                    if(thumbnail==null){ready=!generateThumbnails||parts.all {thumbFile(it.id).isFile||it.id in failedThumbnails};status.text=w("머리와 눈 색상은 각각 따로 저장됩니다","髪と瞳の色は個別に保存されます","Hair and eye colors are saved independently")}
+                    captureThumbnail(view,token);controls()
+                }
             }
             ui.postDelayed(this,250)
         }
     }
     private fun captureThumbnail(view: WebView,token: Int) {
-        val id=value?.appearance?.modelId ?: return;val file=thumbFile(id);if(file.isFile)return
+        val part=parts.firstOrNull {it.styleId==renderTarget?.hairId} ?: return
+        val file=thumbFile(part.id)
+        if(file.isFile){nextThumbnail();return}
+        capturing=true
         view.evaluateJavascript("window.vrmPreview?.thumbnail()") {raw->
             if(token!=epoch||web!==view)return@evaluateJavascript
-            val data=runCatching {JSONTokener(raw).nextValue() as String}.getOrNull() ?: return@evaluateJavascript
-            if(!data.startsWith("data:image/png;base64,")||data.length>512_000)return@evaluateJavascript
-            io.execute {runCatching {val bytes=android.util.Base64.decode(data.substringAfter(','),android.util.Base64.DEFAULT);val target=android.util.AtomicFile(file);val output=target.startWrite();try {output.write(bytes);target.finishWrite(output)}catch(e: Exception){target.failWrite(output);throw e}}
-                ui.post {if(token==epoch&&tab=="hair"&&!isDestroyed)renderTools()}}
+            val data=runCatching {JSONTokener(raw).nextValue() as String}.getOrNull()
+            if(data==null||!data.startsWith("data:image/png;base64,")||data.length>512_000){capturing=false;failedThumbnails.add(part.id);nextThumbnail();return@evaluateJavascript}
+            io.execute {val ok=runCatching {val bytes=android.util.Base64.decode(data.substringAfter(','),android.util.Base64.DEFAULT);val target=android.util.AtomicFile(file);val output=target.startWrite();try {output.write(bytes);target.finishWrite(output)}catch(e: Exception){target.failWrite(output);throw e}}.isSuccess
+                ui.post {if(token==epoch&&!isDestroyed){capturing=false;if(!ok)failedThumbnails.add(part.id);if(tab=="hair")renderTools();nextThumbnail()}}}
         }
     }
-    private fun fail(kind: VrmFailure) {closeWeb(kind==VrmFailure.RENDERER);status.text=if(kind==VrmFailure.MEMORY)w("원본 화질을 표시할 메모리가 부족합니다. 다른 앱을 닫고 다시 시도하세요.","メモリ不足です。他のアプリを閉じて再試行してください。","Not enough memory for original textures. Close other apps and retry.")else w("표시하지 못했습니다. 다시 시도하세요. 초안과 원본은 유지됩니다.","表示できません。再試行してください。下書きと元ファイルは保持されます。","Could not render. Retry; drafts and originals are preserved.");controls()}
+    private fun nextThumbnail() {
+        if(!active||busy||candidate!=null||invalid||!generateThumbnails)return
+        val next=parts.firstOrNull {!thumbFile(it.id).isFile&&it.id !in failedThumbnails}
+        if(next!=null){thumbnail=receipts[next.id]?.appearance();if(thumbnail!=null)openWeb()}
+        else if(thumbnail!=null){thumbnail=null;openWeb()}
+        else {ready=true;controls()}
+    }
+    private fun fail(kind: VrmFailure) {
+        val recover=candidate!=null||thumbnail!=null
+        thumbnail?.let {t->parts.firstOrNull {it.styleId==t.hairId}?.let {failedThumbnails.add(it.id)}}
+        candidate=null;thumbnail=null;closeWeb(kind==VrmFailure.RENDERER)
+        if(recover&&active)openWeb()
+        status.text=if(kind==VrmFailure.MEMORY)w("원본 화질을 표시할 메모리가 부족합니다. 다른 앱을 닫고 다시 시도하세요.","メモリ不足です。他のアプリを閉じて再試行してください。","Not enough memory for original textures. Close other apps and retry.")else w("표시하지 못했습니다. 이전 외형과 저장 자료를 유지합니다.","表示できません。以前の外見と保存データは保持されます。","Could not render. Previous appearance and saved data are preserved.");controls()
+    }
     private fun closeWeb(crashed: Boolean=false) {
-        epoch++;ready=false;ui.removeCallbacks(poll);val view=web;web=null
+        epoch++;ready=false;capturing=false;ui.removeCallbacks(poll);val view=web;web=null
         if(!crashed){runCatching {view?.evaluateJavascript("window.vrmPreview?.dispose()",null)};runCatching {view?.stopLoading()}}
         stage?.removeAllViews();runCatching {view?.destroy()};controls()
     }
@@ -315,7 +380,7 @@ class VrmAvatarActivity: Activity() {
     @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("API 23–32 fallback") override fun onBackPressed()=leave()
     override fun onResume() {super.onResume();active=true;if(value!=null&&stage!=null&&web==null&&!busy)loadModels {openWeb()}}
-    override fun onStop() {active=false;ui.removeCallbacks(draftTask);persistDraft();closeWeb();super.onStop()}
+    override fun onStop() {active=false;candidate=null;thumbnail=null;if(pendingSave==null){operation++;busy=false};ui.removeCallbacks(draftTask);persistDraft();closeWeb();super.onStop()}
     override fun onSaveInstanceState(out: Bundle) {value?.let {out.putString("value",VrmAvatarRules.toJson(it).toString())};saved?.let {out.putString("saved",VrmAvatarRules.toJson(it).toString())};pendingSave?.let {out.putString("pendingSave",VrmAvatarRules.toJson(it).toString())};out.putString("tab",tab);out.putBoolean("dirty",dirty);out.putString("rawHex",rawHex);out.putString("nameRaw",nameField?.text?.toString());out.putBoolean("invalid",invalid);super.onSaveInstanceState(out)}
     override fun onDestroy(){operation++;closeWeb();ui.removeCallbacksAndMessages(null);super.onDestroy()}
 }

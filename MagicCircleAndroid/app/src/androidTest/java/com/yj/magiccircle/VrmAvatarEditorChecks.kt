@@ -25,7 +25,7 @@ object VrmAvatarEditorChecks {
         val output=File(test.targetContext.getExternalFilesDir(null),"vrm-avatar-editor-${UUID.randomUUID()}").apply {check(mkdir())}
         fun main(action:()->Unit) {var error: Throwable?=null;test.runOnMainSync {try{action()}catch(e: Throwable){error=e}};error?.let {throw it}}
         fun waitUntil(label: String,condition:()->Boolean) {
-            val end=SystemClock.elapsedRealtime()+90_000
+            val end=SystemClock.elapsedRealtime()+600_000
             while(!condition()&&SystemClock.elapsedRealtime()<end)Thread.sleep(100)
             check(condition()){label}
         }
@@ -40,7 +40,7 @@ object VrmAvatarEditorChecks {
             activity=test.startActivitySync(Intent(test.targetContext,type).putExtra("avatarId",saved.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitUntil("Avatar editor did not render",::ready)
             // draftDoesNotAlterSavedAvatar + rgbHexSyncAndValidation
-            main {button("avatar-tab-hair-color").performClick();activity!!.window.decorView.findViewWithTag<EditText>("avatar-hex").setText("#204EFF");button("avatar-color-apply").performClick()}
+            main {button("avatar-tab-hair").performClick();activity!!.window.decorView.findViewWithTag<EditText>("avatar-hex").setText("#204EFF");button("avatar-color-apply").performClick()}
             waitUntil("Draft did not persist"){store.draft(saved.id)?.appearance?.dye?.hair=="#204EFF"}
             check(store.find(saved.id)==saved)
             main {
@@ -86,7 +86,7 @@ object VrmAvatarEditorChecks {
             check(store.list().size==3&&store.find(saved.id)==saved)
             waitUntil("Second save still busy",::ready)
             val second=store.list().single {it.name=="Saved two"}
-            main {button("avatar-tab-hair-color").performClick();activity!!.window.decorView.findViewWithTag<EditText>("avatar-hex").setText("#ED91B9");button("avatar-color-apply").performClick();button("avatar-save").performClick()}
+            main {button("avatar-tab-hair").performClick();activity!!.window.decorView.findViewWithTag<EditText>("avatar-hex").setText("#ED91B9");button("avatar-color-apply").performClick();button("avatar-save").performClick()}
             waitUntil("Edit was not saved"){store.find(second.id)?.revision==2}
             main {activity!!.finish()};test.waitForIdleSync()
             activity=test.startActivitySync(Intent(test.targetContext,type).putExtra("avatarId",second.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

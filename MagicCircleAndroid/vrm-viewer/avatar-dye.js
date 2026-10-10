@@ -3,19 +3,32 @@ const BASE='ef6513de66aee3ab78b105e53b2e72c5d92834fc2a49c542221c08ec9f0811d0';
 const HAIR02='c1853aa3c22b5c3b58ba8f819c4b2c4e7bd318aeeefaa9739f7c9f3bb205a708';
 const IRIS='N00_000_00_EyeIris_00_EYE (Instance)';
 const names=['N00_000_00_HairBack_00_HAIR (Instance)',...['01','02','03'].map(n=>`N00_000_Hair_00_HAIR_${n} (Instance)`)];
-export function avatarProfile(modelId){
-  if(modelId!==BASE&&modelId!==HAIR02)throw new Error('Unverified avatar profile');
-  return {modelId,hair:modelId===BASE?names:['N00_000_Hair_00_HAIR (Instance)'],iris:IRIS};
+const hex=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+export function avatarProfile(modelId,receipt=null){
+  let original=modelId===BASE;
+  if(receipt!==null){
+    if(receipt.modelId!==modelId||receipt.baseModelId!==BASE||receipt.assemblerVersion!==1||!['e-original','e-hair02'].includes(receipt.styleId)||
+      ![modelId,receipt.partId,receipt.protectedDigest,receipt.hairDigest].every(hex)||[BASE,HAIR02,'f4df98833a830f84c6f8bcdb90701e86420bc2fe369e7936fff1cf3b0971573e'].includes(modelId))throw new Error('Unverified part receipt');
+    original=receipt.styleId==='e-original';
+  }else if(modelId!==BASE&&modelId!==HAIR02)throw new Error('Unverified avatar profile');
+  return {modelId,hair:original?names:['N00_000_Hair_00_HAIR (Instance)'],iris:IRIS,receipt};
 }
 export function normalizeDye(value){
   if(!value||typeof value!=='object')throw new Error('Invalid dye');
   const color=v=>{if(v===null)return null;if(typeof v!=='string'||!/^#[\da-f]{6}$/i.test(v))throw new Error('Invalid dye color');return v.toUpperCase();};
   return {hair:color(value.hair),iris:color(value.iris)};
 }
-export function normalizeAppearance(value){
+export function normalizeAppearance(value,receipt=null){
   if(value===null)return null;
-  if(value?.profileVersion!==1||value.baseModelId!==BASE||value.modelId!==({'e-original':BASE,'e-hair02':HAIR02})[value.hairId])throw new Error('Invalid avatar appearance');
-  avatarProfile(value.modelId);return {...value,...normalizeDye(value)};
+  if(value?.baseModelId!==BASE)throw new Error('Invalid avatar appearance');
+  if(value.profileVersion===1){
+    if(value.modelId!==({'e-original':BASE,'e-hair02':HAIR02})[value.hairId]||Object.keys(value.parts??{}).length)throw new Error('Invalid legacy appearance');
+    avatarProfile(value.modelId);
+  }else if(value.profileVersion===2){
+    if(!receipt||value.hairId!==receipt.styleId||!value.parts||Object.keys(value.parts).length!==1||value.parts.hair!==receipt.partId)throw new Error('Missing matching part proof');
+    avatarProfile(value.modelId,receipt);
+  }else throw new Error('Invalid avatar appearance');
+  return {...value,...normalizeDye(value),...(value.profileVersion===2?{parts:{hair:value.parts.hair}}:{})};
 }
 const marker='material.shadingShift = shadingShiftFactor;';
 // shortcut: pupil UV protection is specific to the two hash-verified E exports; validate masks before adding another model.
@@ -44,7 +57,7 @@ vec3 avatarRecolor(vec3 source, float protectedMask) {
 }
 `;
 export function bindAvatarDye(vrm,profile){
-  const verified=avatarProfile(profile?.modelId),materials=new Set();
+  const verified=avatarProfile(profile?.modelId,profile?.receipt??null),materials=new Set();
   vrm.scene.traverse(object=>{if(object.isMesh)for(const m of Array.isArray(object.material)?object.material:[object.material])materials.add(m);});
   const entries=[];
   for(const name of [...verified.hair,verified.iris]){

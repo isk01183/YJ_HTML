@@ -18,6 +18,7 @@ internal object VrmWebView {
     fun create(context: Context,openModel: ()->InputStream?,onFailure: (VrmFailure)->Unit,
                transparent: Boolean=false,
                initialAppearance: ()->VrmAvatarAppearance?={null},
+               initialPartReceipt: ()->VrmHairReceipt?={null},
                onPageFinished: (WebView)->Unit): WebView = WebView(context).apply {
         setBackgroundColor(if(transparent)android.graphics.Color.TRANSPARENT else 0xffeee9f3.toInt())
         settings.apply {
@@ -38,6 +39,8 @@ internal object VrmWebView {
                     "/vrm-preview/viewer.css"->response(200,"text/css",context.assets.open("vrm-preview/viewer.css"))
                     "/vrm-preview/appearance.json"->response(200,"application/json",ByteArrayInputStream(
                         (initialAppearance()?.let {VrmAvatarRules.appearanceJson(it).toString()} ?: "null").toByteArray(Charsets.UTF_8)))
+                    "/vrm-preview/part-profile.json"->response(200,"application/json",ByteArrayInputStream(
+                        (initialPartReceipt()?.toJson()?.toString() ?: "null").toByteArray(Charsets.UTF_8)))
                     "/vrm-preview/memory.json"->{
                         val manager=context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                         val memory=ActivityManager.MemoryInfo().also {manager.getMemoryInfo(it)}
