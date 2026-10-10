@@ -107,11 +107,19 @@ export function signatures(source) {
   for(let ni=0;ni<j.nodes.length;ni++) {
     const node=j.nodes[ni],{mesh:mi,skin:si,children,name,...rest}=node;
     const skin=si===undefined?null:j.skins[si];
-    const binding=skin?Object.fromEntries(skin.joints.flatMap((joint,i)=>ownership.nodes.has(joint)?[]:[[nodePath(joint),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,(i+1)*16))]])):null;
+    // Unused skin slots do not deform geometry; independent parts retain only positive influences.
+    const used=new Set();
+    if(skin&&mi!==undefined)j.meshes[mi].primitives.forEach((p,pi)=>{
+      if(hairRefs.has(`${mi}:${pi}`)!==removed.has(ni))return;
+      const joints=accessor(p.attributes.JOINTS_0),weights=accessor(p.attributes.WEIGHTS_0);
+      for(const v of new Set(accessor(p.indices)))for(let k=0;k<4;k++)if(weights[v*4+k]>0)used.add(joints[v*4+k]);
+    });
+    const bindings=skin?[...used].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,(i+1)*16))]).sort(([a],[b])=>a.localeCompare(b)):null;
+    const binding=skin?Object.fromEntries(bindings):null;
     const settings={...rest,children:(children??[]).filter(n=>!removed.has(n)).map(nodePath),binding,skeleton:skin?.skeleton===undefined?null:nodePath(skin.skeleton)};
     if(!removed.has(ni))rig[nodePath(ni)]=settings;
     else hairRig[nodePath(ni)]={...rest,children:(children??[]).map(nodePath),parent:source.parents[ni]<0?null:nodePath(source.parents[ni]),
-      binding:skin?skin.joints.map((n,i)=>[nodePath(n),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,(i+1)*16))]):null};
+      binding:bindings};
     if(mi===undefined)continue;
     j.meshes[mi].primitives.forEach((p,pi)=>{
       const key=`${nodePath(ni)} / ${j.materials[p.material].name}`;
@@ -121,7 +129,10 @@ export function signatures(source) {
       const morph=(p.targets??[]).map(target=>Object.fromEntries(Object.entries(target).map(([k,v])=>[k,values(v,vertices,skin)])));
       const {primitives,...meshSettings}=j.meshes[mi];
       const {indices,attributes:ignoredAttributes,targets,material:ignoredMaterial,...primitiveSettings}=p;
-      shapes.set(key,hash({attributes,morph,material:material(j.materials[p.material]),meshSettings,primitiveSettings}));
+      const positive=new Set(),jointValues=accessor(p.attributes.JOINTS_0),weightValues=accessor(p.attributes.WEIGHTS_0);
+      for(const v of new Set(vertices))for(let k=0;k<4;k++)if(weightValues[v*4+k]>0)positive.add(jointValues[v*4+k]);
+      const primitiveBinding=[...positive].map(i=>[nodePath(skin.joints[i]),Array.from(accessor(skin.inverseBindMatrices).subarray(i*16,i*16+16))]).sort(([a],[b])=>a.localeCompare(b));
+      shapes.set(key,hash({attributes,morph,primitiveBinding,material:material(j.materials[p.material]),meshSettings,primitiveSettings}));
       if(hairRefs.has(`${mi}:${pi}`))hair.add(key);
     });
   }

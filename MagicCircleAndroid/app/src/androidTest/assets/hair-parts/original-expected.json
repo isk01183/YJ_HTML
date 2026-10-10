@@ -1,0 +1,16 @@
+{
+  "partId": "404817d5ad543da5858019fb9fc48abc76c973624219304ee62d7373884441e2",
+  "styleId": "e-original",
+  "baseModelId": "b4258b1b3b0f59f7bdb33d09a9eca6d63fc2e409de1d46cc71c9b05dc7de02fb",
+  "sourceModelId": "b4258b1b3b0f59f7bdb33d09a9eca6d63fc2e409de1d46cc71c9b05dc7de02fb",
+  "protectedDigest": "6085033f9cb472e7f658ebf1937dffaa264b98ffa4d112505587ceea492d6eb9",
+  "hairDigest": "ddbdd02c7e5fce916808df14e894e4800c8c51c9af3ccc3f6263da543a893341",
+  "protectedPrimitiveCount": 0,
+  "anchors": [
+    "Body",
+    "hips/head"
+  ],
+  "imageHashes": [
+    "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384"
+  ]
+}
